@@ -199,6 +199,13 @@ export function secMeeting(p){
   if (!pts.length && !po.pickupOptionType && !dr.type) return null;
   const f = document.createDocumentFragment();
   f.appendChild(rows([
+    // Viator's own flag that it dropped the location off a start/end point. It is the
+    // one field in this capture that is BOTH invisible on the dashboard and actually
+    // varying — true on 29 of 743 products — so it was real signal going unread. Shown
+    // only when set, since "No" on 714 products is noise.
+    ...(p.hasStartEndPointLocationDropped
+        ? [['Start/end point location dropped by Viator', 'Yes — re-check the meeting point',
+            'product.hasStartEndPointLocationDropped']] : []),
     ['Meeting arrangement', (po.pickupOptionType||dr.type)
       ? sentence(po.pickupOptionType||dr.type) : null, 'product.pickupOption.pickupOptionType'],
     ['Ends where it starts', po.endsAtStartPoint!==undefined?po.endsAtStartPoint
