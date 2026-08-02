@@ -1,0 +1,12 @@
+# Vercel's FastAPI support: point it straight at the ASGI app.
+#
+# This replaces a catch-all rewrite in vercel.json ({"source": "/(.*)", "destination":
+# "/api/index"}). That rewrite REPLACED the request path — the function received the
+# literal "/api/index" for every request, so FastAPI matched none of its routes and
+# answered 404 to everything. Only "/" appeared to work, because public/index.html
+# satisfies the filesystem check before any rewrite runs.
+#
+# With an entrypoint declared, Vercel routes each request to the app with its ORIGINAL
+# path and the app does its own routing, which is the whole point of using a framework.
+[tool.vercel]
+entrypoint = "web:app"

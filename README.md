@@ -25,7 +25,7 @@ browser package appears in `requirements.txt`.
 ## Layout
 
 ```
-api/index.py     Vercel entry point (ASGI)
+pyproject.toml   points Vercel at the ASGI app ([tool.vercel] entrypoint)
 web.py           the application — read + edit endpoints only
 db.py            schema, queries, edit/override layer
 store.py         storage abstraction (Postgres in production)
