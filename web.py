@@ -257,11 +257,7 @@ def stats(account: str | None = None):
         #     2 products out of 743.
         # Splitting the bucket makes the chart answer "why is this blank?" on its own.
         by = lambda col: {r[0]: r[1] for r in con.execute(
-            f"""SELECT CASE WHEN p.{col} IS NULL OR p.{col}=''
-                            THEN CASE WHEN p.is_draft_stub=1 THEN 'Not captured (draft)'
-                                      ELSE 'Unknown' END
-                            ELSE p.{col} END,
-                       COUNT(*) FROM products p
+            f"""SELECT {db.blank_bucket(col)}, COUNT(*) FROM products p
                 JOIN accounts a ON a.id=p.account_id {where}
                 GROUP BY 1 ORDER BY 2 DESC""", args)}
         totals = con.execute(
@@ -355,8 +351,10 @@ def overview(account: str | None = None):
           return round((now_v - prev_v) / prev_v * 100, 1)
 
       if True:
+        # SAME bucketing as /api/stats — see db.blank_bucket(). This one still said
+        # 'Unknown', so the Dashboard and the Breakdown page disagreed about the same rows.
         by = lambda col: {r[0]: r[1] for r in con.execute(
-            f"""SELECT COALESCE(p.{col},'Unknown'), COUNT(*) {P}
+            f"""SELECT {db.blank_bucket(col)}, COUNT(*) {P}
                 GROUP BY 1 ORDER BY 2 DESC""", args)}
         dist = {"status": by("status_canonical"), "connection": by("connection_state"),
                 "quality": by("quality_level"), "location": dict(

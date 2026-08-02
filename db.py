@@ -745,6 +745,28 @@ def report_by_employee_type(con, since=None, until=None):
         ORDER BY employee, payable DESC""", args)]
 
 
+
+def blank_bucket(col, alias="p"):
+    """SQL that labels a missing value by WHY it is missing, not just that it is.
+
+    A blank means two different things and lumping them together made a deliberate design
+    decision look like a data fault:
+      * on a DRAFT it means "not captured" — drafts are recorded from the roster and never
+        deep-fetched, and the roster carries no location at all and only partial
+        connection detail. That is 169 of 374 drafts with no location.
+      * on anything else it really is unknown: the portal itself had no value. Two
+        products out of 743.
+
+    Lives here rather than in each endpoint because /api/stats and /api/overview both
+    group by these columns, and fixing one and not the other is exactly what happened:
+    the Breakdown page said "Not captured (draft)" while the Dashboard still said
+    "Unknown" for the same rows.
+    """
+    return (f"CASE WHEN {alias}.{col} IS NULL OR {alias}.{col}=''"
+            f" THEN CASE WHEN {alias}.is_draft_stub=1 THEN 'Not captured (draft)'"
+            f" ELSE 'Unknown' END"
+            f" ELSE {alias}.{col} END")
+
 def platform_matrix(con, account=None, q=None):
     """One row per tour, one column per platform, with the canonical status — and
     NOT_LISTED derived for platforms where no listing exists. That derivation is why a

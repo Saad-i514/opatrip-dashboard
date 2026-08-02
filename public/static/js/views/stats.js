@@ -131,6 +131,19 @@ export async function viewStats(){
   r2.appendChild(bars('Quality', o.dist.quality, qualBadge));
   r2.appendChild(bars('Top locations', o.dist.location));
   v.appendChild(r2);
+  // Same note as the Breakdown page: "Not captured (draft)" is a rule being followed,
+  // not data going missing, and saying so here stops the question being asked twice.
+  const drafty = ['connection','quality','location']
+    .reduce((n,k)=>n+((o.dist[k]||{})['Not captured (draft)']||0), 0);
+  if (drafty){
+    const note = el('div','hint');
+    note.style.marginTop = '12px';
+    note.innerHTML = '<b>“Not captured (draft)”</b> is not missing data. Drafts are '
+      + 'recorded from the account roster and deliberately never deep-fetched, so the '
+      + 'roster’s gaps show here; the fields fill in once a draft goes live. '
+      + '<b>“Unknown”</b> means the portal itself had no value.';
+    v.appendChild(note);
+  }
 
   // recent activity feed
   const r3 = el('div','chartwrap'); r3.style.marginTop='16px';
