@@ -20,8 +20,8 @@ export function automationNotice(){
   host.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.innerHTML = `<div class="scrim"></div>
-    <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="anTitle">
-      <div class="an-badge">Runs on your laptop, not here</div>
+    <div class="modal wide an-modal" role="dialog" aria-modal="true" aria-labelledby="anTitle">
+      <div class="an-badge">● Runs on your laptop, not here</div>
       <h2 id="anTitle" style="font-size:19px;margin:10px 0 8px">
         Fetching data is done with the Automation Tool</h2>
       <p class="an-body">
@@ -68,7 +68,13 @@ export function installReadOnly(){
     b.onclick = automationNotice;
     b.title = `Captures run on your laptop — click for ${OWNER.name}'s details`;
   }
+  // Keep it reading "limit". Replacing the placeholder with "n/a" turned a label into
+  // a shrug — it told you the box was dead without saying what the box was.
   const lim = $('#limit');
-  if (lim){ lim.disabled = true; lim.placeholder = 'n/a'; lim.title =
-    'The product limit applies to a capture run, which happens on your laptop.'; }
+  if (lim){
+    lim.disabled = true;
+    lim.placeholder = 'limit';
+    lim.title = 'A product limit applies to a capture run, and captures happen on your '
+              + 'laptop with the Automation Tool.';
+  }
 }

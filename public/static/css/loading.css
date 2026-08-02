@@ -36,8 +36,15 @@
   border-radius:99px;transition:width .5s ease}
 .pstats{display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:#7C2D12}
 .pstats b{font-variant-numeric:tabular-nums}
+/* A dialog carries its OWN surface. It used to have only position and shadow, so every
+   caller had to remember to add .card as well — and a dialog that forgot it rendered
+   transparent, with the page showing straight through the text. Putting the background
+   here makes that impossible to get wrong; .card on top is harmless, it sets the same
+   three properties. */
 .modal{position:fixed;z-index:50;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:min(520px,94vw);padding:24px 26px;box-shadow:0 18px 54px rgba(28,25,23,.24)}
+  width:min(520px,94vw);padding:24px 26px;
+  background:var(--surface);border:1px solid var(--line);border-radius:16px;
+  box-shadow:0 24px 64px rgba(28,25,23,.26),0 3px 10px rgba(28,25,23,.10)}
 .fl{display:block;margin-bottom:17px;font-weight:600;font-size:13.5px}
 .fl input,.fl select{display:block;width:100%;margin-top:7px;font-weight:400}
 .fl .hint{display:block;margin-top:6px;font-weight:400}

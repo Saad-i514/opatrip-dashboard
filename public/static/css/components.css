@@ -284,13 +284,19 @@ tbody tr:hover{background:var(--surface-2)}
 .rows.editable:hover .penbtn{opacity:.8}
 
 /* ---------- automation notice (deployed, read-only build) ---------- */
-.an-badge{display:inline-block;background:var(--accent-soft);color:#9A3412;
-  border:1px solid var(--accent-line);border-radius:99px;padding:4px 11px;
+/* The notice reads as a friendly explanation, not an error: a warm accent band along the
+   top, the badge, then the message. It sits on .modal's own surface. */
+.an-modal{padding-top:26px;overflow:hidden}
+.an-modal::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;
+  background:linear-gradient(90deg,#FB923C,#EA580C)}
+.an-badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);
+  color:#9A3412;border:1px solid var(--accent-line);border-radius:99px;padding:5px 12px;
   font-size:11.5px;font-weight:700;letter-spacing:.02em}
-.an-body{color:var(--ink-2);font-size:14px;line-height:1.65;margin:0 0 12px}
+.an-body{color:var(--ink-2);font-size:14.5px;line-height:1.7;margin:0 0 13px}
 .an-body a{color:var(--accent);font-weight:600}
 .an-why{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
-  padding:12px 14px;font-size:13px;line-height:1.6;color:var(--ink-2)}
+  padding:13px 15px;font-size:13px;line-height:1.6;color:var(--ink-2)}
+.an-why b{color:var(--ink)}
 /* the capture controls stay visible and clickable — they explain, they don't fail */
 #btnFetch,#btnStop,#btnAdd{cursor:pointer}
 #limit:disabled{opacity:.5;cursor:not-allowed}
