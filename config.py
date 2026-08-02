@@ -54,6 +54,18 @@ TASK_TYPES = [
     ("AUDIT_SYNC",       "Audit sync run",         0.00),
 ]
 
+# How many snapshots to keep per product. A snapshot is a full ~11 kB copy; the audit
+# trail itself lives in `changes`, one small row per field that moved. So the copies in
+# the middle are an expensive second recording of something already written down.
+#
+# 2 = the original (what it looked like first) + the latest (what it looks like now, and
+# the baseline the next sync diffs against). Once a product has that many, a change
+# updates the newest row in place instead of adding another — so a product edited fifteen
+# times a day costs fifteen small change rows, not fifteen 11 kB copies.
+#
+# Raise it if you ever want more depth; nothing else needs to change.
+SNAPSHOT_HISTORY = 2
+
 # --- change-detection noise control (used when rendering stored snapshots) -----
 VOLATILE_PREFIXES = (
     "_capture",
