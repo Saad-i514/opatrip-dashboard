@@ -244,13 +244,24 @@ export function statusBadge(s){
 }
 export const connBadge = c => !c ? '' :
   `<span class="badge ${c==='Connected'?'b-conn':c==='Not connected'?'b-noconn':'b-pending'}">${esc(c)}</span>`;
+/* Viator's own quality ratings. Anything NOT in this table is not a rating and must
+   never be painted as a quality failure — the old version tested `q === 'GOOD'` and sent
+   everything else to "Needs work", which mislabelled two things at once:
+     * EXCELLENT (better than GOOD) was reported as "Needs work";
+     * the Breakdown chart's own bucket label for un-rated drafts landed there too, so
+       "Needs work" appeared three separate times on one chart.
+   Unrecognised values now render as themselves, in neutral styling, which also means a
+   new Viator rating shows up honestly instead of being called a failure. */
+export const QUALITY = {
+  EXCELLENT:    ['Excellent',    'b-good'],
+  GOOD:         ['Good quality', 'b-good'],
+  UNACCEPTABLE: ['Needs work',   'b-bad'],
+};
 export const qualBadge = q => {
   if (!q) return '';
-  // 'Unknown' means Viator hasn't rated it (drafts) — calling that "Needs work" would
-  // report a quality failure that doesn't exist.
-  if (q === 'Unknown') return '<span class="badge b-draft">Not rated</span>';
-  return `<span class="badge ${q==='GOOD'?'b-good':'b-bad'}">${
-    q==='GOOD'?'Good quality':'Needs work'}</span>`;
+  const hit = QUALITY[String(q).toUpperCase()];
+  return hit ? `<span class="badge ${hit[1]}">${hit[0]}</span>`
+             : `<span class="badge b-draft">${esc(q)}</span>`;
 };
 
 /* Timestamps are stored as ISO strings that ALREADY carry an offset ("…T03:59:03+00:00").
