@@ -1,0 +1,296 @@
+/* ---------- KPI cards ---------- */
+.kpis{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  margin-bottom:20px}
+/* auto-fit orphans the last card whenever the count isn't a multiple of what fits — the
+   "stairs". Pin the column count to a divisor of the card count instead. k6 = 6 cards,
+   k4 = 4; every breakpoint below is also a divisor, so a row is never left ragged. */
+.kpis.k6{grid-template-columns:repeat(6,minmax(0,1fr))}
+.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1500px){.kpis.k6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1100px){.kpis.k6,.kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.kpis.k6,.kpis.k4{grid-template-columns:minmax(0,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:16px 18px 10px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi .row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.kpi .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+  font-size:16px}
+.kpi .chip{font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:99px}
+.chip-up{background:var(--green-bg);color:var(--green)}
+.chip-dn{background:var(--red-bg);color:var(--red)}
+.chip-flat{background:var(--surface-2);color:var(--ink-3)}
+.kpi .n{font-size:28px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--ink-2);font-size:13.5px;font-weight:500;margin-top:1px}
+.kpi .s{color:var(--ink-3);font-size:12px;margin-top:3px}
+.kpi svg.spark{display:block;width:100%;height:36px;margin-top:8px}
+
+/* ---------- charts ---------- */
+.chartwrap{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px}
+.legend div{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-2)}
+.legend i{width:10px;height:10px;border-radius:3px;display:block}
+.stack{display:flex;height:26px;border-radius:7px;overflow:hidden;background:var(--surface-2)}
+.stack span{display:block;height:100%}
+.covrow{display:grid;grid-template-columns:130px 1fr 60px;gap:12px;align-items:center;
+  margin:12px 0}
+.feed{display:grid;gap:10px}
+.feeditem{display:grid;grid-template-columns:34px 1fr auto;gap:11px;align-items:start;
+  padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}
+.feeditem .dot3{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);font-size:14px}
+
+/* ---------- controls ---------- */
+select,input[type=text],input[type=email]{background:var(--surface);
+  border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;color:var(--ink);
+  outline:none;min-width:0}
+select:focus,input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.btn{background:var(--surface);border:1px solid var(--line-2);border-radius:9px;
+  padding:8px 15px;cursor:pointer;font-weight:500;color:var(--ink);
+  box-shadow:var(--shadow);white-space:nowrap;transition:.13s}
+.btn:hover{border-color:var(--ink-3)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent;box-shadow:none;border-color:transparent;color:var(--ink-2)}
+.btn.ghost:hover{background:var(--surface-2);border-color:var(--line-2)}
+.btn.sm{padding:5px 11px;font-size:13px}
+
+/* ---------- nav ---------- */
+nav.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:4px 0 22px;
+  overflow-x:auto}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;
+  padding:11px 16px;cursor:pointer;color:var(--ink-2);font-weight:500;white-space:nowrap}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow)}
+.pad{padding:18px 20px}
+.card-h{display:flex;align-items:center;gap:10px;padding:14px 20px;
+  border-bottom:1px solid var(--line)}
+.card-h h3{font-size:14px}
+.card-h .sub{color:var(--ink-3);font-size:13px;font-weight:400}
+.grid2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+
+/* ---------- stat tiles ---------- */
+.tiles{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));
+  margin-bottom:20px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px 18px;box-shadow:var(--shadow)}
+.tile .l{color:var(--ink-3);font-size:12px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.05em}
+.tile .n{font-size:27px;font-weight:700;letter-spacing:-.025em;margin-top:5px;
+  font-variant-numeric:tabular-nums}
+.tile .s{color:var(--ink-3);font-size:12.5px;margin-top:2px}
+
+/* ---------- bars ---------- */
+.bar{margin:11px 0}
+.bar-top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.bar-top .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.bar-top .vl{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-2)}
+.track{height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+.fill{height:100%;background:var(--accent);border-radius:99px;transition:width .3s}
+
+/* ---------- badges ---------- */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;
+  font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.b-active{background:var(--green-bg);color:var(--green)}
+.b-draft{background:var(--surface-2);color:var(--ink-2)}
+.b-pending{background:var(--amber-bg);color:var(--amber)}
+.b-rejected{background:var(--red-bg);color:var(--red)}
+.b-conn{background:var(--blue-bg);color:var(--blue)}
+.b-noconn{background:var(--surface-2);color:var(--ink-3)}
+.b-good{background:var(--green-bg);color:var(--green)}
+.b-bad{background:var(--red-bg);color:var(--red)}
+.b-stub{background:var(--accent-soft);color:#9A3412;border-color:var(--accent-line)}
+
+/* ---------- product list ---------- */
+.filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.plist{display:grid;gap:11px}
+.prow{display:grid;grid-template-columns:72px 1fr auto;gap:16px;align-items:center;
+  padding:13px 16px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);cursor:pointer;transition:.13s;box-shadow:var(--shadow)}
+.prow:hover{border-color:var(--accent-line);box-shadow:0 3px 14px rgba(249,115,22,.1)}
+.thumb{width:72px;height:54px;border-radius:9px;object-fit:cover;background:var(--surface-2);
+  display:block}
+.thumb.ph{display:grid;place-items:center;color:var(--ink-3);font-size:11px}
+.ptitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pmeta{color:var(--ink-3);font-size:13px;margin-top:3px;display:flex;gap:7px;flex-wrap:wrap}
+.pbadges{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;
+  max-width:340px}
+
+/* ---------- drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(28,25,23,.38);backdrop-filter:blur(3px);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(940px,97vw);background:var(--bg);
+  z-index:41;overflow:auto;border-left:1px solid var(--line);
+  box-shadow:-10px 0 40px rgba(28,25,23,.15)}
+.dhead{position:sticky;top:0;z-index:2;background:rgba(250,248,245,.95);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:18px 22px}
+.dhead-top{display:flex;gap:16px;align-items:flex-start}
+.dhead img{width:96px;height:72px;border-radius:10px;object-fit:cover;
+  background:var(--surface-2);flex:none}
+.dbody{padding:20px 22px 70px;display:grid;gap:18px}
+.gal{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.gal a{display:block;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.gal img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;transition:.2s}
+.gal a:hover img{transform:scale(1.04)}
+
+/* ---------- readable field rows ---------- */
+.rows{display:grid;grid-template-columns:minmax(150px,34%) 1fr;gap:0}
+.rows>div{padding:10px 2px;border-bottom:1px solid var(--line);min-width:0}
+.rows>div:nth-last-child(-n+2){border-bottom:0}
+.rows .k{color:var(--ink-3);font-size:13.5px;font-weight:500}
+.rows .v{overflow-wrap:anywhere}
+.rows .v.num{font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;
+  padding:2px 9px;font-size:13px}
+ul.plain{margin:0;padding-left:19px}
+ul.plain li{margin:3px 0}
+.yes{color:var(--green);font-weight:600}
+.no{color:var(--ink-3)}
+.subhead{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--ink-3);margin:18px 0 6px;padding-top:14px;border-top:1px solid var(--line)}
+.subhead:first-child{margin-top:0;padding-top:0;border-top:0}
+
+/* ---------- per-product section tabs ---------- */
+.tabstrip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.tabbtn{background:var(--surface);border:1px solid var(--line-2);border-radius:99px;
+  padding:6px 14px;cursor:pointer;font-size:13.5px;font-weight:500;color:var(--ink-2)}
+.tabbtn:hover{border-color:var(--ink-3);color:var(--ink)}
+.tabbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ---------- tables ---------- */
+.tblwrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--ink-3);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);
+  white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--surface-2)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.old{color:var(--red);text-decoration:line-through;opacity:.75}
+.new{color:var(--green);font-weight:500}
+/* Full value + copy button. Capped in height rather than truncated: the whole point is
+   that the previous value can be read and recovered, and a 700-character description
+   would otherwise make one table row taller than the screen. */
+/* A value cell is a PREVIEW that opens the whole value on click. A table column is far
+   too narrow to ever show a 700-character description in place, so the cell stays short
+   and the popup does the reading. */
+.valcell{display:block;cursor:pointer;border-radius:7px;padding:4px 6px;margin:-4px -6px;
+  font-size:12.5px;line-height:1.5;word-break:break-word;transition:background .12s}
+.valcell:hover{background:var(--accent-soft);outline:1px solid var(--accent-line)}
+.valcell:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.valcell.vc-old .vc-prev{color:var(--red);opacity:.85}
+.vc-more{display:block;margin-top:3px;font-size:11px;color:var(--accent);font-weight:600}
+/* the full value, inside the dialog */
+.fullval{white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.65;
+  max-height:58vh;overflow:auto;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:10px;padding:14px 16px;user-select:text}
+.arrow{color:var(--ink-3);padding:0 5px}
+
+/* ---------- misc ---------- */
+.pill{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:99px;
+  background:var(--surface);border:1px solid var(--line-2);font-size:13px;font-weight:500}
+.pill .dot2{width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
+.pill.run .dot2{background:var(--accent);animation:pulse 1.1s infinite}
+.pill.done .dot2{background:var(--green)}
+.pill.err .dot2{background:var(--red)}
+@keyframes pulse{50%{opacity:.25}}
+.logbox{background:#1C1917;color:#E7E5E4;border-radius:var(--r);padding:14px 16px;
+  font-family:ui-monospace,Menlo,monospace;font-size:12px;max-height:340px;overflow:auto;
+  line-height:1.7}
+.logbox b{color:var(--accent);font-weight:500}
+.empty{text-align:center;color:var(--ink-3);padding:52px 24px}
+.empty .big{font-size:17px;color:var(--ink-2);margin-bottom:6px;font-weight:500}
+.banner{background:var(--accent-soft);border:1px solid var(--accent-line);color:#7C2D12;
+  border-radius:var(--r);padding:13px 16px;font-weight:500}
+.hint{color:var(--ink-3);font-size:13px}
+.hidden{display:none!important}
+
+
+/* ---------- editable field grid ----------
+   Three FIXED columns: label | value | action. The old markup put the Edit button
+   immediately after the value text, so each button started wherever its text happened to
+   end — a ragged staircase down the panel. A grid column pins every button to the same
+   x-position regardless of how long the value is. */
+.editgrid{display:grid;grid-template-columns:minmax(150px,190px) 1fr auto;
+  align-items:start;gap:0}
+.editgrid>*{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);min-width:0}
+.editgrid>.act{padding-right:0;justify-self:end;align-self:center}
+.editgrid>*:nth-last-child(-n+3){border-bottom:0}
+.editgrid .k{color:var(--ink-3);font-size:13.5px;font-weight:500;line-height:1.5}
+.editgrid .v{overflow-wrap:anywhere;line-height:1.5}
+.editgrid .v .was{display:block;margin-top:4px;font-size:12.5px;color:var(--ink-3)}
+.editgrid .empty-v{color:var(--ink-3)}
+.grouphead{grid-column:1/-1;padding:16px 0 7px;font-size:11.5px;font-weight:700;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);
+  border-bottom:1px solid var(--line)}
+.grouphead:first-child{padding-top:0}
+
+/* consistent alignment for the plain label/value rows too */
+.rows{align-items:start}
+.rows>.k{line-height:1.5}
+
+.btn.danger{background:var(--red);border-color:var(--red);color:#fff}
+.btn.danger:hover{filter:brightness(1.08)}
+
+/* ---------- photo manager ---------- */
+.photogrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.photo{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--surface);
+  position:relative;display:flex;flex-direction:column}
+.photo img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.photo .meta{padding:8px 10px;font-size:12px;color:var(--ink-3);flex:1}
+.photo .tag{position:absolute;top:8px;left:8px;font-size:10.5px;font-weight:700;
+  padding:3px 8px;border-radius:99px;background:rgba(28,25,23,.72);color:#fff;
+  letter-spacing:.03em}
+.photo .rm{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;
+  border:0;background:rgba(28,25,23,.72);color:#fff;cursor:pointer;font-size:15px;
+  line-height:1;display:grid;place-items:center}
+.photo .rm:hover{background:var(--red)}
+.dropzone{border:2px dashed var(--line-2);border-radius:11px;padding:26px 18px;
+  text-align:center;color:var(--ink-3);cursor:pointer;transition:.15s;font-size:13.5px}
+.dropzone:hover,.dropzone.over{border-color:var(--accent);background:var(--accent-soft);
+  color:#9A3412}
+
+/* ---------- form grid inside the edit-all modal ---------- */
+.formgrid{display:grid;gap:14px}
+.formgrid label{display:block;font-weight:600;font-size:13px;color:var(--ink-2)}
+.formgrid input,.formgrid select,.formgrid textarea{display:block;width:100%;margin-top:6px;
+  font:inherit;font-weight:400;padding:8px 11px;border:1px solid var(--line-2);
+  border-radius:9px;background:var(--surface);color:var(--ink);outline:none}
+.formgrid textarea{resize:vertical;min-height:74px}
+.formgrid input:focus,.formgrid select:focus,.formgrid textarea:focus{
+  border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.modal.wide{width:min(720px,96vw);max-height:88vh;overflow:auto}
+.changed-dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--accent);margin-left:6px;vertical-align:middle}
+
+/* ---------- inline field editing ----------
+   A third grid column holds the pen. It is a column, not an inline button after the text,
+   so every pen sits at the same x-position however long the value is. */
+.rows.editable{grid-template-columns:minmax(150px,32%) 1fr 42px}
+.rows.editable>div{padding:10px 2px;border-bottom:1px solid var(--line)}
+.rows.editable>div:nth-last-child(-n+3){border-bottom:0}
+.rows.editable>.act{padding:8px 0 8px 8px;justify-self:end;align-self:start}
+.rows .v .was{display:block;margin-top:3px;font-size:12px;color:var(--ink-3)}
+.penbtn{width:30px;height:30px;border-radius:8px;border:1px solid transparent;
+  background:none;color:var(--ink-3);cursor:pointer;font-size:14px;line-height:1;
+  display:grid;place-items:center;transition:.12s;opacity:.45}
+.rows.editable>div:hover~.act .penbtn,.penbtn:hover,.penbtn:focus-visible{opacity:1}
+.penbtn:hover{background:var(--accent-soft);border-color:var(--accent-line);
+  color:var(--accent)}
+.rows.editable:hover .penbtn{opacity:.8}
+
+/* ---------- automation notice (deployed, read-only build) ---------- */
+.an-badge{display:inline-block;background:var(--accent-soft);color:#9A3412;
+  border:1px solid var(--accent-line);border-radius:99px;padding:4px 11px;
+  font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.an-body{color:var(--ink-2);font-size:14px;line-height:1.65;margin:0 0 12px}
+.an-body a{color:var(--accent);font-weight:600}
+.an-why{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+  padding:12px 14px;font-size:13px;line-height:1.6;color:var(--ink-2)}
+/* the capture controls stay visible and clickable — they explain, they don't fail */
+#btnFetch,#btnStop,#btnAdd{cursor:pointer}
+#limit:disabled{opacity:.5;cursor:not-allowed}

@@ -1,0 +1,14 @@
+# Secrets never enter the repository. On Vercel these are project environment variables;
+# locally they come from a .env you create yourself (see README).
+.env
+.env.*
+*.db
+*.db-shm
+*.db-wal
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.vercel/
+.DS_Store

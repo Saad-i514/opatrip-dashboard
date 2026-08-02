@@ -1,0 +1,68 @@
+/* ---------- loading ----------
+   Data now lives in Supabase (another continent), so a request takes a noticeable moment.
+   Every one of these states names WHAT is loading and from WHERE, rather than showing an
+   anonymous spinner that leaves you wondering whether the app has hung. */
+#loadbar{position:fixed;top:0;left:0;height:3px;width:0;z-index:99;
+  background:linear-gradient(90deg,#FB923C,#EA580C);transition:width .25s ease,opacity .4s;
+  box-shadow:0 0 10px rgba(234,88,12,.6)}
+.loadchip{position:fixed;right:18px;bottom:18px;z-index:98;display:flex;align-items:center;
+  gap:10px;background:var(--ink);color:#fff;border-radius:11px;padding:10px 15px;
+  font-size:13px;box-shadow:0 8px 26px rgba(28,25,23,.3);max-width:340px}
+.loadchip .sp{width:15px;height:15px;border-radius:50%;flex:none;
+  border:2px solid rgba(255,255,255,.28);border-top-color:#FB923C;
+  animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loadchip .src{opacity:.6;font-size:11.5px}
+@keyframes shimmer{100%{background-position:200% 0}}
+.sk{background:linear-gradient(90deg,var(--surface-2) 25%,#EFE9E1 50%,var(--surface-2) 75%);
+  background-size:200% 100%;animation:shimmer 1.3s infinite;border-radius:7px;
+  display:block}
+.sk-line{height:12px;margin:9px 0}
+.sk-title{height:17px;width:42%;margin-bottom:14px}
+.skcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:18px 20px;box-shadow:var(--shadow)}
+.loading-note{display:flex;align-items:center;gap:9px;color:var(--ink-3);font-size:13px;
+  padding:10px 0}
+.loading-note .sp{width:13px;height:13px;border-radius:50%;flex:none;
+  border:2px solid var(--line-2);border-top-color:var(--accent);
+  animation:spin .7s linear infinite}
+
+/* ---------- sync progress ---------- */
+.syncbox{background:linear-gradient(135deg,#FFF7ED,#FFEDD5);border:1px solid var(--accent-line);
+  border-radius:14px;padding:16px 18px;margin-bottom:18px}
+.pbar{height:9px;background:rgba(234,88,12,.16);border-radius:99px;overflow:hidden;
+  margin:11px 0 8px}
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,#FB923C,#EA580C);
+  border-radius:99px;transition:width .5s ease}
+.pstats{display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:#7C2D12}
+.pstats b{font-variant-numeric:tabular-nums}
+.modal{position:fixed;z-index:50;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(520px,94vw);padding:24px 26px;box-shadow:0 18px 54px rgba(28,25,23,.24)}
+.fl{display:block;margin-bottom:17px;font-weight:600;font-size:13.5px}
+.fl input,.fl select{display:block;width:100%;margin-top:7px;font-weight:400}
+.fl .hint{display:block;margin-top:6px;font-weight:400}
+.sessbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);
+  border:1px solid var(--accent-line);border-radius:var(--r);padding:12px 16px;
+  margin-bottom:18px;box-shadow:var(--shadow)}
+
+/* ---------- toasts ---------- */
+.toasthost{position:fixed;right:18px;bottom:18px;z-index:120;display:flex;
+  flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:flex-start;gap:11px;min-width:280px;
+  max-width:400px;background:var(--surface);border:1px solid var(--line-2);
+  border-left:4px solid var(--ink-3);border-radius:11px;padding:12px 14px;
+  box-shadow:0 10px 30px rgba(28,25,23,.18);opacity:0;transform:translateY(10px);
+  transition:opacity .2s ease,transform .2s ease}
+.toast.in{opacity:1;transform:translateY(0)}
+.toast .tico{width:21px;height:21px;border-radius:50%;flex:none;display:grid;
+  place-items:center;font-size:12px;font-weight:700;color:#fff;background:var(--ink-3)}
+.toast .tmsg{font-weight:600;font-size:13.5px;line-height:1.4}
+.toast .tdet{color:var(--ink-3);font-size:12.5px;margin-top:3px;line-height:1.45}
+.toast .tact{background:none;border:0;color:var(--accent);font-weight:600;cursor:pointer;
+  font-size:13px;padding:0 2px;white-space:nowrap;align-self:center}
+.toast .tx{background:none;border:0;color:var(--ink-3);cursor:pointer;font-size:17px;
+  line-height:1;padding:0 2px;align-self:flex-start}
+.toast.t-ok{border-left-color:var(--green)}   .toast.t-ok .tico{background:var(--green)}
+.toast.t-err{border-left-color:var(--red)}    .toast.t-err .tico{background:var(--red)}
+.toast.t-warn{border-left-color:var(--amber)} .toast.t-warn .tico{background:var(--amber)}
+.toast.t-info{border-left-color:var(--blue)}  .toast.t-info .tico{background:var(--blue)}

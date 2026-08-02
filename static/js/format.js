@@ -1,0 +1,269 @@
+import { el, esc, q } from './core.js';
+import { when } from './views/drawer.js';
+import { go } from './app.js';
+
+/* ======================= value formatting =======================
+   The capture stores the portal's raw JSON. Everything below turns that into plain
+   English: CONSTANT_CASE -> "Sentence case", camelCase keys -> spaced labels, booleans
+   -> Yes/No, 10:00:00 -> 10:00 AM, minutes -> 2h 30m. Unknown fields still render, just
+   with a derived label, so nothing is hidden when the portal adds something new.        */
+export const words = s => String(s)
+  .replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ')
+  .replace(/\s+/g,' ').trim();
+export const sentence = s => { s = words(s).toLowerCase();
+  return s.charAt(0).toUpperCase()+s.slice(1); };
+export const LABELS = {
+  productCode:'Product code', localizedViatorUrl:'Public page', briefDescription:'Description',
+  isActive:'Active', durationInMinutes:'Duration', privateTour:'Private tour',
+  isCustomizable:'Customizable', skipTheLine:'Skip the line', productItineraryType:'Itinerary type',
+  bookingCutoffType:'Cut-off measured from', bookingCutoffInHours:'Cut-off',
+  confirmationType:'Confirmation', isSendNotificationForEachBooking:'Email me every booking',
+  ticketType:'Ticket format', ticketsPerBooking:'Tickets per booking',
+  exchangePoint:'Exchange point', barcodeType:'Barcode format',
+  showBarcodeOnTicket:'Show barcode on ticket', specialInstructions:'Special instructions',
+  supplierProductCode:'Your system’s product code', priceUnit:'Priced per',
+  priceUnitType:'Price unit type', pickupOptionType:'Pickup', endsAtStartPoint:'Ends where it starts',
+  isPickupOfferedAndOptional:'Pickup optional', baseMargin:'Commission',
+  minimumAge:'Minimum age', maximumAge:'Maximum age', isUsed:'In use',
+  totalReviewCount:'Reviews', performanceStatus:'Performance', quality_level:'Quality',
+  commission_percent:'Commission', isHumanGuideCertified:'Guide certified',
+  isHumanGuideDriver:'Guide is the driver', startDate:'From', endDate:'To',
+  timeZone:'Time zone', isAutoExtended:'Auto-extends', displayText:'Detail',
+};
+export const label = k => LABELS[k] || words(k).replace(/^./,c=>c.toUpperCase());
+
+export function fmtTime(v){
+  const m = /^(\d{2}):(\d{2})(:\d{2})?$/.exec(String(v)); if(!m) return null;
+  let h = +m[1]; const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12;
+  return `${h}:${m[2]} ${ap}`;
+}
+export function fmtDate(v){
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v)); if(!m) return null;
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${+m[3]} ${M[+m[2]-1]} ${m[1]}`;
+}
+export function fmtDuration(min){
+  min = Number(min); if(!isFinite(min)||min<=0) return null;
+  const h = Math.floor(min/60), m = min%60;
+  return h ? (m ? `${h}h ${m}m` : `${h} hour${h>1?'s':''}`) : `${m} min`;
+}
+export function fmtVal(v, key){
+  if (v === null || v === undefined || v === '') return '<span class="hint">—</span>';
+  if (typeof v === 'boolean') return v ? '<span class="yes">Yes</span>'
+                                       : '<span class="no">No</span>';
+  if (typeof v === 'number'){
+    if (/margin|commission|percent/i.test(key||'')) return esc(v)+'%';
+    if (/hours?$/i.test(key||'')) return esc(v)+(v===1?' hour':' hours');
+    if (/durationInMinutes/i.test(key||'')) return esc(fmtDuration(v)||v);
+    return esc(v);
+  }
+  const s = String(v);
+  if (/^https?:\/\//.test(s))
+    return `<a href="${esc(s)}" target="_blank" rel="noopener">${esc(
+      s.length>52 ? s.slice(0,52)+'…' : s)}</a>`;
+  return esc(fmtTime(s) || fmtDate(s) ||
+    (/^[A-Z][A-Z0-9_]{2,}$/.test(s) ? sentence(s) : s));
+}
+
+/* rows(obj) — aligned label/value pairs, skipping empties and nested noise */
+/* ---------- inline editing context ----------
+   sections.js is pure rendering and knows nothing about products or the API. Rather than
+   thread a product id through fifteen section functions, the drawer sets the context once
+   before it builds them. */
+let EDITCTX = null;
+export function setEditContext(ctx){ EDITCTX = ctx; }
+export function editContext(){ return EDITCTX; }
+
+/** Read a dotted path out of the captured snapshot. */
+export function getPath(obj, path){
+  let cur = obj;
+  for (const part of String(path).split('.')){
+    if (cur == null) return undefined;
+    cur = cur[part];
+  }
+  return cur;
+}
+
+/* rows(pairs) — aligned label / value / edit triples.
+
+   A pair is [label, displayValue] or [label, displayValue, snapshotPath]. Where a path is
+   given AND an edit context is active, the row gets a pen button in a THIRD grid column,
+   so every pen lines up vertically no matter how long the values are.
+
+   Rows carrying a path are rendered even when empty: that is what makes information
+   possible to ADD, not just correct. */
+export function rows(pairs){
+  const ctx = EDITCTX;
+  const editable = !!ctx && pairs.some(p => Array.isArray(p) && p.length > 2 && p[2]);
+  const wrap = el('div', editable ? 'rows editable' : 'rows');
+  let any = false;
+  pairs.forEach(entry => {
+    const [k, v, path] = entry;
+    const ed = (ctx && path) ? (ctx.edits || {})[path] : null;
+    const blank = v === undefined || v === null || v === ''
+                  || (Array.isArray(v) && !v.length);
+    if (blank && !ed && !(editable && path)) return;
+    any = true;
+    const text = typeof k === 'string' ? label(k) : k;
+    wrap.appendChild(el('div','k', esc(text)));
+    const cell = el('div','v');
+    if (ed){
+      // a manual override wins the display, and says so
+      cell.innerHTML = (ed.value == null || ed.value === '')
+        ? '<span class="hint">—</span>' : esc(ed.value);
+      cell.innerHTML += ' <span class="badge b-stub">edited</span>'
+        + `<span class="was">by ${esc(ed.editor_email)}`
+        + (ed.captured_value != null
+           ? ` · Viator had: <span class="old">${esc(String(ed.captured_value).slice(0,70))}</span>`
+           : '') + '</span>';
+    } else if (blank){
+      cell.innerHTML = '<span class="hint">Not set</span>';
+    // Primitives go through fmtVal so a boolean shows as Yes/No rather than "false";
+    // strings are already-built HTML (chips, lists, links) and pass through untouched.
+    } else if (v instanceof Node) cell.appendChild(v);
+    else if (typeof v === 'boolean' || typeof v === 'number') cell.innerHTML = fmtVal(v, k);
+    else cell.innerHTML = v;
+    wrap.appendChild(cell);
+    if (editable){
+      const act = el('div','act');
+      if (path){
+        const b = el('button','penbtn');
+        b.innerHTML = '&#9998;';                 // pencil
+        b.title = `Edit ${text}`;
+        b.setAttribute('aria-label', `Edit ${text}`);
+        b.dataset.path = path;
+        b.onclick = () => ctx.edit({
+          path, label: text,
+          value: ed ? ed.value : getPath(ctx.snapshot, path)});
+        act.appendChild(b);
+      }
+      wrap.appendChild(act);      // always appended, so the grid stays aligned
+    }
+  });
+  return any ? wrap : null;
+}
+/* A value someone may need to READ IN FULL and copy — what Viator had before a manual
+   edit, or the old side of a change. A table column is ~130px wide, so no amount of
+   in-cell wrapping shows a 700-character description: the cell stays a preview, and
+   CLICKING it opens the whole value with a Copy button.
+   `tone`: 'old' colours it as the superseded value. No line-through — striking out 700
+   characters makes the text people came here to read hard to read.
+   `label` titles the popup ("Viator had", "Before", …).                                */
+export function fullText(v){
+  let s = (v === null || v === undefined) ? '' : String(v);
+  // pretty-print JSON: a one-line blob is exactly the thing that most needs unpacking
+  try { const p = JSON.parse(s);
+        if (p && typeof p === 'object') s = JSON.stringify(p, null, 2); } catch(e){}
+  return s;
+}
+export function valueBox(v, tone, label){
+  const s = fullText(v);
+  if (!s) return '<span class="hint">(none)</span>';
+  const short = s.length > 90 ? s.slice(0, 90) + '…' : s;
+  // The full text is carried in a hidden element, not a data- attribute: textContent
+  // hands back the exact original with no escaping round trip to get wrong.
+  return `<span class="valcell${tone === 'old' ? ' vc-old' : ''}" role="button" tabindex="0"`
+    + ` title="Click to see the full value">`
+    + `<span class="vc-prev">${esc(short)}</span>`
+    + (s.length > 90 ? `<span class="vc-more">${s.length} chars · click to open</span>` : '')
+    + `<span class="vc-full" hidden>${esc(s)}</span>`
+    + `<span class="vc-label" hidden>${esc(label || 'Value')}</span></span>`;
+}
+
+/** The whole value, in a dialog, with a Copy button. */
+export async function showValue(title, text){
+  const { copyText } = await import('./toast.js');
+  const h = document.getElementById('modalHost');
+  h.innerHTML = '';
+  const wrap = el('div');
+  wrap.innerHTML = `<div class="scrim"></div>
+    <div class="modal wide">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+        <h2 style="font-size:17px">${esc(title)}</h2>
+        <span class="hint">${text.length} characters</span></div>
+      <div class="fullval">${esc(text)}</div>
+      <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:16px">
+        <button class="btn ghost" data-close>Close</button>
+        <button class="btn primary" data-copy>Copy</button></div></div>`;
+  h.appendChild(wrap);
+  const close = () => { h.innerHTML = ''; document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  wrap.querySelector('.scrim').onclick = close;
+  wrap.querySelector('[data-close]').onclick = close;
+  wrap.querySelector('[data-copy]').onclick = () => copyText(text);
+  wrap.querySelector('[data-copy]').focus();
+}
+
+// One delegated listener for every value cell on the page, present and future — the
+// tables are built as innerHTML strings, so per-cell handlers would need re-binding on
+// every repaint.
+// CAPTURE phase (the trailing `true`), not bubble: a bubble listener on document runs
+// AFTER the row it sits inside has already handled the click, so opening a value would
+// also open the product drawer behind it. Capture runs before the row sees the event.
+function openCell(cell){
+  showValue(cell.querySelector('.vc-label').textContent,
+            cell.querySelector('.vc-full').textContent);
+}
+document.addEventListener('click', ev => {
+  const cell = ev.target.closest && ev.target.closest('.valcell');
+  if (!cell) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  openCell(cell);
+}, true);
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  const cell = ev.target.closest && ev.target.closest('.valcell');
+  if (!cell) return;
+  ev.preventDefault(); ev.stopPropagation();
+  openCell(cell);
+}, true);
+
+export const chips = arr => `<div class="chips">${arr.filter(x=>x!=null&&x!=='')
+  .map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>`;
+export const list = arr => `<ul class="plain">${arr.filter(Boolean)
+  .map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+export const sub = t => el('div','subhead', esc(t));
+export function section(title, node){
+  if (!node) return null;
+  const f = document.createDocumentFragment();
+  if (title) f.appendChild(sub(title));
+  f.appendChild(node);
+  return f;
+}
+
+/* ---------- badges ---------- */
+export function statusBadge(s){
+  const k=(s||'').toUpperCase();
+  const cls = k==='ACTIVE'?'b-active':k==='REJECTED'?'b-rejected'
+    :k.startsWith('PENDING')?'b-pending':'b-draft';
+  const nice = k==='PENDING_FIRST_ACTIVATION'?'Pending activation'
+    :k?sentence(k):'Unknown';
+  return `<span class="badge ${cls}">${esc(nice)}</span>`;
+}
+export const connBadge = c => !c ? '' :
+  `<span class="badge ${c==='Connected'?'b-conn':c==='Not connected'?'b-noconn':'b-pending'}">${esc(c)}</span>`;
+export const qualBadge = q => {
+  if (!q) return '';
+  // 'Unknown' means Viator hasn't rated it (drafts) — calling that "Needs work" would
+  // report a quality failure that doesn't exist.
+  if (q === 'Unknown') return '<span class="badge b-draft">Not rated</span>';
+  return `<span class="badge ${q==='GOOD'?'b-good':'b-bad'}">${
+    q==='GOOD'?'Good quality':'Needs work'}</span>`;
+};
+
+/* Timestamps are stored as ISO strings that ALREADY carry an offset ("…T03:59:03+00:00").
+   Appending "Z" to those makes "+00:00Z", which Date rejects — every "last capture" cell
+   read "NaN days ago". Only bare SQLite-style stamps need the timezone added. */
+export function parseTs(t){
+  if (!t) return null;
+  let s = String(t).trim().replace(' ', 'T');
+  if (!/(Z|[+-]\d{2}:?\d{2})$/.test(s)) s += 'Z';
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+export function daysSince(t){
+  const d = parseTs(t);
+  return d ? (Date.now() - d.getTime()) / 864e5 : null;
+}

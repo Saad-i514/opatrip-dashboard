@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Viator Product Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Styles are split by concern; see static/css/. Load order matters only in that
+     base.css defines the design tokens every other file uses. -->
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/layout.css">
+<link rel="stylesheet" href="/static/css/components.css">
+<link rel="stylesheet" href="/static/css/loading.css">
+</head>
+<body>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand">
+    <div class="mark">PA</div>
+    <div><b>Product Audit</b><span>Opatrip · multi-platform</span></div>
+  </div>
+  <nav id="tabs">
+    <div class="navgrp">Overview</div>
+    <button class="navbtn" data-t="stats" aria-selected="true"><span class="ico">▦</span>Dashboard</button>
+    <button class="navbtn" data-t="products" aria-selected="false"><span class="ico">◧</span>Products<span class="cnt" id="cntProducts">–</span></button>
+    <button class="navbtn" data-t="accounts" aria-selected="false"><span class="ico">⌂</span>Accounts<span class="cnt" id="cntAccounts">–</span></button>
+    <button class="navbtn" data-t="matrix" aria-selected="false"><span class="ico">◈</span>Platforms<span class="cnt" id="cntPlatforms">–</span></button>
+    <div class="navgrp">Traceability</div>
+    <button class="navbtn" data-t="audit" aria-selected="false"><span class="ico">⟳</span>Change history<span class="cnt" id="cntChanges">–</span></button>
+    <button class="navbtn" data-t="syncs" aria-selected="false"><span class="ico">⎘</span>Sync runs</button>
+    <button class="navbtn" data-t="activity" aria-selected="false"><span class="ico">≡</span>Activity</button>
+    <div class="navgrp">Insights</div>
+    <button class="navbtn" data-t="reports" aria-selected="false"><span class="ico">◵</span>Reports</button>
+    <button class="navbtn" data-t="categories" aria-selected="false"><span class="ico">◱</span>Breakdown</button>
+  </nav>
+  <div id="storagebar" class="hint" style="padding:9px 11px;border-radius:10px;
+       background:var(--surface-2);margin-top:auto;font-size:12px;line-height:1.5"></div>
+  <div class="whoami" style="margin-top:10px">
+    <div class="av" id="meAv">?</div>
+    <div style="min-width:0">
+      <div style="font-weight:600;font-size:13.5px" id="meName">Not signed in</div>
+      <div class="hint" id="meRole">open a browser to begin</div>
+    </div>
+  </div>
+</aside>
+
+<div>
+<div class="topbar">
+  <div>
+    <h1 id="pageTitle">Dashboard</h1>
+    <div class="crumb" id="pageCrumb">All accounts</div>
+  </div>
+  <div class="grow"></div>
+  <select id="acct" title="Show data for" style="max-width:280px"></select>
+  <input type="text" id="limit" placeholder="limit" title="Optional: capture only the first N products. Leave blank for all." style="width:64px">
+  <button class="btn" id="btnFetch" disabled>Fetch</button>
+  <button class="btn ghost" id="btnStop">Stop</button>
+  <button class="btn primary" id="btnAdd">+ Add Account</button>
+  <span class="pill" id="statusPill"><span class="dot2"></span><span id="statusTxt">idle</span></span>
+</div>
+
+<main>
+  <div id="sessions"></div>
+  <div id="filterbar"></div>
+  <div id="banner" class="banner hidden" style="margin-bottom:18px"></div>
+
+  <div id="syncprogress"></div>
+
+  <section id="v-stats"></section>
+  <section id="v-accounts" class="hidden"></section>
+  <section id="v-products" class="hidden"></section>
+  <section id="v-matrix" class="hidden"></section>
+  <section id="v-reports" class="hidden"></section>
+  <section id="v-categories" class="hidden"></section>
+  <section id="v-audit" class="hidden"></section>
+  <section id="v-syncs" class="hidden"></section>
+  <section id="v-activity" class="hidden"></section>
+</main>
+</div>
+</div>
+
+<div id="loadbar"></div>
+<div id="loadchip" class="loadchip hidden"></div>
+<div id="drawerHost"></div>
+<div id="modalHost"></div>
+<template id="tplAdd">
+  <div class="scrim"></div>
+  <div class="modal card">
+    <h2 style="font-size:18px;margin-bottom:5px">Add account &amp; sign in</h2>
+    <p class="hint" style="margin:0 0 18px">
+      <b>Open browser</b> launches a Viator window. Sign in there by hand (including any
+      2FA), then come back and press <b>Fetch</b>.
+    </p>
+    <label class="fl">Email you'll sign in with
+      <input type="email" id="mEmail" placeholder="you@gmail.com" autocomplete="email">
+      <span class="hint">Recorded against every change found, so you can see who ran what.</span>
+    </label>
+    <label class="fl">Viator account
+      <select id="mAcct"></select>
+      <span class="hint">Leave as “New account” — the account is detected after you sign in.</span>
+    </label>
+    <div id="mErr" class="banner hidden" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:9px;justify-content:flex-end">
+      <button class="btn ghost" id="mCancel">Cancel</button>
+      <button class="btn primary" id="mGo">Open browser</button>
+    </div>
+  </div>
+</template>
+
+<!-- One entry point. app.js imports the rest, so adding a view means adding a file
+     under static/js/views/ and registering it in app.js — nothing here changes. -->
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

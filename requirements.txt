@@ -1,0 +1,8 @@
+# Deployed dashboard only. Deliberately absent: camoufox, playwright and anything else
+# that could drive a browser — the capture tool is not part of this deployment.
+fastapi==0.141.1
+pydantic==2.13.4
+python-multipart==0.0.32
+psycopg[binary]==3.3.4
+psycopg-pool==3.3.1
+boto3==1.43.60
