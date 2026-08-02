@@ -25,7 +25,7 @@ browser package appears in `requirements.txt`.
 ## Layout
 
 ```
-pyproject.toml   points Vercel at the ASGI app ([tool.vercel] entrypoint)
+pyproject.toml   dependencies + the ASGI entrypoint Vercel loads
 web.py           the application — read + edit endpoints only
 db.py            schema, queries, edit/override layer
 store.py         storage abstraction (Postgres in production)
@@ -52,7 +52,7 @@ git-ignored.
 Run locally:
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 uvicorn web:app --reload --port 8001
 ```
 

@@ -1,3 +1,22 @@
+# A [project] table is required: Vercel's build runs `uv lock`, which fails outright
+# without one ("No `project` table found"). Dependencies live here rather than in
+# requirements.txt so there is a single source for them.
+[project]
+name = "opatrip-dashboard"
+version = "1.0.0"
+description = "Read-only web dashboard for the Opatrip product audit"
+requires-python = ">=3.12"
+# Deliberately absent: camoufox, playwright and anything else that could drive a browser.
+# The capture tool is not part of this deployment.
+dependencies = [
+    "fastapi==0.141.1",
+    "pydantic==2.13.4",
+    "python-multipart==0.0.32",
+    "psycopg[binary]==3.3.4",
+    "psycopg-pool==3.3.1",
+    "boto3==1.43.60",
+]
+
 # Vercel's FastAPI support: point it straight at the ASGI app.
 #
 # This replaces a catch-all rewrite in vercel.json ({"source": "/(.*)", "destination":
@@ -7,6 +26,6 @@
 # satisfies the filesystem check before any rewrite runs.
 #
 # With an entrypoint declared, Vercel routes each request to the app with its ORIGINAL
-# path and the app does its own routing, which is the whole point of using a framework.
+# path and the app does its own routing, which is the point of using a framework.
 [tool.vercel]
 entrypoint = "web:app"
