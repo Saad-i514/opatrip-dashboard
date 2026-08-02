@@ -44,17 +44,15 @@ ALLOWED_IMAGE = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 _REACH = {"at": 0.0, "val": None}
 
-# Assets live in public/ so Vercel's CDN serves them directly: a filesystem match wins
-# over the catch-all rewrite in vercel.json, so they never reach the function. Vercel's
-# docs advise against app.mount for static files, and files outside api/ are not
-# guaranteed to be bundled into the function anyway.
+# Everything under public/ is served by Vercel's CDN and is NOT part of the function
+# bundle: only the Python files are shipped to /var/task. An unguarded
+# StaticFiles(directory=...) therefore raised at import and 500'd every route, including
+# the ones that never touch a file. Vercel's own FastAPI guidance says the same thing —
+# do not mount static directories; put the files in public/ and let the CDN serve them.
 #
-# The desktop tool serves the same files through a versioned /sv/<hash>/ path, because
-# there a long-running server has files changing underneath it and browsers went on
-# serving a stale ES module graph. That cannot happen here: every Vercel deployment is an
-# immutable build with its own cache headers. The mount below is the LOCAL path
-# (uvicorn web:app); on Vercel the CDN answers first and it is never reached.
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+# The mount below exists purely for `uvicorn web:app` locally, where public/ IS on disk.
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # The desktop tool sets this while it is uploading its local photo queue. Nothing here
 # has a local queue — images arrive already in R2 — so it is permanently false.
@@ -180,16 +178,24 @@ def favicon():
     """On Vercel the CDN serves this straight from public/ and never reaches the function.
     This route exists so `uvicorn web:app` locally shows the same icon rather than a blank
     tab that looks like a missing file."""
-    return FileResponse(Path(__file__).resolve().parent / "public" / "favicon.svg",
-                        media_type="image/svg+xml")
+    p = STATIC_DIR.parent / "favicon.svg"
+    if not p.is_file():
+        raise HTTPException(404, "served by the CDN from public/")
+    return FileResponse(p, media_type="image/svg+xml")
 
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    """The dashboard shell. Its asset URLs are plain /static/... paths, which Vercel's
-    CDN serves and which uvicorn serves locally through the mount near the top."""
-    html = (Path(__file__).resolve().parent / "dashboard.html").read_text(encoding="utf-8")
-    return HTMLResponse(html)
+    """Only ever reached locally.
+
+    On Vercel `public/index.html` is a static file, so the CDN answers "/" before the
+    catch-all rewrite sends anything to this function — which is what we want, because
+    the HTML is not in the function bundle to read.
+    """
+    p = STATIC_DIR.parent / "index.html"
+    if not p.is_file():
+        raise HTTPException(404, "the dashboard shell is served by the CDN from public/")
+    return HTMLResponse(p.read_text(encoding="utf-8"))
 
 
 

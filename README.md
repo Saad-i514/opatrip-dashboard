@@ -31,8 +31,10 @@ db.py            schema, queries, edit/override layer
 store.py         storage abstraction (Postgres in production)
 cloud.py         Supabase + Cloudflare R2 clients
 config.py        reference data; also names who runs captures
-dashboard.html   the shell
-static/          ES modules + CSS (static/js/readonly.js is the notice)
+public/          served by Vercel's CDN, NOT bundled into the function
+  index.html     the shell
+  favicon.svg
+  static/        ES modules + CSS (static/js/readonly.js is the notice)
 ```
 
 ## Configuration
