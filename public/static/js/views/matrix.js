@@ -17,31 +17,17 @@ export async function viewMatrix(){
   const d = await api('/api/matrix?' + ps);
   v.dataset.painted='1';
   v.innerHTML = '';
+  // One tour can hold more than one listing (the same tour posted twice), which is
+  // why this page's tour total sits below the product total on the dashboard.
+  const listings = d.tours.reduce((n, t) => n + Object.values(t.platforms || {})
+    .reduce((m, c) => m + (c && c.code ? 1 + (c.others || []).length : 0), 0), 0);
   const f = el('div','filters');
   f.innerHTML = `<input type="text" id="mq" placeholder="Search tours or product codes"
       value="${esc(S.mq)}" style="min-width:280px;flex:1;max-width:420px">
     <span class="pill">${d.tours.length} tours</span>
+    <span class="pill">${listings} listings</span>
     <span class="pill">${d.platforms.length} platforms</span>`;
   v.appendChild(f);
-  // This page counts TOURS; the dashboard counts LISTINGS. They differ whenever one tour
-  // is listed twice on the same platform, and that gap read as a bug ("630 live here,
-  // 626 there") when it is really a duplicate worth knowing about. Name it, and name the
-  // tours responsible.
-  // platform_matrix already keeps extra listings on a cell as `others` — a tour with two
-  // products on one platform. That is exactly the gap between the two counts.
-  const codesOf = t => Object.values(t.platforms || {}).flatMap(
-    c => c && c.code ? [c.code, ...((c.others || []).map(o => o.code))] : []);
-  const dupes = d.tours.map(t => [t, codesOf(t)]).filter(([, cs]) => cs.length > 1);
-  if (dupes.length){
-    const note = el('div','banner');
-    note.innerHTML = `<b>${dupes.length} tour${dupes.length > 1 ? 's are' : ' is'} listed `
-      + `more than once.</b> That is why the tour count here is lower than the listing `
-      + `count on the dashboard — a duplicate is one tour but several products. `
-      + dupes.slice(0, 4).map(([t, cs]) =>
-          `<b>${esc(t.title)}</b> (${esc(cs.join(', '))})`).join('; ')
-      + (dupes.length > 4 ? `, and ${dupes.length - 4} more.` : '.');
-    v.appendChild(note);
-  }
   f.querySelector('#mq').oninput = e=>{ S.mq=e.target.value; debounce(viewMatrix); };
 
   // per-platform totals
