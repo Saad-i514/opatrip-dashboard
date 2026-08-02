@@ -221,8 +221,14 @@ export async function openDrawer(pid){
       `<h3>Earlier captures</h3><span class="sub">${d.snapshots.length} snapshot(s)</span>`));
     const b = el('div','pad');
     d.snapshots.forEach((s,i)=>{
+      // A run that found no change writes no snapshot — it stamps the existing one.
+      // Saying so here is the difference between "captured once" and "unchanged since".
+      const conf = s.confirmations
+        ? ` · unchanged in ${s.confirmations} later run${s.confirmations>1?'s':''}`
+          + (s.last_confirmed_at ? `, last ${when(s.last_confirmed_at)}` : '')
+        : '';
       const btn = el('button','btn ghost sm',
-        `${when(s.captured_at)} · run #${s.sync_id}${i===0?' · latest':''}`);
+        `${when(s.captured_at)} · run #${s.sync_id}${i===0?' · latest':''}${conf}`);
       btn.style.cssText='display:block;width:100%;text-align:left;margin:4px 0';
       btn.onclick = async ()=>{
         const snap = await api('/api/snapshot/'+s.id);

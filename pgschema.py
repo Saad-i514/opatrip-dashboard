@@ -208,6 +208,11 @@ ALTER TABLE product_images ADD COLUMN IF NOT EXISTS bytes BIGINT;
 -- Which machine is running this sync, and when it last showed a sign of life. With one
 -- machine these were unnecessary; with a fleet sharing one database they are what stops
 -- each machine treating every other machine's live run as its own abandoned leftover.
+-- A snapshot is now written only when the content actually differs from the previous
+-- one. These two record the runs that saw it unchanged, so "when did we last confirm
+-- this?" is still answerable without storing a duplicate copy per sync.
+ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS last_confirmed_at TEXT;
+ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS confirmations INTEGER DEFAULT 0;
 ALTER TABLE syncs ADD COLUMN IF NOT EXISTS host TEXT;
 ALTER TABLE syncs ADD COLUMN IF NOT EXISTS heartbeat TEXT;
 CREATE INDEX IF NOT EXISTS idx_syncs_running ON syncs(status, host);

@@ -450,9 +450,12 @@ def product_detail(pid: int):
         prow = dict(p)
         db.apply_edits(con, [prow])
         cur_edits, edit_hist = db.edits_for(con, pid)
+        # last_confirmed_at / confirmations: a snapshot is only written when the content
+        # changed, so these say "and we checked again on these later runs and it was
+        # identical" — otherwise an unchanged product would look uncaptured.
         snaps = [dict(r) for r in con.execute(
-            """SELECT id, sync_id, captured_at FROM snapshots
-               WHERE product_id=? ORDER BY id DESC""", (pid,))]
+            """SELECT id, sync_id, captured_at, last_confirmed_at, confirmations
+               FROM snapshots WHERE product_id=? ORDER BY id DESC""", (pid,))]
         cur = con.execute("""SELECT normalized_json FROM snapshots WHERE product_id=?
                              ORDER BY id DESC LIMIT 1""", (pid,)).fetchone()
         imgs = [dict(r) for r in con.execute(

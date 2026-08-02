@@ -59,7 +59,9 @@ CREATE TABLE IF NOT EXISTS snapshots (
   sync_id          INTEGER NOT NULL REFERENCES syncs(id),
   captured_at      TEXT,
   normalized_json  TEXT,
-  raw_network_json TEXT
+  raw_network_json TEXT,
+  last_confirmed_at TEXT,      -- latest run that saw this content unchanged
+  confirmations     INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS changes (
   id INTEGER PRIMARY KEY,
@@ -217,6 +219,11 @@ def init():
         for col, decl in (("host", "TEXT"), ("heartbeat", "TEXT")):
             if col not in syn:
                 con.execute(f"ALTER TABLE syncs ADD COLUMN {col} {decl}")
+        snp = store.table_columns(con, "snapshots")
+        for col, decl in (("last_confirmed_at", "TEXT"),
+                          ("confirmations", "INTEGER DEFAULT 0")):
+            if col not in snp:
+                con.execute(f"ALTER TABLE snapshots ADD COLUMN {col} {decl}")
         img = store.table_columns(con, "product_images")
         for col, decl in (("r2_key", "TEXT"), ("bytes", "INTEGER"),
                           ("is_manual", "INTEGER DEFAULT 0"), ("added_by", "TEXT"),
@@ -518,21 +525,53 @@ def latest_snapshot(con, product_id):
     return json.loads(r["normalized_json"]) if r and r["normalized_json"] else None
 
 
+def _latest_snapshot_row(con, product_id):
+    """The previous snapshot's id and content, in one read — save_snapshot needs both."""
+    r = con.execute("""SELECT id, normalized_json, raw_network_json FROM snapshots
+                       WHERE product_id=? ORDER BY id DESC LIMIT 1""",
+                    (product_id,)).fetchone()
+    if not r:
+        return None, None, None
+    return (r["id"],
+            json.loads(r["normalized_json"]) if r["normalized_json"] else None,
+            r["raw_network_json"])
+
+
 def save_snapshot(con, product_id, sync_id, account_id, operator_email,
                   normalized, raw_network=None, portal_modified_by=None):
     """Write a snapshot and the field-level changes vs the previous one.
     Returns the number of changes recorded."""
-    prev = latest_snapshot(con, product_id)
+    prev_id, prev, prev_raw = _latest_snapshot_row(con, product_id)
+    t = now()
+    raw_json = json.dumps(raw_network, ensure_ascii=False) if raw_network else None
+
+    # Write a snapshot only when the content actually differs.
+    #
+    # Most products do not change between syncs, and storing a second identical ~16 kB
+    # copy each time was the whole of the database's growth: a full re-sync of 129
+    # accounts would have added ~42 MB whether anything changed or not. The test is the
+    # SAME diff() the audit trail uses, so a snapshot is skipped only when it would have
+    # produced zero changes — a change can never be lost by this.
+    #
+    # An unchanged product still records that it was seen: last_confirmed_at and a
+    # counter on the existing row, so "we checked this on the 3rd and it was identical"
+    # is still answerable. products.last_seen_at is updated by upsert_product regardless.
+    if prev is not None and not diff(prev, normalized):
+        con.execute("""UPDATE snapshots
+                       SET last_confirmed_at=?,
+                           confirmations=COALESCE(confirmations,0)+1,
+                           raw_network_json=COALESCE(raw_network_json, ?)
+                       WHERE id=?""", (t, raw_json, prev_id))
+        return 0
+
     con.execute("""INSERT INTO snapshots (product_id, sync_id, captured_at,
                                           normalized_json, raw_network_json)
                    VALUES (?,?,?,?,?)""",
-                (product_id, sync_id, now(),
-                 json.dumps(normalized, ensure_ascii=False),
-                 json.dumps(raw_network, ensure_ascii=False) if raw_network else None))
+                (product_id, sync_id, t,
+                 json.dumps(normalized, ensure_ascii=False), raw_json))
     if prev is None:
         return 0  # first sight of this product is a baseline, not a change
     rows = diff(prev, normalized)
-    t = now()
     # If the portal itself tells us who changed it, attribute to that instead of the
     # operator who merely ran the sync. We never invent a "who".
     src = "viator_modified_by" if portal_modified_by else "diff"
