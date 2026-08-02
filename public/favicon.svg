@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img"
+     aria-label="Product Audit">
+  <!-- Same mark as the sidebar: the #FB923C -> #EA580C gradient and the 11/38 corner
+       radius from .brand .mark, scaled to 64px (11/38 * 64 = 18.5). -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FB923C"/>
+      <stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18.5" fill="url(#g)"/>
+  <!-- "PA" is unreadable at 16px, so the icon carries the dashboard's own shape instead:
+       the bar chart with a rising trend line, matching the hero artwork. -->
+  <g fill="#fff">
+    <rect x="14" y="34" width="8" height="17" rx="2.5"/>
+    <rect x="28" y="26" width="8" height="25" rx="2.5"/>
+    <rect x="42" y="30" width="8" height="21" rx="2.5"/>
+  </g>
+  <polyline points="16,28 32,18 46,23" fill="none" stroke="#fff" stroke-width="4"
+            stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>
+  <circle cx="46" cy="23" r="4.5" fill="#fff"/>
+</svg>

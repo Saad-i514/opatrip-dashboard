@@ -175,6 +175,15 @@ def pending_images(con):
                           WHERE r2_key IS NULL AND local_path IS NOT NULL""").fetchone()[0]
 
 
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon():
+    """On Vercel the CDN serves this straight from public/ and never reaches the function.
+    This route exists so `uvicorn web:app` locally shows the same icon rather than a blank
+    tab that looks like a missing file."""
+    return FileResponse(Path(__file__).resolve().parent / "public" / "favicon.svg",
+                        media_type="image/svg+xml")
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     """The dashboard shell. Its asset URLs are plain /static/... paths, which Vercel's
