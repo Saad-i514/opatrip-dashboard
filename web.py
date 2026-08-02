@@ -247,8 +247,21 @@ def add_account(a: AccountIn):
 def stats(account: str | None = None):
     with db.session() as con:
         where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
+        # A missing value has two very different meanings, and lumping both under
+        # "Unknown" made a deliberate design decision look like a data fault.
+        #   * on a DRAFT it means "not captured": the client's rule is that drafts are
+        #     recorded from the roster and never deep-fetched, and the roster carries no
+        #     location at all (that comes from the accelerate page) and option counts for
+        #     only some entries. 45% of drafts have no location for exactly that reason.
+        #   * on anything else it really is unknown — Viator itself had no value. That is
+        #     2 products out of 743.
+        # Splitting the bucket makes the chart answer "why is this blank?" on its own.
         by = lambda col: {r[0]: r[1] for r in con.execute(
-            f"""SELECT COALESCE(p.{col},'Unknown'), COUNT(*) FROM products p
+            f"""SELECT CASE WHEN p.{col} IS NULL OR p.{col}=''
+                            THEN CASE WHEN p.is_draft_stub=1 THEN 'Not captured (draft)'
+                                      ELSE 'Unknown' END
+                            ELSE p.{col} END,
+                       COUNT(*) FROM products p
                 JOIN accounts a ON a.id=p.account_id {where}
                 GROUP BY 1 ORDER BY 2 DESC""", args)}
         totals = con.execute(

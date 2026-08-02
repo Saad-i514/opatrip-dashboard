@@ -16,6 +16,20 @@ export async function viewCategories(){
   g.appendChild(bars('Connection', s.by_connection, connBadge));
   g.appendChild(bars('Quality', s.by_quality, qualBadge));
   v.appendChild(g);
+  // "Not captured (draft)" is a real bucket on these charts and deserves a sentence
+  // rather than leaving people to guess why a listing has no location.
+  const drafty = ['by_location','by_connection','by_quality']
+    .reduce((n,k)=>n+((s[k]||{})['Not captured (draft)']||0), 0);
+  if (drafty){
+    const note = el('div','hint');
+    note.style.marginTop = '14px';
+    note.innerHTML = '<b>“Not captured (draft)”</b> is not missing data. Drafts are '
+      + 'recorded from the account roster and deliberately never deep-fetched, and the '
+      + 'roster carries no location and only partial connection detail. Those fields '
+      + 'fill in by themselves once a draft goes live and is captured in full. '
+      + '<b>“Unknown”</b> is different: there the portal itself had no value.';
+    v.appendChild(note);
+  }
 }
 export async function viewAudit(){
   const v = $('#v-audit');
