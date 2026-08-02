@@ -36,13 +36,25 @@ import store
 
 app = FastAPI(title="Opatrip Product Audit")
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR = Path(__file__).resolve().parent / "public" / "static"
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ALLOWED_IMAGE = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
                  "image/gif": ".gif"}
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 _REACH = {"at": 0.0, "val": None}
+
+# Assets live in public/ so Vercel's CDN serves them directly: a filesystem match wins
+# over the catch-all rewrite in vercel.json, so they never reach the function. Vercel's
+# docs advise against app.mount for static files, and files outside api/ are not
+# guaranteed to be bundled into the function anyway.
+#
+# The desktop tool serves the same files through a versioned /sv/<hash>/ path, because
+# there a long-running server has files changing underneath it and browsers went on
+# serving a stale ES module graph. That cannot happen here: every Vercel deployment is an
+# immutable build with its own cache headers. The mount below is the LOCAL path
+# (uvicorn web:app); on Vercel the CDN answers first and it is never reached.
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # The desktop tool sets this while it is uploading its local photo queue. Nothing here
 # has a local queue — images arrive already in R2 — so it is permanently false.
@@ -163,69 +175,18 @@ def pending_images(con):
                           WHERE r2_key IS NULL AND local_path IS NOT NULL""").fetchone()[0]
 
 
-# -------------------------------------------------------------------------- pages
 @app.get("/", response_class=HTMLResponse)
 def index():
-    html = (Path(__file__).parent / "dashboard.html").read_text(encoding="utf-8")
-    # Point the page at this build's versioned paths. dashboard.html keeps plain /static/
-    # URLs so it stays readable and works if opened directly; the rewrite happens here.
-    html = html.replace("/static/", f"/sv/{static_version()}/")
-    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+    """The dashboard shell. Its asset URLs are plain /static/... paths, which Vercel's
+    CDN serves and which uvicorn serves locally through the mount near the top."""
+    html = (Path(__file__).resolve().parent / "dashboard.html").read_text(encoding="utf-8")
+    return HTMLResponse(html)
 
 
-def static_version():
-    """A token that changes whenever any static file changes.
-
-    `no-cache` alone was not enough in practice: a browser that had already cached these
-    URLs under heuristic freshness kept serving them, and a shipped fix stayed invisible
-    through restarts and reloads. The reliable answer is to change the URL, because a URL
-    the browser has never seen cannot be served from its cache.
-
-    The version goes in the PATH, not a ?query, and that is the whole trick: a module's
-    relative `import './core.js'` resolves against the URL of the module doing the
-    importing. Under /sv/<ver>/js/app.js the entire graph therefore inherits the version
-    automatically — which is exactly what ?v= cannot do.
-    """
-    newest = 0
-    for p in STATIC_DIR.rglob("*"):
-        if p.is_file():
-            newest = max(newest, p.stat().st_mtime_ns)
-    return format(newest % (1 << 32), "x")
 
 
-@app.get("/sv/{ver}/{path:path}")
-def versioned_static(ver: str, path: str):
-    """Serve a static file under a versioned path. `ver` is deliberately ignored — it
-    exists only to give the browser a URL it cannot have cached."""
-    root = STATIC_DIR.resolve()
-    try:
-        f = (root / path).resolve()
-        f.relative_to(root)                      # refuse ../ escapes
-    except (ValueError, OSError):
-        raise HTTPException(404, "no such file")
-    if not f.is_file():
-        raise HTTPException(404, "no such file")
-    return FileResponse(f, headers={"Cache-Control": "no-cache"})
 
 
-class FreshStatic(StaticFiles):
-    """Serve static files with `no-cache`, i.e. "ask me every time".
-
-    Not an optimisation — a correctness fix. The dashboard is an ES module graph: app.js
-    is the only URL the page names, and a relative `import './core.js'` does NOT inherit a
-    ?v= query, so the usual cache-busting trick can only ever bust the entry point. The
-    browser went on serving the other 17 modules from cache, and a shipped fix simply did
-    not appear until someone found the right way to force a reload.
-
-    `no-cache` still stores the file and still revalidates with ETag/If-None-Match, so the
-    normal answer is a 304 with no body — over localhost that is microseconds. It matters
-    more with a fleet: 17 machines must pick up a change by reloading, not by folklore.
-    """
-
-    def file_response(self, *a, **kw):
-        resp = super().file_response(*a, **kw)
-        resp.headers["Cache-Control"] = "no-cache"
-        return resp
 
 
 # ----------------------------------------------------------------------- accounts
