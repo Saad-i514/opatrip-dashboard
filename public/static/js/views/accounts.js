@@ -41,7 +41,8 @@ export async function viewAccounts(){
       : dd < 14 ? ['b-pending', `${Math.round(dd)} days ago`]
       : ['b-rejected', `${Math.round(dd)} days ago`];
     // a zero reads better as a quiet dash than as a column of 0s to scan past
-    const n = (v2, warn) => !v2 ? '<span class="hint">—</span>'
+    // 0 rather than a dash: a dash reads as "unknown", and these are known zeros
+    const n = (v2, warn) => !v2 ? '0'
       : (warn ? `<b style="color:var(--red)">${v2}</b>` : String(v2));
     return `<tr>
       <td><div style="font-weight:600">${esc(a.name||a.viator_account_id)}</div>

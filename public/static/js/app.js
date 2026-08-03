@@ -9,7 +9,6 @@ import { viewStats } from './views/stats.js';
 import { viewProducts } from './views/products.js';
 import { when } from './views/drawer.js';
 import { viewMatrix } from './views/matrix.js';
-import { viewReports } from './views/reports.js';
 import { viewActivity, viewAudit, viewCategories, viewSyncs } from './views/misc.js';
 import { viewAccounts } from './views/accounts.js';
 
@@ -64,13 +63,12 @@ export async function poll(){
 /* ======================= routing ======================= */
 export const VIEWS = {stats:viewStats, products:viewProducts, accounts:viewAccounts,
   matrix:viewMatrix,
-  reports:viewReports, categories:viewCategories, audit:viewAudit, syncs:viewSyncs,
+  categories:viewCategories, audit:viewAudit, syncs:viewSyncs,
   activity:()=>viewActivity(null)};
 export const TITLES = {stats:['Dashboard','Everything at a glance'],
   accounts:['Accounts','Coverage and capture freshness'],
   products:['Products','Every captured listing'],
   matrix:['Platforms','Tour status on each platform'],
-  reports:['Reports','Output, tasks and payable value'],
   categories:['Breakdown','Distribution by category'],
   audit:['Change history','What changed, when and by whom'],
   syncs:['Sync runs','Every capture run'],

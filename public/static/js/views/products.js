@@ -7,6 +7,15 @@ import { openDrawer, when } from './drawer.js';
 /* ======================= products ======================= */
 
 
+/* "2026-08" -> "August 2026". A month filter labelled 2026-08 is a database column
+   wearing a costume. */
+const MONTHS = ['January','February','March','April','May','June','July','August',
+                'September','October','November','December'];
+function monthName(m){
+  const [y, mm] = String(m).split('-');
+  return MONTHS[Number(mm)-1] ? `${MONTHS[Number(mm)-1]} ${y}` : m;
+}
+
 /* Reviews, shown on the row itself: it is the field people are filtering on, and a
    filter whose result you cannot see is hard to trust. Zero is called out rather than
    printed as "0 reviews" among the rest — it is the actionable state. */
@@ -27,12 +36,12 @@ export async function viewProducts(){
   // every filter travels as a query param, so a filtered view is a shareable URL and the
   // server does the narrowing — filtering 1,100 rows in the browser would mean shipping
   // all of them first
-  for (const k of ['q','lifecycle','platform','connection','reviews','missing'])
+  for (const k of ['q','lifecycle','platform','connection','reviews','missing','month'])
     if (S.pf[k]) ps.set(k, S.pf[k]);
   if (S.pf.status) ps.set('status', S.pf.status);
-  const [d, plats] = await Promise.all([
+  const [d, opts0] = await Promise.all([
     api('/api/products?'+ps),
-    S._plats ? Promise.resolve(S._plats) : api('/api/platforms').then(r=>(S._plats=r)),
+    api('/api/filters'+q()),      // months come from the data, so no empty option exists
   ]);
   v.dataset.painted='1';
   v.innerHTML='';
@@ -49,7 +58,10 @@ export async function viewProducts(){
     <input type="text" id="pq" placeholder="Search by name or product code"
            value="${esc(S.pf.q)}" style="min-width:240px;flex:1;max-width:360px">
     <select id="pplat" title="Platform"><option value="">All platforms</option>
-      ${opts((plats.platforms||[]).map(p=>[p.code, p.name]), S.pf.platform)}</select>
+      ${opts((opts0.platforms||[]).map(p=>[p.code, p.name]), S.pf.platform)}</select>
+    <select id="pmonth" title="Month the product was first captured">
+      <option value="">Any month</option>
+      ${opts((opts0.months||[]).map(m=>[m, monthName(m)]), S.pf.month)}</select>
     <select id="plife" title="Lifecycle status"><option value="">Any status</option>
       ${opts(LIFECYCLE, S.pf.lifecycle)}</select>
     <select id="previews" title="Review count"><option value="">Any reviews</option>
@@ -63,12 +75,13 @@ export async function viewProducts(){
   const set = (k, val) => { S.pf[k] = val; viewProducts(); };
   f.querySelector('#pq').oninput = e=>{S.pf.q=e.target.value; debounce(viewProducts);};
   f.querySelector('#pplat').onchange   = e=>set('platform', e.target.value);
+  f.querySelector('#pmonth').onchange  = e=>set('month', e.target.value);
   f.querySelector('#plife').onchange   = e=>set('lifecycle', e.target.value);
   f.querySelector('#previews').onchange= e=>set('reviews', e.target.value);
   f.querySelector('#pconn').onchange   = e=>set('connection', e.target.value);
   f.querySelector('#pclear').onclick = ()=>{
     Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',connection:'',
-                         reviews:'',missing:''});
+                         reviews:'',missing:'',month:''});
     viewProducts();
   };
   // Say what is being filtered in words. A count alone ("447 shown") leaves people
@@ -79,6 +92,7 @@ export async function viewProducts(){
     S.pf.lifecycle && (LIFECYCLE.find(x=>x[0]===S.pf.lifecycle)||[,S.pf.lifecycle])[1],
     S.pf.reviews && (REVIEWS.find(x=>x[0]===S.pf.reviews)||[,S.pf.reviews])[1],
     S.pf.connection, S.pf.missing && 'no longer listed on the platform',
+    S.pf.month && `first captured in ${monthName(S.pf.month)}`,
   ].filter(Boolean);
   if (active.length){
     const note = el('div','hint');

@@ -109,36 +109,37 @@ export async function viewStats(){
      /api/progress). The note under the table says so, because a chart that quietly
      assumes is worse than one that admits. */
   try {
-    const pg = await api('/api/progress'+q());
+    const pg = await api('/api/progress'+q('months='+(S.pgMonths||6)));
     const D = pg.deltas || {};
     const pc = el('div','card'); pc.style.marginTop='16px';
-    pc.appendChild(el('div','card-h','<h3>Progress</h3>'+
-      `<span class="sub">${esc(pg.current.month)} vs ${
-        pg.previous ? esc(pg.previous.month) : 'no earlier month'}</span>`));
+    const head = el('div','card-h');
+    head.innerHTML = `<h3>Progress</h3><span class="sub">where the catalogue stands in `
+      + `${esc(pg.current.month)}</span>
+      <span style="flex:1"></span>
+      <select id="pgmonths" title="How far back to show">
+        ${[3,6,12,24].map(n=>`<option value="${n}" ${S.pgMonths===n?'selected':''}
+          >Last ${n} months</option>`).join('')}</select>`;
+    pc.appendChild(head);
+    head.querySelector('#pgmonths').onchange = e=>{
+      S.pgMonths = Number(e.target.value); viewStats();
+    };
     const pb = el('div','pad');
 
-    const MOVERS = [['total','Products tracked'], ['added','Added'], ['LIVE','Live'],
-                    ['DRAFT','Draft'], ['REJECTED','Rejected'], ['REMOVED','Removed']];
-    const cells = MOVERS.map(([k, lab]) => {
-      const d = D[k];
-      if (!d) return `<div class="mv"><div class="mv-l">${esc(lab)}</div>
-        <div class="mv-n">${(pg.current[k]||0)}</div>
-        <div class="mv-d hint">no earlier month yet</div></div>`;
-      // "added" falling is not a regression — it counts new arrivals, and a big first
-      // import makes every later month look like a drop. Colour only what it means.
-      const good = k === 'REJECTED' || k === 'REMOVED' ? d.diff < 0 : d.diff > 0;
-      const cls = d.diff === 0 ? 'flat' : (good ? 'up' : 'dn');
-      const arrow = d.diff === 0 ? '–' : (d.diff > 0 ? '↗' : '↘');
-      return `<div class="mv"><div class="mv-l">${esc(lab)}</div>
-        <div class="mv-n">${d.now}</div>
-        <div class="mv-d mv-${cls}">${arrow} ${d.diff > 0 ? '+' : ''}${d.diff}${
-          d.pct == null ? '' : ` (${d.pct > 0 ? '+' : ''}${d.pct}%)`}
-          <span class="hint">was ${d.was}</span></div></div>`;
-    }).join('');
+    // Just the figure and what it is. The +/- chips against last month were removed on
+    // request: "added" in particular fell 81% simply because the first import was one
+    // big batch, which reads as a collapse rather than a normal month.
+    const MOVERS = [['total','Products tracked'], ['added','Added this month'],
+                    ['LIVE','Live'], ['DRAFT','Draft'],
+                    ['REJECTED','Rejected'], ['REMOVED','Removed']];
+    const cells = MOVERS.map(([k, lab]) =>
+      `<div class="mv"><div class="mv-l">${esc(lab)}</div>
+        <div class="mv-n">${pg.current[k] || 0}</div></div>`).join('');
     pb.innerHTML = `<div class="movers">${cells}</div>`;
 
-    // month-by-month table — the raw numbers behind the deltas
-    const rows = (pg.series||[]).filter(s => s.total || s.added);
+    // every month in the chosen range, not only the ones with products — a gap is a
+    // fact about the catalogue, and hiding it makes a two-row table look like all the
+    // history there is
+    const rows = (pg.series||[]);
     if (rows.length > 1){
       const t = el('div','tblwrap'); t.style.marginTop='14px';
       t.innerHTML = `<table><thead><tr><th>Month</th><th>Tracked</th><th>Added</th>
@@ -146,7 +147,7 @@ export async function viewStats(){
         </tr></thead><tbody>${rows.map(s=>`<tr>
           <td class="mono">${esc(s.month)}</td>
           <td class="v num"><b>${s.total}</b></td>
-          <td class="v num">${s.added ? '+'+s.added : '—'}</td>
+          <td class="v num">${s.added || 0}</td>
           <td class="v num">${s.LIVE}</td><td class="v num">${s.DRAFT}</td>
           <td class="v num">${s.PENDING}</td><td class="v num">${s.REJECTED}</td>
           <td class="v num">${s.REMOVED}</td></tr>`).join('')}</tbody></table>`;

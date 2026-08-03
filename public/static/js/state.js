@@ -14,6 +14,7 @@ export const S = {
   // product filters. `lifecycle` is the canonical status (LIVE/DRAFT/...), the
   // same word the dashboard cards use; `status` is the platform's own raw word.
   pf: {q: '', status: '', lifecycle: '', platform: '', connection: '', reviews: ''},
+  pgMonths: 6,           // how far back the Progress card looks
   mq: '',                 // platform-grid search
   rsince: '', runtil: '', // report period
 };

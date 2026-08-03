@@ -448,6 +448,30 @@ def review_bands():
     return {"bands": [{"key": k, "label": v[0]} for k, v in REVIEW_BANDS.items()]}
 
 
+@app.get("/api/filters")
+def filter_options(account: str | None = None):
+    """Everything the product filter bar needs, in one call.
+
+    The months come from the data rather than a generated range, so the dropdown can
+    only ever offer a month that has products in it — an empty option that returns
+    nothing is a small betrayal of trust in the filter.
+    """
+    where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
+    with db.session() as con:
+        months = [r[0] for r in con.execute(
+            f"""SELECT DISTINCT substr(p.first_seen_at,1,7) m FROM products p
+                JOIN accounts a ON a.id=p.account_id {where}
+                {'AND' if where else 'WHERE'} p.first_seen_at IS NOT NULL
+                ORDER BY 1 DESC""", args)]
+        plats = [dict(r) for r in con.execute(
+            """SELECT code, name FROM platforms ORDER BY sort_order""")]
+        lifecycle = [dict(r) for r in con.execute(
+            """SELECT code, label FROM statuses ORDER BY sort_order""")]
+    return {"platforms": plats, "months": months, "lifecycle": lifecycle,
+            "reviews": [{"key": k, "label": v[0]} for k, v in REVIEW_BANDS.items()
+                        if k not in ("none",)]}
+
+
 @app.get("/api/progress")
 def progress(account: str | None = None, months: int = 6):
     """Month-over-month movement, reconstructed rather than guessed.
@@ -577,7 +601,8 @@ def progress(account: str | None = None, months: int = 6):
 def products(account: str | None = None, q: str | None = None,
              status: str | None = None, connection: str | None = None,
              platform: str | None = None, lifecycle: str | None = None,
-             reviews: str | None = None, missing: str | None = None):
+             reviews: str | None = None, missing: str | None = None,
+             month: str | None = None):
     sql = """SELECT p.*, a.viator_account_id, a.name AS account_name,
                pl.code AS platform_code, pl.name AS platform_name,
                (SELECT COUNT(*) FROM product_images i WHERE i.product_id=p.id) AS image_count,
@@ -608,6 +633,11 @@ def products(account: str | None = None, q: str | None = None,
     if connection:
         sql += " AND p.connection_state=?"
         args.append(connection)
+    if month:
+        # matched as a string against the stored ISO timestamp — no date parsing, and it
+        # cannot inject: the value only ever reaches SQL as a bound parameter
+        sql += " AND substr(p.first_seen_at,1,7)=?"
+        args.append(month)
     if missing:
         sql += " AND p.missing_since IS NOT NULL"
     if reviews:

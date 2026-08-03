@@ -2,7 +2,7 @@ import { $, api, el, esc, q } from '../core.js';
 import { connBadge, qualBadge, rows, statusBadge, sub, valueBox } from '../format.js';
 import { skeleton } from '../ui.js';
 import { bars } from './stats.js';
-import { fieldLabel, trunc, when } from './drawer.js';
+import { trunc, when } from './drawer.js';
 
 /* ======================= breakdown / history / runs ======================= */
 export async function viewCategories(){
@@ -61,7 +61,7 @@ export async function viewAudit(){
           <div class="hint" style="margin:2px 0 7px">
             <span class="mono">${esc(c.product_code)}</span>
             · ${esc(c.account_name||c.viator_account_id)}</div>
-          <div class="chg-what"><b>${esc(fieldLabel(c.field_path))}</b> was changed</div>
+          <div class="chg-what">Something on this product was changed</div>
           <div class="chg-vals">
             <div><div class="chg-lbl">Before</div>${valueBox(c.old_value,'old','Value before')}</div>
             <div class="chg-arrow">→</div>

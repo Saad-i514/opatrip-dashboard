@@ -218,18 +218,10 @@ export async function openDrawer(pid){
      JSON dumps — a debugging tool on a page people open to read a product. What
      changed, and when, is the Change history below; the raw data is still one click
      away under the developer section. */
-  if (cur){
-    // Collapsed and unlabelled beyond "for developers": the raw JSON is an escape hatch,
-    // not a section of the page.
-    const raw = el('details','rawbox');
-    const sm = el('summary','hint','Show raw captured data (for developers)');
-    sm.style.cursor='pointer';
-    raw.appendChild(sm);
-    const holder = el('div'); holder.style.marginTop='10px';
-    raw.appendChild(holder);
-    raw.ontoggle = ()=>{ if(raw.open && !holder.childElementCount) holder.appendChild(tree(cur)); };
-    body.appendChild(raw);
-  }
+  /* The raw-JSON toggle was removed from the product page: it is a debugging view on a
+     screen people open to read a listing. The data is still served by /api/snapshot/<id>
+     for anyone who needs it. */
+
   dr.appendChild(body); host.appendChild(dr);
   head.querySelector('#xClose').onclick = closeDrawer;
 }
