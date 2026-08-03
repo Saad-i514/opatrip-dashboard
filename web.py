@@ -349,8 +349,10 @@ def overview(account: str | None = None):
                  (SELECT COUNT(DISTINCT t.id) FROM tours t
                     JOIN products p ON p.tour_id=t.id
                     JOIN accounts a ON a.id=p.account_id {where}) AS tours_total
-      """.format(swhere=swhere, swhere_done=swhere_done),
-          args + [db.now()[:7]] + args * 10).fetchone()
+      """,
+          # Positional params must follow the ? order above: five account filters, then
+          # the month for added_month, then the remaining seven account filters.
+          args * 5 + [db.now()[:7]] + args * 7).fetchone()
       total_products = counts["total_products"] or 0
       drafts = counts["drafts"] or 0
       missing = counts["missing"] or 0
