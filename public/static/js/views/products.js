@@ -1,20 +1,11 @@
 import { S } from '../state.js';
 import { $, api, el, esc, q } from '../core.js';
-import { connBadge, list, qualBadge, sentence, statusBadge } from '../format.js';
+import { connBadge, list, monthName, qualBadge, sentence, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { openDrawer, when } from './drawer.js';
 
 /* ======================= products ======================= */
 
-
-/* "2026-08" -> "August 2026". A month filter labelled 2026-08 is a database column
-   wearing a costume. */
-const MONTHS = ['January','February','March','April','May','June','July','August',
-                'September','October','November','December'];
-function monthName(m){
-  const [y, mm] = String(m).split('-');
-  return MONTHS[Number(mm)-1] ? `${MONTHS[Number(mm)-1]} ${y}` : m;
-}
 
 /* Reviews, shown on the row itself: it is the field people are filtering on, and a
    filter whose result you cannot see is hard to trust. Zero is called out rather than
@@ -61,7 +52,7 @@ export async function viewProducts(){
       ${opts((opts0.platforms||[]).map(p=>[p.code, p.name]), S.pf.platform)}</select>
     <select id="pmonth" title="Month the product was first captured">
       <option value="">Any month</option>
-      ${opts((opts0.months||[]).map(m=>[m, monthName(m)]), S.pf.month)}</select>
+      ${opts((opts0.months||[]).map(m=>[m.month||m, `${monthName(m.month||m)}` + (m.n!=null?` (${m.n})`:'')]), S.pf.month)}</select>
     <select id="plife" title="Lifecycle status"><option value="">Any status</option>
       ${opts(LIFECYCLE, S.pf.lifecycle)}</select>
     <select id="previews" title="Review count"><option value="">Any reviews</option>

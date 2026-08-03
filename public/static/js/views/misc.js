@@ -99,7 +99,8 @@ export async function viewSyncs(){
       stopped:'Stopped by you'};
     const t = el('div','tblwrap');
     t.innerHTML = `<table><thead><tr><th>Run</th><th>Account</th><th>Started</th>
-      <th>Result</th><th>Products</th><th>Changes</th><th>Run by</th></tr></thead><tbody>${
+      <th>Result</th><th class="num">Products</th><th class="num">Changes</th>
+      <th>Run by</th></tr></thead><tbody>${
       d.syncs.map(s=>{
         const cls = s.status==='done'?'b-active':s.status==='running'?'b-pending'
           :(s.status||'').startsWith('paused')||s.status==='interrupted'?'b-stub'

@@ -458,11 +458,13 @@ def filter_options(account: str | None = None):
     """
     where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
     with db.session() as con:
-        months = [r[0] for r in con.execute(
-            f"""SELECT DISTINCT substr(p.first_seen_at,1,7) m FROM products p
+        # the COUNT matters: with products captured in only two months, a two-option
+        # dropdown looks broken until each option says how many it holds
+        months = [{"month": r[0], "n": r[1]} for r in con.execute(
+            f"""SELECT substr(p.first_seen_at,1,7) m, COUNT(*) n FROM products p
                 JOIN accounts a ON a.id=p.account_id {where}
                 {'AND' if where else 'WHERE'} p.first_seen_at IS NOT NULL
-                ORDER BY 1 DESC""", args)]
+                GROUP BY 1 ORDER BY 1 DESC""", args)]
         plats = [dict(r) for r in con.execute(
             """SELECT code, name FROM platforms ORDER BY sort_order""")]
         lifecycle = [dict(r) for r in con.execute(

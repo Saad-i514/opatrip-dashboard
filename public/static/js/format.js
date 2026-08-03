@@ -220,6 +220,16 @@ document.addEventListener('keydown', ev => {
   openCell(cell);
 }, true);
 
+
+/* "2026-08" -> "August 2026". A month shown as 2026-08 is a database column wearing a
+   costume. Lives here so the filter dropdown and the progress table cannot disagree. */
+export const MONTH_NAMES = ['January','February','March','April','May','June','July',
+                            'August','September','October','November','December'];
+export function monthName(m){
+  const [y, mm] = String(m || '').split('-');
+  return MONTH_NAMES[Number(mm) - 1] ? `${MONTH_NAMES[Number(mm) - 1]} ${y}` : (m || '');
+}
+
 export const chips = arr => `<div class="chips">${arr.filter(x=>x!=null&&x!=='')
   .map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>`;
 export const list = arr => `<ul class="plain">${arr.filter(Boolean)

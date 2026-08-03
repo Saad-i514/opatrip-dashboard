@@ -350,3 +350,9 @@ tbody tr:hover{background:var(--surface-2)}
 .chg-lbl{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
   color:var(--ink-3);margin-bottom:3px}
 .chg-arrow{align-self:center;color:var(--ink-3);font-size:15px;text-align:center}
+
+/* Numbers line up when they are centred under a centred heading. Left-aligned figures
+   in a wide column drift away from their header and become hard to compare down a
+   column, which is the only reason to put them in a table. */
+th.num, td.v.num, td.num{text-align:center}
+td.v.num, td.num{font-variant-numeric:tabular-nums}

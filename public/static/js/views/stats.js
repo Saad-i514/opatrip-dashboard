@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { $, api, el, esc, q } from '../core.js';
-import { connBadge, qualBadge, sentence, sub, valueBox } from '../format.js';
+import { connBadge, monthName, qualBadge, sentence, sub, valueBox } from '../format.js';
 import { STATUS_COLOR, areaChart, donut, kpiCard, sparkline } from '../charts.js';
 import { skeleton } from '../ui.js';
 import { fieldLabel, trunc, when } from './drawer.js';
@@ -142,10 +142,11 @@ export async function viewStats(){
     const rows = (pg.series||[]);
     if (rows.length > 1){
       const t = el('div','tblwrap'); t.style.marginTop='14px';
-      t.innerHTML = `<table><thead><tr><th>Month</th><th>Tracked</th><th>Added</th>
-        <th>Live</th><th>Draft</th><th>Pending</th><th>Rejected</th><th>Removed</th>
+      t.innerHTML = `<table><thead><tr><th>Month</th><th class="num">Tracked</th><th class="num">Added</th>
+        <th class="num">Live</th><th class="num">Draft</th><th class="num">Pending</th>
+        <th class="num">Rejected</th><th class="num">Removed</th>
         </tr></thead><tbody>${rows.map(s=>`<tr>
-          <td class="mono">${esc(s.month)}</td>
+          <td>${esc(monthName(s.month))}</td>
           <td class="v num"><b>${s.total}</b></td>
           <td class="v num">${s.added || 0}</td>
           <td class="v num">${s.LIVE}</td><td class="v num">${s.DRAFT}</td>
@@ -192,12 +193,12 @@ export async function viewStats(){
         '<span class="sub">products added, this month vs last</span>'));
       const gb = el('div','pad');
       const t = el('div','tblwrap');
-      t.innerHTML = `<table><thead><tr><th>Account</th><th>This month</th>
-        <th>Last month</th><th>Total</th></tr></thead><tbody>${
+      t.innerHTML = `<table><thead><tr><th>Account</th><th class="num">This month</th>
+        <th class="num">Last month</th><th class="num">Total</th></tr></thead><tbody>${
         pg.growth.map(g=>`<tr><td><div style="font-weight:600">${esc(g.name||g.account)}</div>
             <div class="mono hint">${esc(g.account)}</div></td>
-          <td class="v num">${g.this_month ? '+'+g.this_month : '—'}</td>
-          <td class="v num">${g.last_month ? '+'+g.last_month : '—'}</td>
+          <td class="v num">${g.this_month || 0}</td>
+          <td class="v num">${g.last_month || 0}</td>
           <td class="v num"><b>${g.total}</b></td></tr>`).join('')}</tbody></table>`;
       gb.appendChild(t); gc.appendChild(gb); v.appendChild(gc);
     }

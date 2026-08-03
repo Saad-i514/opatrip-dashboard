@@ -57,8 +57,9 @@ export async function viewAccounts(){
       <td><span class="badge ${fresh[0]}">${esc(fresh[1])}</span></td>
       <td><button class="btn sm ghost" data-pick="${esc(a.viator_account_id)}">Open</button></td>
     </tr>`;}).join('');
-  wrap.innerHTML = `<table><thead><tr><th>Account</th><th>Total products</th><th>Live</th>
-    <th>Draft</th><th>Pending</th><th>Rejected</th><th>Removed</th><th>No reviews</th>
+  wrap.innerHTML = `<table><thead><tr><th>Account</th><th class="num">Total products</th>
+    <th class="num">Live</th><th class="num">Draft</th><th class="num">Pending</th>
+    <th class="num">Rejected</th><th class="num">Removed</th><th class="num">No reviews</th>
     <th>Last checked</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
   card.appendChild(wrap); v.appendChild(card);
   wrap.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
