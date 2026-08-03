@@ -60,7 +60,7 @@ export async function viewAccounts(){
   wrap.innerHTML = `<table><thead><tr><th>Account</th><th class="num">Total products</th>
     <th class="num">Live</th><th class="num">Draft</th><th class="num">Pending</th>
     <th class="num">Rejected</th><th class="num">Removed</th><th class="num">No reviews</th>
-    <th>Last checked</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+    <th>Last Updated</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
   card.appendChild(wrap); v.appendChild(card);
   wrap.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
     S.acct = b.dataset.pick; localStorage.setItem('acct', S.acct);
