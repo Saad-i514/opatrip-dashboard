@@ -13,7 +13,7 @@ export async function viewCategories(){
   const g = el('div','grid2');
   g.appendChild(bars('Locations', s.by_location));
   g.appendChild(bars('Status', s.by_status, statusBadge));
-  g.appendChild(bars('Connection', s.by_connection, connBadge));
+  g.appendChild(bars('Book on Connection', s.by_connection, connBadge));
   g.appendChild(bars('Quality', s.by_quality, qualBadge));
   v.appendChild(g);
   // "Not captured (draft)" is a real bucket on these charts and deserves a sentence
@@ -41,23 +41,40 @@ export async function viewAudit(){
     `<h3>Change history</h3><span class="sub">${d.changes.length} most recent</span>`));
   const b = el('div','pad');
   if (!d.changes.length){
-    b.appendChild(el('div','empty','<div class="big">No changes yet</div>'+
-      'The first capture is the baseline. Run a second sync and anything that '+
-      'differs will be listed here.'));
+    b.appendChild(el('div','empty','<div class="big">Nothing has changed yet</div>'+
+      'The first time a product is captured it becomes the starting point. From the '+
+      'second check onwards, anything Viator changes shows up here — with the old and '+
+      'new value side by side.'));
   } else {
-    const t = el('div','tblwrap');
-    t.innerHTML = `<table><thead><tr><th>When</th><th>Product</th><th>What changed</th>
-      <th>Before</th><th>After</th><th>Account</th><th>Run by</th></tr></thead><tbody>${
-      d.changes.map(c=>`<tr>
-        <td class="hint" style="white-space:nowrap">${esc(when(c.detected_at))}</td>
-        <td><div style="font-weight:600">${esc(trunc(c.title))}</div>
-            <div class="mono hint">${esc(c.product_code)}</div></td>
-        <td>${esc(fieldLabel(c.field_path))}</td>
-        <td>${valueBox(c.old_value, 'old', 'Value before')}</td>
-        <td>${valueBox(c.new_value, null, 'Value after')}</td>
-        <td class="hint">${esc(c.account_name||c.viator_account_id)}</td>
-        <td class="hint">${esc(c.operator_email)}</td></tr>`).join('')}</tbody></table>`;
-    b.appendChild(t);
+    b.appendChild(el('div','hint',
+      'Every line is one thing that changed on Viator between two checks. '
+      + 'Click a value to see it in full.'));
+    // One card per change, written as a sentence. The old version was a table of dotted
+    // field paths, run ids and operator emails — accurate, but you had to know the schema
+    // to read it. The same facts are here; the reader no longer has to.
+    const feed = el('div','feed'); feed.style.marginTop='12px';
+    d.changes.forEach(c=>{
+      const it = el('div','feeditem chg');
+      it.innerHTML = `<div class="dot3">⟳</div>
+        <div style="min-width:0">
+          <div style="font-weight:600">${esc(trunc(c.title))}</div>
+          <div class="hint" style="margin:2px 0 7px">
+            <span class="mono">${esc(c.product_code)}</span>
+            · ${esc(c.account_name||c.viator_account_id)}</div>
+          <div class="chg-what"><b>${esc(fieldLabel(c.field_path))}</b> was changed</div>
+          <div class="chg-vals">
+            <div><div class="chg-lbl">Before</div>${valueBox(c.old_value,'old','Value before')}</div>
+            <div class="chg-arrow">→</div>
+            <div><div class="chg-lbl">After</div>${valueBox(c.new_value,null,'Value after')}</div>
+          </div>
+        </div>
+        <div class="hint" style="text-align:right;white-space:nowrap">
+          ${esc(when(c.detected_at))}<br>
+          <span title="the person who ran the check that spotted it"
+            >found by ${esc((c.operator_email||'').split('@')[0])}</span></div>`;
+      feed.appendChild(it);
+    });
+    b.appendChild(feed);
   }
   c.appendChild(b); v.appendChild(c);
 }
@@ -67,7 +84,13 @@ export async function viewSyncs(){
   const d = await api('/api/syncs'+q());
   v.innerHTML='';
   const c = el('div','card');
-  c.appendChild(el('div','card-h','<h3>Sync runs</h3>'));
+  // The success rate used to be a card on the dashboard. It measures the TOOL, not the
+  // catalogue, so it belongs where someone is already looking at runs.
+  const done = d.syncs.filter(s=>s.status==='done').length;
+  const rate = d.syncs.length ? Math.round(done/d.syncs.length*100) : 0;
+  c.appendChild(el('div','card-h','<h3>Sync runs</h3>'+
+    (d.syncs.length ? `<span class="sub">${done} of ${d.syncs.length} completed`
+      + ` · ${rate}% success</span>` : '')));
   const b = el('div','pad');
   if (!d.syncs.length){ b.appendChild(el('div','hint','No runs yet.')); }
   else {

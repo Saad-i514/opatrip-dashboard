@@ -19,17 +19,20 @@ export async function viewAccounts(){
   const days = daysSince;   // shared parser: handles the +00:00 offset
 
   const tiles = el('div','tiles');
-  [['Accounts', list.length, `${synced.length} captured`],
-   ['Products', totP, 'across every account'],
-   ['Never captured', never.length, never.length?'need a first run':'all covered'],
-   ['Photos', list.reduce((s,a)=>s+(a.image_count||0),0), 'stored in R2']]
+  const sum = k => list.reduce((s,a)=>s+(a[k]||0),0);
+  [['Accounts', list.length, `${synced.length} captured so far`],
+   ['Total products', totP, 'across every account'],
+   ['Live', sum('live_count'), 'selling right now'],
+   ['Drafts', sum('draft_count'), 'not submitted yet'],
+   ['Rejected', sum('rejected_count'), 'need fixing'],
+   ['Never captured', never.length, never.length?'need a first run':'all covered']]
    .forEach(([l,n,s2])=>tiles.appendChild(el('div','tile',
      `<div class="l">${l}</div><div class="n">${n}</div><div class="s">${esc(s2)}</div>`)));
   v.appendChild(tiles);
 
   const card = el('div','card');
-  card.appendChild(el('div','card-h','<h3>Account coverage</h3>'+
-    '<span class="sub">how recently each account was captured</span>'));
+  card.appendChild(el('div','card-h','<h3>Every account at a glance</h3>'+
+    '<span class="sub">how many products, and what state they are in</span>'));
   const wrap = el('div','tblwrap');
   const rowsHtml = list.map(a=>{
     const dd = days(a.last_sync_at);
@@ -37,20 +40,25 @@ export async function viewAccounts(){
       : dd < 2 ? ['b-active', `${Math.round(dd*24)}h ago`]
       : dd < 14 ? ['b-pending', `${Math.round(dd)} days ago`]
       : ['b-rejected', `${Math.round(dd)} days ago`];
+    // a zero reads better as a quiet dash than as a column of 0s to scan past
+    const n = (v2, warn) => !v2 ? '<span class="hint">—</span>'
+      : (warn ? `<b style="color:var(--red)">${v2}</b>` : String(v2));
     return `<tr>
       <td><div style="font-weight:600">${esc(a.name||a.viator_account_id)}</div>
           <div class="mono hint">${esc(a.viator_account_id)}</div></td>
-      <td class="v num">${a.product_count||0}</td>
-      <td class="v num">${a.draft_count||0}</td>
-      <td class="v num">${a.image_count||0}</td>
-      <td class="v num">${a.missing_count?`<b style="color:var(--red)">${a.missing_count}</b>`:'0'}</td>
+      <td class="v num"><b>${a.product_count||0}</b></td>
+      <td class="v num">${n(a.live_count)}</td>
+      <td class="v num">${n(a.draft_count)}</td>
+      <td class="v num">${n(a.pending_count)}</td>
+      <td class="v num">${n(a.rejected_count, true)}</td>
+      <td class="v num">${n(a.removed_count)}</td>
+      <td class="v num">${n(a.no_review_count)}</td>
       <td><span class="badge ${fresh[0]}">${esc(fresh[1])}</span></td>
-      <td class="hint">${esc(a.signin_email||'')}</td>
-      <td><button class="btn sm ghost" data-pick="${esc(a.viator_account_id)}">View</button></td>
+      <td><button class="btn sm ghost" data-pick="${esc(a.viator_account_id)}">Open</button></td>
     </tr>`;}).join('');
-  wrap.innerHTML = `<table><thead><tr><th>Account</th><th>Products</th><th>Drafts</th>
-    <th>Photos</th><th>Removed</th><th>Last capture</th><th>Last operator</th><th></th>
-    </tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  wrap.innerHTML = `<table><thead><tr><th>Account</th><th>Total products</th><th>Live</th>
+    <th>Draft</th><th>Pending</th><th>Rejected</th><th>Removed</th><th>No reviews</th>
+    <th>Last checked</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
   card.appendChild(wrap); v.appendChild(card);
   wrap.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
     S.acct = b.dataset.pick; localStorage.setItem('acct', S.acct);

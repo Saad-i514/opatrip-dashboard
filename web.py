@@ -218,6 +218,18 @@ def accounts():
                  AND p.missing_since IS NOT NULL) AS missing_count,
               (SELECT COUNT(*) FROM products p WHERE p.account_id=a.id
                  AND p.is_draft_stub=1) AS draft_count,
+              -- one row per account with its whole lifecycle split, so the Accounts tab
+              -- can answer "how is this account doing" without a query per status
+              (SELECT COUNT(*) FROM products p WHERE p.account_id=a.id
+                 AND p.status_canonical='LIVE') AS live_count,
+              (SELECT COUNT(*) FROM products p WHERE p.account_id=a.id
+                 AND p.status_canonical='PENDING') AS pending_count,
+              (SELECT COUNT(*) FROM products p WHERE p.account_id=a.id
+                 AND p.status_canonical='REJECTED') AS rejected_count,
+              (SELECT COUNT(*) FROM products p WHERE p.account_id=a.id
+                 AND p.status_canonical='REMOVED') AS removed_count,
+              (SELECT COUNT(*) FROM products p WHERE p.account_id=a.id
+                 AND p.review_count=0) AS no_review_count,
               (SELECT COUNT(*) FROM product_images i JOIN products p ON p.id=i.product_id
                  WHERE p.account_id=a.id) AS image_count
             FROM accounts a ORDER BY a.name IS NULL, a.name""")]
@@ -324,6 +336,8 @@ def overview(account: str | None = None):
                  (SELECT COUNT(*) FROM product_images i
                     JOIN products p ON p.id=i.product_id
                     JOIN accounts a ON a.id=p.account_id {where}) AS photos,
+                 (SELECT COUNT(*) {P} {AND} substr(p.first_seen_at,1,7)=?)
+                   AS added_month,
                  (SELECT COUNT(*) {P} {AND} {ago_seen} <= 30) AS new30,
                  (SELECT COUNT(*) {P} {AND} {ago_seen} BETWEEN 30 AND 60) AS prev30,
                  (SELECT COUNT(*) {C_} {AND} {ago_chg} <= 7) AS ch7,
@@ -335,7 +349,8 @@ def overview(account: str | None = None):
                  (SELECT COUNT(DISTINCT t.id) FROM tours t
                     JOIN products p ON p.tour_id=t.id
                     JOIN accounts a ON a.id=p.account_id {where}) AS tours_total
-      """.format(swhere=swhere, swhere_done=swhere_done), args * 11).fetchone()
+      """.format(swhere=swhere, swhere_done=swhere_done),
+          args + [db.now()[:7]] + args * 10).fetchone()
       total_products = counts["total_products"] or 0
       drafts = counts["drafts"] or 0
       missing = counts["missing"] or 0
@@ -398,6 +413,8 @@ def overview(account: str | None = None):
             "photos": {"value": photos, "delta": None, "sub": "downloaded locally"},
             "changes": {"value": ch7, "delta": pct(ch7, chprev7),
                         "sub": "detected this week"},
+            "added_month": {"value": counts["added_month"] or 0, "delta": None,
+                            "sub": "new products captured in " + db.now()[:7]},
             "drafts": {"value": drafts, "delta": None, "sub": "recorded, not fetched"},
             "removed": {"value": missing, "delta": None, "sub": "gone from the roster"},
             "sync_rate": {"value": round(syncs_done / syncs_all * 100) if syncs_all else 0,
@@ -411,13 +428,164 @@ def overview(account: str | None = None):
     }
 
 
+# Review bands, as one definition. The UI needs the labels for its dropdown and the API
+# needs the SQL; keeping them apart is how a filter ends up meaning something different
+# from the option that selects it.
+REVIEW_BANDS = {
+    "0":     ("No reviews yet",   "p.review_count = 0"),
+    "1":     ("Exactly 1 review", "p.review_count = 1"),
+    "2-5":   ("2 to 5 reviews",   "p.review_count BETWEEN 2 AND 5"),
+    "6-20":  ("6 to 20 reviews",  "p.review_count BETWEEN 6 AND 20"),
+    "21+":   ("21 or more",       "p.review_count >= 21"),
+    "any":   ("Has at least one", "p.review_count > 0"),
+    "none":  ("Not captured",     "p.review_count IS NULL"),
+}
+
+
+@app.get("/api/review-bands")
+def review_bands():
+    """So the dropdown and the query can never drift apart."""
+    return {"bands": [{"key": k, "label": v[0]} for k, v in REVIEW_BANDS.items()]}
+
+
+@app.get("/api/progress")
+def progress(account: str | None = None, months: int = 6):
+    """Month-over-month movement, reconstructed rather than guessed.
+
+    Two different questions get two different answers, because the data supports them
+    differently:
+
+      * "how many products existed, and in what state, at the end of month M" is
+        RECONSTRUCTED: start from today's status and walk the recorded status changes
+        backwards. A product whose status changed after month M is counted under the
+        status it had *then* (the change row's old value), not the one it has now. With
+        no status changes recorded the reconstruction correctly reduces to today's
+        status, and it stays correct as changes accumulate.
+      * "how many were ADDED in month M" comes straight from first_seen_at.
+
+    Never inferred: a status from before the product's first capture. A product's history
+    begins when this tool first saw it, and the response says so rather than drawing a
+    line back to zero that would read as growth that never happened.
+    """
+    where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
+    with db.session() as con:
+        prods = [dict(r) for r in con.execute(
+            f"""SELECT p.id, p.status_canonical, p.first_seen_at,
+                       a.viator_account_id AS acct, a.name AS acct_name
+                FROM products p JOIN accounts a ON a.id=p.account_id {where}""", args)]
+        raw2canon = {r["raw"]: r["canonical"]
+                     for r in con.execute("SELECT raw, canonical FROM status_map")}
+        chg = [dict(r) for r in con.execute(
+            f"""SELECT c.product_id, c.old_value, c.detected_at
+                FROM changes c JOIN accounts a ON a.id=c.account_id
+                {where} {'AND' if where else 'WHERE'}
+                (c.field_path LIKE '%status' OR c.field_path LIKE '%status_canonical')
+                ORDER BY c.detected_at""", args)]
+
+    by_prod = {}
+    for c in chg:
+        by_prod.setdefault(c["product_id"], []).append(c)
+
+    now = db.now()
+    y, m = int(now[:4]), int(now[5:7])
+    keys = []
+    for _ in range(max(1, min(months, 24))):
+        keys.append(f"{y:04d}-{m:02d}")
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    keys.reverse()
+
+    ORDER = ["LIVE", "PENDING", "DRAFT", "REJECTED", "REMOVED"]
+
+    def status_at(p, end):
+        """Its status at the END of month `end`: the old value of the first change
+        recorded after that point, or today's status if nothing has moved since."""
+        for c in by_prod.get(p["id"], []):
+            if (c["detected_at"] or "")[:7] > end:
+                return raw2canon.get(c["old_value"], c["old_value"])
+        return p["status_canonical"]
+
+    series = []
+    for k in keys:
+        existed = [p for p in prods if (p["first_seen_at"] or "")[:7] <= k]
+        counts = {s: 0 for s in ORDER}
+        for p in existed:
+            st = status_at(p, k)
+            if st in counts:
+                counts[st] += 1
+        series.append({"month": k, "total": len(existed),
+                       "added": sum(1 for p in prods
+                                    if (p["first_seen_at"] or "")[:7] == k),
+                       **counts})
+
+    cur = series[-1]
+    prev = series[-2] if len(series) > 1 else None
+
+    def delta(field):
+        if not prev:
+            return None
+        a, b = cur.get(field, 0), prev.get(field, 0)
+        return {"now": a, "was": b, "diff": a - b,
+                "pct": round((a - b) / b * 100, 1) if b else None}
+
+    per_acct = {}
+    for p in prods:
+        e = per_acct.setdefault(p["acct"], {"account": p["acct"], "name": p["acct_name"],
+                                            "total": 0, "this_month": 0, "last_month": 0})
+        e["total"] += 1
+        fs = (p["first_seen_at"] or "")[:7]
+        if fs == keys[-1]:
+            e["this_month"] += 1
+        elif len(keys) > 1 and fs == keys[-2]:
+            e["last_month"] += 1
+    growth = sorted(per_acct.values(),
+                    key=lambda x: (-x["this_month"], -x["total"]))[:12]
+
+    with db.session() as con:
+        bands = {}
+        for key, (label, cond) in REVIEW_BANDS.items():
+            if key in ("any", "none"):
+                continue
+            bands[key] = {"label": label, "n": con.execute(
+                f"""SELECT COUNT(*) FROM products p JOIN accounts a ON a.id=p.account_id
+                    {where} {'AND' if where else 'WHERE'} {cond}""",
+                args).fetchone()[0]}
+        chg_series = [dict(r) for r in con.execute(
+            f"""SELECT substr(c.detected_at,1,7) m, COUNT(*) n FROM changes c
+                JOIN accounts a ON a.id=c.account_id {where}
+                GROUP BY 1 ORDER BY 1 DESC LIMIT 12""", args)]
+
+    return {
+        "series": series,
+        "current": cur, "previous": prev,
+        "deltas": {f: delta(f) for f in ("total", "added", *ORDER)},
+        "growth": growth,
+        "reviews": bands,
+        "status_changes": list(reversed(chg_series)),
+        "history_note": (
+            "A product's history starts when this tool first captured it, so nothing is "
+            "drawn before that. Earlier months are reconstructed from recorded status "
+            "changes"
+            + (f" ({len(chg)} recorded)." if chg else
+               " — none recorded yet, so earlier months show each product's current "
+               "status.")),
+    }
+
+
 @app.get("/api/products")
 def products(account: str | None = None, q: str | None = None,
-             status: str | None = None, connection: str | None = None):
+             status: str | None = None, connection: str | None = None,
+             platform: str | None = None, lifecycle: str | None = None,
+             reviews: str | None = None, missing: str | None = None):
     sql = """SELECT p.*, a.viator_account_id, a.name AS account_name,
+               pl.code AS platform_code, pl.name AS platform_name,
                (SELECT COUNT(*) FROM product_images i WHERE i.product_id=p.id) AS image_count,
                (SELECT COUNT(*) FROM changes c WHERE c.product_id=p.id) AS change_count
-             FROM products p JOIN accounts a ON a.id=p.account_id WHERE 1=1"""
+             FROM products p
+             JOIN accounts a ON a.id=p.account_id
+             LEFT JOIN platforms pl ON pl.id=p.platform_id
+             WHERE 1=1"""
     args = []
     if account:
         sql += " AND a.viator_account_id=?"
@@ -428,9 +596,26 @@ def products(account: str | None = None, q: str | None = None,
     if status:
         sql += " AND p.status=?"
         args.append(status)
+    # lifecycle is the CANONICAL status (LIVE/DRAFT/...) — the same word the dashboard
+    # cards and the donut use. `status` above is the platform's own raw word, kept so an
+    # existing link with ?status=ACTIVE still works.
+    if lifecycle:
+        sql += " AND p.status_canonical=?"
+        args.append(lifecycle)
+    if platform:
+        sql += " AND pl.code=?"
+        args.append(platform)
     if connection:
         sql += " AND p.connection_state=?"
         args.append(connection)
+    if missing:
+        sql += " AND p.missing_since IS NOT NULL"
+    if reviews:
+        band = REVIEW_BANDS.get(reviews)
+        if not band:
+            raise HTTPException(400, f"unknown review band {reviews!r}; "
+                                     f"expected one of {sorted(REVIEW_BANDS)}")
+        sql += f" AND {band[1]}"          # from the table above, never from the request
     sql += " ORDER BY p.product_code"
     with db.session() as con:
         rows = [dict(r) for r in con.execute(sql, args)]

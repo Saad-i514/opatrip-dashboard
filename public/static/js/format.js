@@ -234,16 +234,45 @@ export function section(title, node){
 }
 
 /* ---------- badges ---------- */
+/* Status, as a table rather than an if-chain — the same shape as QUALITY above, and for
+   the same reason: an unrecognised value must render as itself, never fall into whatever
+   the last branch happened to be. Each entry carries a dot colour so the state is
+   readable at a glance without reading the word.
+   Both the platform's own words (ACTIVE, INACTIVE…) and the canonical ones
+   (LIVE, REMOVED…) map here, so a badge means the same thing wherever it is drawn. */
+export const STATUS_LABEL = {
+  ACTIVE:                    ['Live',              'b-active'],
+  LIVE:                      ['Live',              'b-active'],
+  DRAFT:                     ['Draft',             'b-draft'],
+  PENDING:                   ['Pending review',    'b-pending'],
+  UNDER_REVIEW:              ['Pending review',    'b-pending'],
+  PENDING_FIRST_ACTIVATION:  ['Pending activation','b-pending'],
+  REJECTED:                  ['Rejected',          'b-rejected'],
+  INACTIVE:                  ['Removed',           'b-removed'],
+  REMOVED:                   ['Removed',           'b-removed'],
+  NOT_LISTED:                ['Not uploaded',      'b-draft'],
+};
 export function statusBadge(s){
-  const k=(s||'').toUpperCase();
-  const cls = k==='ACTIVE'?'b-active':k==='REJECTED'?'b-rejected'
-    :k.startsWith('PENDING')?'b-pending':'b-draft';
-  const nice = k==='PENDING_FIRST_ACTIVATION'?'Pending activation'
-    :k?sentence(k):'Unknown';
-  return `<span class="badge ${cls}">${esc(nice)}</span>`;
+  const k = (s || '').toUpperCase();
+  if (!k) return '<span class="badge b-draft">Unknown</span>';
+  const hit = STATUS_LABEL[k];
+  const [label, cls] = hit || [sentence(k), 'b-draft'];
+  return `<span class="badge ${cls}"><i class="dot"></i>${esc(label)}</span>`;
 }
-export const connBadge = c => !c ? '' :
-  `<span class="badge ${c==='Connected'?'b-conn':c==='Not connected'?'b-noconn':'b-pending'}">${esc(c)}</span>`;
+/* "Book on Connection" is Viator's own name for a product bookable through the API
+   connection. The badge shows the state; the column header carries the full term. */
+export const CONNECTION_LABEL = {
+  'Connected':           ['Bookable',           'b-conn'],
+  'Partially connected': ['Partly bookable',    'b-pending'],
+  'Not connected':       ['Not bookable',       'b-noconn'],
+};
+export const connBadge = c => {
+  if (!c) return '';
+  const hit = CONNECTION_LABEL[c];
+  const [label, cls] = hit || [c, 'b-draft'];
+  return `<span class="badge ${cls}" title="Book on Connection: ${esc(c)}">`
+       + `<i class="dot"></i>${esc(label)}</span>`;
+};
 /* Viator's own quality ratings. Anything NOT in this table is not a rating and must
    never be painted as a quality failure — the old version tested `q === 'GOOD'` and sent
    everything else to "Needs work", which mislabelled two things at once:

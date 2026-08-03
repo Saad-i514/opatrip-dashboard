@@ -102,11 +102,16 @@ export function kpiCard(icon, tint, label, k){
   const chip = d === null || d === undefined ? ''
     : `<span class="chip ${d>0?'chip-up':d<0?'chip-dn':'chip-flat'}">${
         d>0?'↗':d<0?'↘':'–'} ${Math.abs(d)}%</span>`;
-  return `<div class="kpi">
+  // A card with `k.filter` becomes a button: clicking it opens Products already
+  // filtered to what the number counts. A figure you cannot drill into is trivia.
+  const act = k.filter
+    ? ` role="button" tabindex="0" data-filter="${esc(JSON.stringify(k.filter))}"`
+      + ` title="Show these products"` : '';
+  return `<div class="kpi${k.filter ? ' kpi-click' : ''}"${act}>
     <div class="row1"><div class="ic" style="background:${tint}">${icon}</div>${chip}</div>
     <div class="n">${k.value}${k.suffix||''}</div>
     <div class="l">${esc(label)}</div>
     <div class="s">${esc(k.sub||'')}</div>
-    ${k.spark||''}</div>`;
+    ${k.spark||''}${k.filter ? '<div class="kpi-go">View products →</div>' : ''}</div>`;
 }
 

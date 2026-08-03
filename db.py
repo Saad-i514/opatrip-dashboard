@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS products (
   first_seen_at    TEXT,
   last_seen_at     TEXT,
   missing_since    TEXT,   -- set when it stops appearing in the account's roster
+  review_count     INTEGER,           -- from review_rating.totalReviewCount
+  review_rating    REAL,
   UNIQUE(account_id, product_code)
 );
 CREATE TABLE IF NOT EXISTS product_images (
@@ -210,7 +212,8 @@ def init():
         # IF NOT EXISTS won't add a new column to an existing table.
         have = store.table_columns(con, "products")
         for col, decl in (("missing_since", "TEXT"), ("platform_id", "INTEGER"),
-                          ("tour_id", "INTEGER"), ("status_canonical", "TEXT")):
+                          ("tour_id", "INTEGER"), ("status_canonical", "TEXT"),
+                          ("review_count", "INTEGER"), ("review_rating", "REAL")):
             if col not in have:
                 con.execute(f"ALTER TABLE products ADD COLUMN {col} {decl}")
         acc = store.table_columns(con, "accounts")
@@ -448,8 +451,9 @@ def upsert_product(con, account_id, code, **f):
                                    connection_state, quality_level, location,
                                    is_draft_stub, thumbnail_url, thumbnail_path,
                                    platform_id, tour_id, status_canonical,
+                                   review_count, review_rating,
                                    first_seen_at, last_seen_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON CONFLICT(account_id, product_code) DO UPDATE SET
                title=COALESCE(excluded.title, products.title),
                status=COALESCE(excluded.status, products.status),
@@ -464,11 +468,14 @@ def upsert_product(con, account_id, code, **f):
                tour_id=COALESCE(excluded.tour_id, products.tour_id),
                status_canonical=COALESCE(excluded.status_canonical,
                                          products.status_canonical),
+               review_count=COALESCE(excluded.review_count, products.review_count),
+               review_rating=COALESCE(excluded.review_rating, products.review_rating),
                last_seen_at=excluded.last_seen_at"""
     args = (account_id, code, f.get("title"), f.get("status"), f.get("connection_state"),
             f.get("quality_level"), f.get("location"), int(bool(f.get("is_draft_stub"))),
             f.get("thumbnail_url"), f.get("thumbnail_path"), f.get("platform_id"),
-            f.get("tour_id"), f.get("status_canonical"), t, t)
+            f.get("tour_id"), f.get("status_canonical"),
+            f.get("review_count"), f.get("review_rating"), t, t)
     # RETURNING id saves the follow-up SELECT. Postgres returns the row for DO UPDATE too.
     if store.is_cloud():
         r = con.execute(sql + " RETURNING id", args).fetchone()

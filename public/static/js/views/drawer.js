@@ -214,42 +214,21 @@ export async function openDrawer(pid){
     c.appendChild(b2); body.appendChild(c);
   }
 
-  /* snapshots + raw */
-  if (d.snapshots.length){
-    const c = el('div','card');
-    c.appendChild(el('div','card-h',
-      `<h3>Earlier captures</h3><span class="sub">${d.snapshots.length} snapshot(s)</span>`));
-    const b = el('div','pad');
-    d.snapshots.forEach((s,i)=>{
-      // A run that found no change writes no snapshot — it stamps the existing one.
-      // Saying so here is the difference between "captured once" and "unchanged since".
-      const conf = s.confirmations
-        ? ` · unchanged in ${s.confirmations} later run${s.confirmations>1?'s':''}`
-          + (s.last_confirmed_at ? `, last ${when(s.last_confirmed_at)}` : '')
-        : '';
-      const btn = el('button','btn ghost sm',
-        `${when(s.captured_at)} · run #${s.sync_id}${i===0?' · latest':''}${conf}`);
-      btn.style.cssText='display:block;width:100%;text-align:left;margin:4px 0';
-      btn.onclick = async ()=>{
-        const snap = await api('/api/snapshot/'+s.id);
-        const holder = el('div','card pad'); holder.style.marginTop='10px';
-        holder.appendChild(el('div','subhead',`Snapshot ${when(snap.captured_at)}`));
-        holder.appendChild(tree(snap.normalized));
-        btn.after(holder); btn.disabled = true;
-      };
-      b.appendChild(btn);
-    });
-    if (cur){
-      const raw = el('details'); raw.style.marginTop='14px';
-      const s = el('summary','hint','Show raw captured data (for developers)');
-      s.style.cursor='pointer';
-      raw.appendChild(s);
-      const holder = el('div'); holder.style.marginTop='10px';
-      raw.appendChild(holder);
-      raw.ontoggle = ()=>{ if(raw.open && !holder.childElementCount) holder.appendChild(tree(cur)); };
-      b.appendChild(raw);
-    }
-    c.appendChild(b); body.appendChild(c);
+  /* The "Earlier captures" snapshot browser lived here. It listed run ids and raw
+     JSON dumps — a debugging tool on a page people open to read a product. What
+     changed, and when, is the Change history below; the raw data is still one click
+     away under the developer section. */
+  if (cur){
+    // Collapsed and unlabelled beyond "for developers": the raw JSON is an escape hatch,
+    // not a section of the page.
+    const raw = el('details','rawbox');
+    const sm = el('summary','hint','Show raw captured data (for developers)');
+    sm.style.cursor='pointer';
+    raw.appendChild(sm);
+    const holder = el('div'); holder.style.marginTop='10px';
+    raw.appendChild(holder);
+    raw.ontoggle = ()=>{ if(raw.open && !holder.childElementCount) holder.appendChild(tree(cur)); };
+    body.appendChild(raw);
   }
   dr.appendChild(body); host.appendChild(dr);
   head.querySelector('#xClose').onclick = closeDrawer;

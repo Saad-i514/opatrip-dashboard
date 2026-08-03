@@ -6,40 +6,91 @@ import { openDrawer, when } from './drawer.js';
 
 /* ======================= products ======================= */
 
+
+/* Reviews, shown on the row itself: it is the field people are filtering on, and a
+   filter whose result you cannot see is hard to trust. Zero is called out rather than
+   printed as "0 reviews" among the rest — it is the actionable state. */
+function reviewChip(p){
+  if (p.review_count == null) return '';
+  if (p.review_count === 0)
+    return '· <b style="color:var(--accent)">no reviews</b>';
+  const stars = p.review_rating ? ` ★${Number(p.review_rating).toFixed(1)}` : '';
+  return `· ${p.review_count} review${p.review_count===1?'':'s'}${esc(stars)}`;
+}
+
 let _t; const debounce = fn => { clearTimeout(_t); _t=setTimeout(fn,260); };
 export async function viewProducts(){
   const v = $('#v-products');
   if (!v.dataset.painted) skeleton(v, 'list', 'products');
   const ps = new URLSearchParams();
   if (S.acct) ps.set('account',S.acct);
-  if (S.pf.q) ps.set('q',S.pf.q);
-  if (S.pf.status) ps.set('status',S.pf.status);
-  if (S.pf.connection) ps.set('connection',S.pf.connection);
-  const d = await api('/api/products?'+ps);
+  // every filter travels as a query param, so a filtered view is a shareable URL and the
+  // server does the narrowing — filtering 1,100 rows in the browser would mean shipping
+  // all of them first
+  for (const k of ['q','lifecycle','platform','connection','reviews','missing'])
+    if (S.pf[k]) ps.set(k, S.pf[k]);
+  if (S.pf.status) ps.set('status', S.pf.status);
+  const [d, plats] = await Promise.all([
+    api('/api/products?'+ps),
+    S._plats ? Promise.resolve(S._plats) : api('/api/platforms').then(r=>(S._plats=r)),
+  ]);
   v.dataset.painted='1';
   v.innerHTML='';
+
+  const LIFECYCLE = [['LIVE','Live'],['DRAFT','Draft'],['PENDING','Pending review'],
+                     ['REJECTED','Rejected'],['REMOVED','Removed']];
+  const REVIEWS = [['0','No reviews yet'],['1','Exactly 1 review'],['2-5','2 to 5 reviews'],
+                   ['6-20','6 to 20 reviews'],['21+','21 or more'],['any','Has reviews']];
+  const opts = (list, cur) => list.map(([val,lab]) =>
+    `<option value="${esc(val)}" ${cur===val?'selected':''}>${esc(lab)}</option>`).join('');
+
   const f = el('div','filters');
   f.innerHTML = `
     <input type="text" id="pq" placeholder="Search by name or product code"
-           value="${esc(S.pf.q)}" style="min-width:280px;flex:1;max-width:420px">
-    <select id="pstatus"><option value="">Any status</option>
-      ${['ACTIVE','DRAFT','PENDING_FIRST_ACTIVATION','REJECTED'].map(x=>
-        `<option value="${x}" ${S.pf.status===x?'selected':''}>${esc(
-          x==='PENDING_FIRST_ACTIVATION'?'Pending activation':sentence(x))}</option>`).join('')}
-    </select>
-    <select id="pconn"><option value="">Any connection</option>
-      ${['Connected','Partially connected','Not connected'].map(x=>
-        `<option ${S.pf.connection===x?'selected':''}>${x}</option>`).join('')}
-    </select>
-    <span class="pill">${d.products.length} shown</span>`;
+           value="${esc(S.pf.q)}" style="min-width:240px;flex:1;max-width:360px">
+    <select id="pplat" title="Platform"><option value="">All platforms</option>
+      ${opts((plats.platforms||[]).map(p=>[p.code, p.name]), S.pf.platform)}</select>
+    <select id="plife" title="Lifecycle status"><option value="">Any status</option>
+      ${opts(LIFECYCLE, S.pf.lifecycle)}</select>
+    <select id="previews" title="Review count"><option value="">Any reviews</option>
+      ${opts(REVIEWS, S.pf.reviews)}</select>
+    <select id="pconn" title="Book on Connection"><option value="">Any connection</option>
+      ${opts([['Connected','Connected'],['Partially connected','Partially connected'],
+              ['Not connected','Not connected']], S.pf.connection)}</select>
+    <span class="pill">${d.products.length} shown</span>
+    <button class="btn ghost sm" id="pclear">Clear</button>`;
   v.appendChild(f);
+  const set = (k, val) => { S.pf[k] = val; viewProducts(); };
   f.querySelector('#pq').oninput = e=>{S.pf.q=e.target.value; debounce(viewProducts);};
-  f.querySelector('#pstatus').onchange = e=>{S.pf.status=e.target.value; viewProducts();};
-  f.querySelector('#pconn').onchange = e=>{S.pf.connection=e.target.value; viewProducts();};
+  f.querySelector('#pplat').onchange   = e=>set('platform', e.target.value);
+  f.querySelector('#plife').onchange   = e=>set('lifecycle', e.target.value);
+  f.querySelector('#previews').onchange= e=>set('reviews', e.target.value);
+  f.querySelector('#pconn').onchange   = e=>set('connection', e.target.value);
+  f.querySelector('#pclear').onclick = ()=>{
+    Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',connection:'',
+                         reviews:'',missing:''});
+    viewProducts();
+  };
+  // Say what is being filtered in words. A count alone ("447 shown") leaves people
+  // wondering why the other 670 vanished.
+  const active = [
+    S.pf.q && `matching “${S.pf.q}”`,
+    S.pf.platform && `on ${S.pf.platform}`,
+    S.pf.lifecycle && (LIFECYCLE.find(x=>x[0]===S.pf.lifecycle)||[,S.pf.lifecycle])[1],
+    S.pf.reviews && (REVIEWS.find(x=>x[0]===S.pf.reviews)||[,S.pf.reviews])[1],
+    S.pf.connection, S.pf.missing && 'no longer listed on the platform',
+  ].filter(Boolean);
+  if (active.length){
+    const note = el('div','hint');
+    note.style.margin = '-6px 0 12px';
+    note.innerHTML = `Showing <b>${d.products.length}</b> product(s): ${
+      active.map(a=>esc(a)).join(' · ')}`;
+    v.appendChild(note);
+  }
   if (!d.products.length){
     // three different reasons for an empty list — say which one it is
     const acc = S.accounts.find(a=>a.viator_account_id===S.acct);
-    const anyFilter = S.pf.q || S.pf.status || S.pf.connection;
+    const anyFilter = Object.values(S.pf).some(Boolean);
     let msg;
     if (anyFilter){
       msg = '<div class="big">No products match those filters</div>'+
@@ -74,6 +125,7 @@ export async function viewProducts(){
           ${p.location?'· '+esc(p.location):''}
           ${!S.acct?'· '+esc(p.account_name||p.viator_account_id):''}
           ${p.image_count?`· ${p.image_count} photo${p.image_count===1?'':'s'}`:''}
+          ${reviewChip(p)}
           ${p.change_count?`· <b style="color:var(--accent)">${p.change_count} change${p.change_count===1?'':'s'}</b>`:''}
         </div>
       </div>

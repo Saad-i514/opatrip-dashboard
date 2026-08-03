@@ -211,6 +211,12 @@ ALTER TABLE product_images ADD COLUMN IF NOT EXISTS bytes BIGINT;
 -- A snapshot is now written only when the content actually differs from the previous
 -- one. These two record the runs that saw it unchanged, so "when did we last confirm
 -- this?" is still answerable without storing a duplicate copy per sync.
+-- Review counts are the signal for "which products need review generation", so they
+-- have to be filterable and sortable — reading them out of the snapshot JSON per request
+-- would mean parsing 743 blobs to answer one filter.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS review_count INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS review_rating REAL;
+CREATE INDEX IF NOT EXISTS idx_products_reviews ON products(review_count);
 ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS last_confirmed_at TEXT;
 ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS confirmations INTEGER DEFAULT 0;
 ALTER TABLE syncs ADD COLUMN IF NOT EXISTS host TEXT;

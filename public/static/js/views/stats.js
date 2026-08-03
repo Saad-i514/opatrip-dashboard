@@ -59,30 +59,153 @@ export async function viewStats(){
   const K = o.kpis;
   K.products.spark = sparkline((o.series.added||[]).map(x=>x.n), '#F97316');
   K.changes.spark  = sparkline((o.series.changes||[]).map(x=>x.n), '#2563EB');
-  const kp = el('div','kpis k6');
+  // Row 1 — the headline figures. "Sync success" used to sit here; it measured the
+  // TOOL, not the catalogue, which is not what this page is for. It is still on the
+  // Sync runs tab, where someone looking at runs will actually want it.
+  const kp = el('div','kpis k4');
   kp.innerHTML =
     // "Total products" is a lie while an account filter is on — name what it counts
     kpiCard('◧','var(--accent-soft)',
-            S.acct ? 'Products in this account' : 'Total products', K.products) +
+            S.acct ? 'Products in this account' : 'Total Products Ever Added',
+            {...K.products, filter: {}}) +
     kpiCard('◈','#EDE9FE','Tours tracked', K.tours) +
-    kpiCard('⟳','#DBEAFE','Changes this week', K.changes) +
-    kpiCard('✓','var(--green-bg)','Sync success', K.sync_rate) +
-    kpiCard('▤','#FEF3C7','Drafts', K.drafts) +
-    // NOT the same thing as the REMOVED status below: this counts products that vanished
-    // from the account roster entirely. Named apart so the two can't be read as one figure.
-    kpiCard('⚑','var(--red-bg)','No longer listed', K.removed);
+    kpiCard('↑','#DCFCE7','Added this month', K.added_month) +
+    kpiCard('⟳','#DBEAFE','Changes this week', K.changes);
   v.appendChild(kp);
 
-  // lifecycle row — the canonical status split, same source as the donut below
+  // Row 2 — the whole lifecycle in one row, every card a filter into Products.
   const st = o.dist.status || {};
-  const box = (n, sb) => ({value: st[n] || 0, delta: null, sub: sb});
-  const kp2 = el('div','kpis k4');
+  const box = (n, sb) => ({value: st[n] || 0, delta: null, sub: sb,
+                           filter: {lifecycle: n}});
+  const kp2 = el('div','kpis k6');
   kp2.innerHTML =
     kpiCard('●','var(--green-bg)','Live', box('LIVE','selling on the platform')) +
+    kpiCard('▤','#FEF3C7','Draft', box('DRAFT','recorded, not yet submitted')) +
     kpiCard('◷','var(--amber-bg)','Pending', box('PENDING','awaiting platform review')) +
     kpiCard('✕','var(--red-bg)','Rejected', box('REJECTED','needs fixing and resubmitting')) +
-    kpiCard('⊘','#F1EDE7','Removed', box('REMOVED','inactive on the platform'));
+    kpiCard('⊘','#F1EDE7','Removed', box('REMOVED','inactive on the platform')) +
+    // NOT the same thing as REMOVED: this counts products that vanished from the account
+    // roster entirely. Named apart so the two can't be read as one figure.
+    kpiCard('⚑','var(--red-bg)','No longer listed',
+            {...K.removed, filter: {missing: '1'}});
   v.appendChild(kp2);
+
+  // Every card that carries a filter opens Products already narrowed to it.
+  const drill = el2 => {
+    const f = JSON.parse(el2.dataset.filter);
+    Object.assign(S.pf, {q:'', status:'', lifecycle:'', platform:'', connection:'',
+                         reviews:'', missing:''}, f);
+    go('products');
+  };
+  v.querySelectorAll('.kpi-click').forEach(c => {
+    c.onclick = () => drill(c);
+    c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); drill(c); } };
+  });
+
+  /* ---- Progress: this month against last ----------------------------------------
+     Answers "are we moving forward?", which no single-point figure can. Every number
+     here is measured, never modelled: `added` comes from first_seen_at, and the status
+     counts for past months are reconstructed from recorded status changes (see
+     /api/progress). The note under the table says so, because a chart that quietly
+     assumes is worse than one that admits. */
+  try {
+    const pg = await api('/api/progress'+q());
+    const D = pg.deltas || {};
+    const pc = el('div','card'); pc.style.marginTop='16px';
+    pc.appendChild(el('div','card-h','<h3>Progress</h3>'+
+      `<span class="sub">${esc(pg.current.month)} vs ${
+        pg.previous ? esc(pg.previous.month) : 'no earlier month'}</span>`));
+    const pb = el('div','pad');
+
+    const MOVERS = [['total','Products tracked'], ['added','Added'], ['LIVE','Live'],
+                    ['DRAFT','Draft'], ['REJECTED','Rejected'], ['REMOVED','Removed']];
+    const cells = MOVERS.map(([k, lab]) => {
+      const d = D[k];
+      if (!d) return `<div class="mv"><div class="mv-l">${esc(lab)}</div>
+        <div class="mv-n">${(pg.current[k]||0)}</div>
+        <div class="mv-d hint">no earlier month yet</div></div>`;
+      // "added" falling is not a regression — it counts new arrivals, and a big first
+      // import makes every later month look like a drop. Colour only what it means.
+      const good = k === 'REJECTED' || k === 'REMOVED' ? d.diff < 0 : d.diff > 0;
+      const cls = d.diff === 0 ? 'flat' : (good ? 'up' : 'dn');
+      const arrow = d.diff === 0 ? '–' : (d.diff > 0 ? '↗' : '↘');
+      return `<div class="mv"><div class="mv-l">${esc(lab)}</div>
+        <div class="mv-n">${d.now}</div>
+        <div class="mv-d mv-${cls}">${arrow} ${d.diff > 0 ? '+' : ''}${d.diff}${
+          d.pct == null ? '' : ` (${d.pct > 0 ? '+' : ''}${d.pct}%)`}
+          <span class="hint">was ${d.was}</span></div></div>`;
+    }).join('');
+    pb.innerHTML = `<div class="movers">${cells}</div>`;
+
+    // month-by-month table — the raw numbers behind the deltas
+    const rows = (pg.series||[]).filter(s => s.total || s.added);
+    if (rows.length > 1){
+      const t = el('div','tblwrap'); t.style.marginTop='14px';
+      t.innerHTML = `<table><thead><tr><th>Month</th><th>Tracked</th><th>Added</th>
+        <th>Live</th><th>Draft</th><th>Pending</th><th>Rejected</th><th>Removed</th>
+        </tr></thead><tbody>${rows.map(s=>`<tr>
+          <td class="mono">${esc(s.month)}</td>
+          <td class="v num"><b>${s.total}</b></td>
+          <td class="v num">${s.added ? '+'+s.added : '—'}</td>
+          <td class="v num">${s.LIVE}</td><td class="v num">${s.DRAFT}</td>
+          <td class="v num">${s.PENDING}</td><td class="v num">${s.REJECTED}</td>
+          <td class="v num">${s.REMOVED}</td></tr>`).join('')}</tbody></table>`;
+      pb.appendChild(t);
+    }
+    pb.appendChild(el('div','hint', esc(pg.history_note)));
+    pc.appendChild(pb); v.appendChild(pc);
+
+    /* ---- Reviews: the "needs attention" list, one click from here ---------------- */
+    const rc = el('div','card'); rc.style.marginTop='16px';
+    rc.appendChild(el('div','card-h','<h3>Reviews</h3>'+
+      '<span class="sub">click a band to see those products</span>'));
+    const rb = el('div','pad');
+    const bands = pg.reviews || {};
+    const maxB = Math.max(1, ...Object.values(bands).map(b=>b.n));
+    Object.entries(bands).forEach(([key, b]) => {
+      const row = el('div','bar rev-bar');
+      row.setAttribute('role','button'); row.tabIndex = 0;
+      row.innerHTML = `<div class="bar-top">
+          <span class="nm">${esc(b.label)}</span><span class="vl">${b.n}</span></div>
+        <div class="track"><div class="fill${key==='0'?' fill-warn':''}"
+             style="width:${b.n/maxB*100}%"></div></div>`;
+      const go2 = () => {
+        Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',connection:'',
+                             missing:'', reviews:key});
+        go('products');
+      };
+      row.onclick = go2;
+      row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); go2(); } };
+      rb.appendChild(row);
+    });
+    if (bands['0'] && bands['0'].n)
+      rb.appendChild(el('div','hint',
+        `<b>${bands['0'].n} product(s) have no reviews yet.</b> Those are the ones review `
+        + `generation moves the needle on — click the band to work through them.`));
+    rc.appendChild(rb); v.appendChild(rc);
+
+    /* ---- Growth per account ----------------------------------------------------- */
+    if ((pg.growth||[]).length > 1 && !S.acct){
+      const gc = el('div','card'); gc.style.marginTop='16px';
+      gc.appendChild(el('div','card-h','<h3>Growth by account</h3>'+
+        '<span class="sub">products added, this month vs last</span>'));
+      const gb = el('div','pad');
+      const t = el('div','tblwrap');
+      t.innerHTML = `<table><thead><tr><th>Account</th><th>This month</th>
+        <th>Last month</th><th>Total</th></tr></thead><tbody>${
+        pg.growth.map(g=>`<tr><td><div style="font-weight:600">${esc(g.name||g.account)}</div>
+            <div class="mono hint">${esc(g.account)}</div></td>
+          <td class="v num">${g.this_month ? '+'+g.this_month : '—'}</td>
+          <td class="v num">${g.last_month ? '+'+g.last_month : '—'}</td>
+          <td class="v num"><b>${g.total}</b></td></tr>`).join('')}</tbody></table>`;
+      gb.appendChild(t); gc.appendChild(gb); v.appendChild(gc);
+    }
+  } catch(e){
+    // Progress is an extra, not the page. If it fails the rest of the dashboard stands.
+    const w = el('div','hint'); w.style.marginTop='16px';
+    w.textContent = 'Progress figures unavailable: ' + e.message;
+    v.appendChild(w);
+  }
 
   // charts row 1: status donut + activity area
   const r1 = el('div','chartwrap');
@@ -127,7 +250,7 @@ export async function viewStats(){
 
   // category breakdowns
   const r2 = el('div','chartwrap'); r2.style.marginTop='16px';
-  r2.appendChild(bars('Connection state', o.dist.connection, connBadge));
+  r2.appendChild(bars('Book on Connection', o.dist.connection, connBadge));
   r2.appendChild(bars('Quality', o.dist.quality, qualBadge));
   r2.appendChild(bars('Top locations', o.dist.location));
   v.appendChild(r2);
@@ -145,58 +268,10 @@ export async function viewStats(){
     v.appendChild(note);
   }
 
-  // recent activity feed
-  const r3 = el('div','chartwrap'); r3.style.marginTop='16px';
-  const f1 = el('div','card');
-  f1.appendChild(el('div','card-h','<h3>Latest changes</h3>'+
-    `<span class="sub">${o.recent_changes.length} most recent</span>`));
-  const fb = el('div','pad');
-  if (!o.recent_changes.length) fb.appendChild(el('div','hint',
-    'No changes yet — the first capture of each product is the baseline.'));
-  else {
-    const feed = el('div','feed');
-    o.recent_changes.forEach(c=>{
-      const it = el('div','feeditem');
-      it.innerHTML = `<div class="dot3">⟳</div>
-        <div style="min-width:0">
-          <div style="font-weight:600">${esc(trunc(c.title))}</div>
-          <div class="hint">${esc(fieldLabel(c.field_path))}</div>
-          <div style="margin-top:3px">${valueBox(c.old_value, 'old', 'Value before')}
-            <div class="arrow">→</div>${valueBox(c.new_value, null, 'Value after')}</div>
-        </div>
-        <div class="hint" style="text-align:right;white-space:nowrap">
-          ${esc(when(c.detected_at))}<br>${esc(c.operator_email||'')}</div>`;
-      feed.appendChild(it);
-    });
-    fb.appendChild(feed);
-  }
-  f1.appendChild(fb); r3.appendChild(f1);
-
-  const f2 = el('div','card');
-  f2.appendChild(el('div','card-h','<h3>Recent sync runs</h3>'));
-  const sb = el('div','pad');
-  if (!o.recent_syncs.length) sb.appendChild(el('div','hint','No runs yet.'));
-  else {
-    const NICE = {done:'Completed', running:'Running', paused_signed_out:'Signed out',
-      paused_challenge:'Challenge', interrupted:'Interrupted', error:'Stopped',
-      stopped:'Stopped'};
-    const feed = el('div','feed');
-    o.recent_syncs.forEach(s=>{
-      const cls = s.status==='done'?'b-active':s.status==='running'?'b-pending'
-        :s.status==='error'?'b-rejected':'b-stub';
-      const it = el('div','feeditem');
-      it.innerHTML = `<div class="dot3">⎘</div>
-        <div><div style="font-weight:600">Run #${s.id}
-            <span class="badge ${cls}" style="margin-left:6px">${esc(NICE[s.status]||s.status)}</span></div>
-          <div class="hint">${s.products_seen} products · ${s.changes_found} changes ·
-            ${esc(s.operator_email||'')}</div></div>
-        <div class="hint" style="white-space:nowrap">${esc(when(s.started_at))}</div>`;
-      feed.appendChild(it);
-    });
-    sb.appendChild(feed);
-  }
-  f2.appendChild(sb); r3.appendChild(f2);
-  v.appendChild(r3);
+  // The dashboard used to end with two raw feeds — "Latest changes" and "Recent sync
+  // runs". Both were tables of field paths, run ids and operator emails: true, but
+  // written for whoever built the tool rather than whoever uses it. Change history has
+  // its own tab, in plain English, and run history lives under Sync runs.
 
   // sidebar counters
   $('#cntProducts').textContent = K.products.value;
