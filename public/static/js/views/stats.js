@@ -1,9 +1,8 @@
 import { S } from '../state.js';
 import { $, api, el, esc, q } from '../core.js';
-import { connBadge, monthName, qualBadge, sentence, sub, valueBox } from '../format.js';
+import { monthName, sentence } from '../format.js';
 import { STATUS_COLOR, areaChart, donut, kpiCard, sparkline } from '../charts.js';
 import { skeleton } from '../ui.js';
-import { fieldLabel, trunc, when } from './drawer.js';
 import { go } from '../app.js';
 
 /* ======================= overview ======================= */
@@ -55,40 +54,25 @@ export async function viewStats(){
   hero.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   v.appendChild(hero);
 
-  // KPI row — sparklines only where a real series exists
+  // One KPI row: the total, then the three lifecycle states the client tracks. Tours,
+  // Added this month, Changes this week, Pending, Removed and "No longer listed" were all
+  // removed on request — the row is the headline, not an inventory of every figure.
   const K = o.kpis;
   K.products.spark = sparkline((o.series.added||[]).map(x=>x.n), '#F97316');
-  K.changes.spark  = sparkline((o.series.changes||[]).map(x=>x.n), '#2563EB');
-  // Row 1 — the headline figures. "Sync success" used to sit here; it measured the
-  // TOOL, not the catalogue, which is not what this page is for. It is still on the
-  // Sync runs tab, where someone looking at runs will actually want it.
-  const kp = el('div','kpis k4');
-  kp.innerHTML =
-    // "Total products" is a lie while an account filter is on — name what it counts
-    kpiCard('◧','var(--accent-soft)',
-            S.acct ? 'Products in this account' : 'Total Products Ever Added',
-            {...K.products, filter: {}}) +
-    kpiCard('◈','#EDE9FE','Tours tracked', K.tours) +
-    kpiCard('↑','#DCFCE7','Added this month', K.added_month) +
-    kpiCard('⟳','#DBEAFE','Changes this week', K.changes);
-  v.appendChild(kp);
-
-  // Row 2 — the whole lifecycle in one row, every card a filter into Products.
   const st = o.dist.status || {};
   const box = (n, sb) => ({value: st[n] || 0, delta: null, sub: sb,
                            filter: {lifecycle: n}});
-  const kp2 = el('div','kpis k6');
-  kp2.innerHTML =
+  const kp = el('div','kpis k4');
+  kp.innerHTML =
+    // "Total products" is a lie while an account filter is on — name what it counts.
+    // sub is blank: "1117 added in 30 days" was removed on request.
+    kpiCard('◧','var(--accent-soft)',
+            S.acct ? 'Products in this account' : 'Total Products Ever Added',
+            {...K.products, sub: '', filter: {}}) +
     kpiCard('●','var(--green-bg)','Live', box('LIVE','selling on the platform')) +
     kpiCard('▤','#FEF3C7','Draft', box('DRAFT','recorded, not yet submitted')) +
-    kpiCard('◷','var(--amber-bg)','Pending', box('PENDING','awaiting platform review')) +
-    kpiCard('✕','var(--red-bg)','Rejected', box('REJECTED','needs fixing and resubmitting')) +
-    kpiCard('⊘','#F1EDE7','Removed', box('REMOVED','inactive on the platform')) +
-    // NOT the same thing as REMOVED: this counts products that vanished from the account
-    // roster entirely. Named apart so the two can't be read as one figure.
-    kpiCard('⚑','var(--red-bg)','No longer listed',
-            {...K.removed, filter: {missing: '1'}});
-  v.appendChild(kp2);
+    kpiCard('✕','var(--red-bg)','Rejected', box('REJECTED','needs fixing and resubmitting'));
+  v.appendChild(kp);
 
   // Every card that carries a filter opens Products already narrowed to it.
   const drill = el2 => {
@@ -128,9 +112,9 @@ export async function viewStats(){
     // Just the figure and what it is. The +/- chips against last month were removed on
     // request: "added" in particular fell 81% simply because the first import was one
     // big batch, which reads as a collapse rather than a normal month.
-    const MOVERS = [['total','Products tracked'], ['added','Added this month'],
-                    ['LIVE','Live'], ['DRAFT','Draft'],
-                    ['REJECTED','Rejected'], ['REMOVED','Removed']];
+    // Tracked / Pending / Removed were dropped on request, here and in the table below.
+    const MOVERS = [['added','Added this month'], ['LIVE','Live'], ['DRAFT','Draft'],
+                    ['REJECTED','Rejected']];
     const cells = MOVERS.map(([k, lab]) =>
       `<div class="mv"><div class="mv-l">${esc(lab)}</div>
         <div class="mv-n">${pg.current[k] || 0}</div></div>`).join('');
@@ -142,49 +126,21 @@ export async function viewStats(){
     const rows = (pg.series||[]);
     if (rows.length > 1){
       const t = el('div','tblwrap'); t.style.marginTop='14px';
-      t.innerHTML = `<table><thead><tr><th>Month</th><th class="num">Tracked</th><th class="num">Added</th>
-        <th class="num">Live</th><th class="num">Draft</th><th class="num">Pending</th>
-        <th class="num">Rejected</th><th class="num">Removed</th>
+      t.innerHTML = `<table><thead><tr><th>Month</th><th class="num">Added</th>
+        <th class="num">Live</th><th class="num">Draft</th>
+        <th class="num">Rejected</th>
         </tr></thead><tbody>${rows.map(s=>`<tr>
           <td>${esc(monthName(s.month))}</td>
-          <td class="v num"><b>${s.total}</b></td>
           <td class="v num">${s.added || 0}</td>
           <td class="v num">${s.LIVE}</td><td class="v num">${s.DRAFT}</td>
-          <td class="v num">${s.PENDING}</td><td class="v num">${s.REJECTED}</td>
-          <td class="v num">${s.REMOVED}</td></tr>`).join('')}</tbody></table>`;
+          <td class="v num">${s.REJECTED}</td></tr>`).join('')}</tbody></table>`;
       pb.appendChild(t);
     }
     pb.appendChild(el('div','hint', esc(pg.history_note)));
     pc.appendChild(pb); v.appendChild(pc);
 
-    /* ---- Reviews: the "needs attention" list, one click from here ---------------- */
-    const rc = el('div','card'); rc.style.marginTop='16px';
-    rc.appendChild(el('div','card-h','<h3>Reviews</h3>'+
-      '<span class="sub">click a band to see those products</span>'));
-    const rb = el('div','pad');
-    const bands = pg.reviews || {};
-    const maxB = Math.max(1, ...Object.values(bands).map(b=>b.n));
-    Object.entries(bands).forEach(([key, b]) => {
-      const row = el('div','bar rev-bar');
-      row.setAttribute('role','button'); row.tabIndex = 0;
-      row.innerHTML = `<div class="bar-top">
-          <span class="nm">${esc(b.label)}</span><span class="vl">${b.n}</span></div>
-        <div class="track"><div class="fill${key==='0'?' fill-warn':''}"
-             style="width:${b.n/maxB*100}%"></div></div>`;
-      const go2 = () => {
-        Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',connection:'',
-                             missing:'', reviews:key});
-        go('products');
-      };
-      row.onclick = go2;
-      row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); go2(); } };
-      rb.appendChild(row);
-    });
-    if (bands['0'] && bands['0'].n)
-      rb.appendChild(el('div','hint',
-        `<b>${bands['0'].n} product(s) have no reviews yet.</b> Those are the ones review `
-        + `generation moves the needle on — click the band to work through them.`));
-    rc.appendChild(rb); v.appendChild(rc);
+    /* The Reviews band card was removed from this page on request. The same filter is
+       still on Products ("Any reviews"), and /api/progress still returns the bands. */
 
     /* ---- Growth per account ----------------------------------------------------- */
     if ((pg.growth||[]).length > 1 && !S.acct){
@@ -215,7 +171,10 @@ export async function viewStats(){
   c1.appendChild(el('div','card-h','<h3>Lifecycle status</h3>'+
     '<span class="sub">canonical, across platforms</span>'));
   const b1 = el('div','pad');
-  b1.innerHTML = donut(Object.entries(o.dist.status||{}));
+  // Pending and Removed were dropped from this donut on request, so it shows the same
+  // three states as the cards above rather than contradicting them.
+  const SHOW = ['LIVE','DRAFT','REJECTED'];
+  b1.innerHTML = donut(Object.entries(o.dist.status||{}).filter(([k])=>SHOW.includes(k)));
   c1.appendChild(b1); r1.appendChild(c1);
 
   const c2 = el('div','card');
@@ -250,25 +209,10 @@ export async function viewStats(){
       k==='NOT_LISTED'?'Not uploaded':sentence(k))}</div>`).join('')));
   cov.appendChild(cb); v.appendChild(cov);
 
-  // category breakdowns
-  const r2 = el('div','chartwrap'); r2.style.marginTop='16px';
-  r2.appendChild(bars('Book on Connection', o.dist.connection, connBadge));
-  r2.appendChild(bars('Quality', o.dist.quality, qualBadge));
-  r2.appendChild(bars('Top locations', o.dist.location));
-  v.appendChild(r2);
-  // Same note as the Breakdown page: "Not captured (draft)" is a rule being followed,
-  // not data going missing, and saying so here stops the question being asked twice.
-  const drafty = ['connection','quality','location']
-    .reduce((n,k)=>n+((o.dist[k]||{})['Not captured (draft)']||0), 0);
-  if (drafty){
-    const note = el('div','hint');
-    note.style.marginTop = '12px';
-    note.innerHTML = '<b>“Not captured (draft)”</b> is not missing data. Drafts are '
-      + 'recorded from the account roster and deliberately never deep-fetched, so the '
-      + 'roster’s gaps show here; the fields fill in once a draft goes live. '
-      + '<b>“Unknown”</b> means the portal itself had no value.';
-    v.appendChild(note);
-  }
+  // The "Book on Connection", "Quality" and "Top locations" bar charts were removed on
+  // request. What replaced the last one answers the actual question: pick a month and see
+  // how many tours were made in each place. Those three still exist on the Breakdown tab.
+  await placesCard(v);
 
   // The dashboard used to end with two raw feeds — "Latest changes" and "Recent sync
   // runs". Both were tables of field paths, run ids and operator emails: true, but
@@ -278,6 +222,61 @@ export async function viewStats(){
   // sidebar counters
   $('#cntProducts').textContent = K.products.value;
   $('#cntChanges').textContent = K.changes.value;
-  $('#cntPlatforms').textContent = o.coverage.length;
+}
+
+/* ---- Tours by place, for one month or all of them ------------------------------------
+   The client asked for country + month. There is no country in anything the portal
+   returns — every accounts.country is empty and no product carries one — and the account
+   name is not a substitute: "Local Tours in Pakistan" holds Barcelona, Rome and
+   Washington DC tours. So this filters by the place Viator does give, and says so. */
+async function placesCard(v){
+  const c = el('div','card'); c.style.marginTop='16px';
+  const head = el('div','card-h');
+  head.innerHTML = `<h3>Where tours were made</h3>
+    <span class="sub">products by place, first captured in the chosen month</span>
+    <span style="flex:1"></span><select id="plmonth" title="Month"></select>`;
+  c.appendChild(head);
+  const body = el('div','pad');
+  c.appendChild(body); v.appendChild(c);
+
+  const sel = head.querySelector('#plmonth');
+  const opts = await api('/api/filters'+q());
+  sel.innerHTML = '<option value="">All months</option>' + (opts.months||[]).map(m=>
+    `<option value="${esc(m.month)}" ${S.plMonth===m.month?'selected':''}
+      >${esc(monthName(m.month))} (${m.n})</option>`).join('');
+
+  const paint = async () => {
+    body.innerHTML = '<div class="hint">Loading…</div>';
+    const d = await api('/api/places'+q(S.plMonth?'month='+encodeURIComponent(S.plMonth):''));
+    const rows = d.places || [];
+    if (!rows.length){
+      body.innerHTML = '<div class="hint">No products were first captured in that month.</div>';
+      return;
+    }
+    const total = rows.reduce((n,r)=>n+r.n, 0);
+    const max = Math.max(1, ...rows.map(r=>r.n));
+    body.innerHTML = `<div class="hint" style="margin-bottom:10px"><b>${total}</b>
+      product(s) across <b>${rows.length}</b> place(s)${
+      S.plMonth?` in ${esc(monthName(S.plMonth))}`:''}. Click a place to see them.</div>`;
+    rows.forEach(r=>{
+      const row = el('div','bar rev-bar');
+      row.setAttribute('role','button'); row.tabIndex = 0;
+      row.innerHTML = `<div class="bar-top"><span class="nm">${esc(r.place)}</span>
+          <span class="vl">${r.n}</span></div>
+        <div class="track"><div class="fill" style="width:${r.n/max*100}%"></div></div>`;
+      // "Not captured (draft)" and "Unknown" are labels, not searchable place names
+      const real = r.place !== 'Not captured (draft)' && r.place !== 'Unknown';
+      const open = () => {
+        Object.assign(S.pf, {q: real ? r.place : '', status:'', lifecycle:'', platform:'',
+                             connection:'', reviews:'', missing:'', month: S.plMonth||''});
+        go('products');
+      };
+      row.onclick = open;
+      row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
+      body.appendChild(row);
+    });
+  };
+  sel.onchange = e => { S.plMonth = e.target.value; paint(); };
+  await paint();
 }
 

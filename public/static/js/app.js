@@ -8,7 +8,6 @@ import { installReadOnly, automationNotice, setOwner } from './readonly.js';
 import { viewStats } from './views/stats.js';
 import { viewProducts } from './views/products.js';
 import { when } from './views/drawer.js';
-import { viewMatrix } from './views/matrix.js';
 import { viewActivity, viewAudit, viewCategories, viewSyncs } from './views/misc.js';
 import { viewAccounts } from './views/accounts.js';
 
@@ -61,14 +60,14 @@ export async function poll(){
    belongs to the desktop tool; the notice explains where to do it. */
 
 /* ======================= routing ======================= */
+// The Platforms tab was removed on request — which platforms a tour is listed on is now
+// a badge on the product row itself. /api/matrix still exists for anything that needs it.
 export const VIEWS = {stats:viewStats, products:viewProducts, accounts:viewAccounts,
-  matrix:viewMatrix,
   categories:viewCategories, audit:viewAudit, syncs:viewSyncs,
   activity:()=>viewActivity(null)};
 export const TITLES = {stats:['Dashboard','Everything at a glance'],
   accounts:['Accounts','Coverage and capture freshness'],
   products:['Products','Every captured listing'],
-  matrix:['Platforms','Tour status on each platform'],
   categories:['Breakdown','Distribution by category'],
   audit:['Change history','What changed, when and by whom'],
   syncs:['Sync runs','Every capture run'],

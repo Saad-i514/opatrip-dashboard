@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { $, api, el, esc, q } from '../core.js';
-import { connBadge, list, monthName, qualBadge, sentence, statusBadge } from '../format.js';
+import { monthName, qualBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { openDrawer, when } from './drawer.js';
 
@@ -16,6 +16,16 @@ function reviewChip(p){
     return '· <b style="color:var(--accent)">no reviews</b>';
   const stars = p.review_rating ? ` ★${Number(p.review_rating).toFixed(1)}` : '';
   return `· ${p.review_count} review${p.review_count===1?'':'s'}${esc(stars)}`;
+}
+
+/* Which platforms this tour is listed on. The Platforms grid was a whole tab of its own;
+   the client asked for it here instead, on the row, next to the quality badge. Falls back
+   to this listing's own platform so a tour that was never grouped still says where it is.
+   Connection and lifecycle badges were removed from the row on the same request. */
+function platformBadges(p){
+  const names = (p.tour_platforms && p.tour_platforms.length)
+    ? p.tour_platforms : (p.platform_name ? [p.platform_name] : []);
+  return names.map(n=>`<span class="badge b-plat">${esc(n)}</span>`).join('');
 }
 
 let _t; const debounce = fn => { clearTimeout(_t); _t=setTimeout(fn,260); };
@@ -137,7 +147,7 @@ export async function viewProducts(){
       <div class="pbadges">
         ${p.missing_since?'<span class="badge b-rejected">Removed from Viator</span>':''}
         ${p.is_draft_stub?'<span class="badge b-stub">Draft — not fetched</span>':''}
-        ${qualBadge(p.quality_level)}${connBadge(p.connection_state)}${statusBadge(p.status)}
+        ${qualBadge(p.quality_level)}${platformBadges(p)}
       </div>`;
     if (p.missing_since) row.style.opacity = '.72';
     row.onclick = ()=>openDrawer(p.id);

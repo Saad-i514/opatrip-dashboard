@@ -103,6 +103,8 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 .b-good{background:var(--green-bg);color:var(--green)}
 .b-bad{background:var(--red-bg);color:var(--red)}
 .b-stub{background:var(--accent-soft);color:#9A3412;border-color:var(--accent-line)}
+/* which platform a listing is on — replaced the Platforms tab on the product row */
+.b-plat{background:var(--surface-2);color:var(--ink-2);border-color:var(--line)}
 
 /* ---------- product list ---------- */
 .filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px;align-items:center}

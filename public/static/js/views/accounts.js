@@ -50,16 +50,14 @@ export async function viewAccounts(){
       <td class="v num"><b>${a.product_count||0}</b></td>
       <td class="v num">${n(a.live_count)}</td>
       <td class="v num">${n(a.draft_count)}</td>
-      <td class="v num">${n(a.pending_count)}</td>
-      <td class="v num">${n(a.rejected_count, true)}</td>
-      <td class="v num">${n(a.removed_count)}</td>
       <td class="v num">${n(a.no_review_count)}</td>
       <td><span class="badge ${fresh[0]}">${esc(fresh[1])}</span></td>
       <td><button class="btn sm ghost" data-pick="${esc(a.viator_account_id)}">Open</button></td>
     </tr>`;}).join('');
+  // Pending, Rejected and Removed columns were dropped on request; the per-status counts
+  // are still on /api/accounts, so restoring one is a header plus a cell.
   wrap.innerHTML = `<table><thead><tr><th>Account</th><th class="num">Total products</th>
-    <th class="num">Live</th><th class="num">Draft</th><th class="num">Pending</th>
-    <th class="num">Rejected</th><th class="num">Removed</th><th class="num">No reviews</th>
+    <th class="num">Live</th><th class="num">Draft</th><th class="num">No reviews</th>
     <th>Last Updated</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
   card.appendChild(wrap); v.appendChild(card);
   wrap.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
