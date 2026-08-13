@@ -168,28 +168,62 @@ ul.plain li{margin:3px 0}
    portal's own tab names; then headings stacked down the page with a hairline between
    them, each field written as "Label: value" on one line rather than as a two-column
    table. Scoped to .drawer so the rest of the dashboard keeps its own table styling. */
-.vtitle{font-size:25px;line-height:1.25;font-weight:700;letter-spacing:-.01em}
-.vsubline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:9px}
-.vpage .tabstrip{gap:24px;border-bottom:1px solid var(--line);margin-bottom:0}
+/* The portal is teal, not orange. Scoped to the drawer so the product page reads as the
+   portal does while the rest of the dashboard keeps this tool's own colour. */
+.drawer{--v:#0F7B72;--v-soft:#EAF3F2;--v-line:#BFDCD8}
+.vtitle{font-size:27px;line-height:1.22;font-weight:700;letter-spacing:-.015em}
+.vsubline{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:11px}
+/* the status sits in a bordered box with a dot, the way the portal's status control does */
+.vsubline .badge{background:var(--surface);border-color:var(--line-2);color:var(--ink);
+  padding:6px 13px;font-size:13.5px}
+.vpage{padding:0}
+.vpage .tabstrip{gap:26px;border-bottom:1px solid var(--line);margin:0 0 18px;
+  padding:0 20px}
 .vpage .tabbtn{background:none;border:0;border-bottom:2px solid transparent;
-  border-radius:0;padding:9px 1px;font-size:14px;font-weight:600;color:var(--ink-2)}
+  border-radius:0;padding:12px 1px;font-size:14.5px;font-weight:600;color:var(--ink-2)}
 .vpage .tabbtn:hover{color:var(--ink);border-bottom-color:var(--line-2)}
-.vpage .tabbtn.on{background:none;color:var(--accent);border-bottom-color:var(--accent)}
-.vsec{padding:22px 0;border-bottom:1px solid var(--line)}
-.vsec:first-child{padding-top:6px}
-.vsec:last-child{border-bottom:0;padding-bottom:4px}
-.vsec-h{font-size:17px;font-weight:700;margin:0 0 13px}
+.vpage .tabbtn.on{background:none;color:var(--v);border-bottom-color:var(--v)}
+.vpage>div{padding:0 20px 18px}
+/* every section is its own card, stacked — never a card inside a card */
+.vsecs{display:block}
+.vsec{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:22px 24px;margin-bottom:16px}
+.vsec:last-child{margin-bottom:0}
+.vsec-top{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
+.vsec-h{font-size:19px;font-weight:700;margin:0;flex:1;min-width:0}
+.vedit{flex:none;color:var(--v);border-color:var(--v-line);font-weight:700;
+  padding:7px 20px;box-shadow:none}
+.vedit:hover{border-color:var(--v);background:var(--v-soft)}
+.vsec .vsec{border:0;padding:0;margin:0}      /* nested block: fall back to plain content */
 /* "Product Title: Private Car Tour…" — label bold, value beside it, no rules between */
 .drawer .rows{grid-template-columns:minmax(0,max-content) 1fr;column-gap:8px}
-.drawer .rows.editable{grid-template-columns:minmax(0,max-content) 1fr 42px}
+/* two columns, not three: the .act cell is display:none below, and a display:none grid
+   item is not laid out at all — with a 3-column template every second label would land
+   in the empty third column */
+.drawer .rows.editable{grid-template-columns:minmax(0,max-content) 1fr}
 .drawer .rows>div{padding:5px 0;border-bottom:0}
 .drawer .rows>.k{color:var(--ink);font-size:14px;font-weight:700;white-space:nowrap}
 .drawer .rows>.k::after{content:":"}
-.drawer .rows>.act{padding:3px 0 3px 8px}
+/* the pencils still carry which fields are editable; the block's Edit button reads them */
+.drawer .rows>.act,.drawer .penbtn{display:none}
 /* the portal's own sub-labels ("What's included", "Listing name") are plain bold, not
    the uppercase letter-spaced kind this dashboard uses elsewhere */
 .drawer .subhead{font-size:14px;font-weight:700;text-transform:none;letter-spacing:0;
   color:var(--ink);margin:16px 0 7px;padding-top:0;border-top:0}
+/* ringed tick / cross, as the portal marks inclusions and exclusions */
+.iconlist{list-style:none;margin:0;padding:0}
+.iconlist li{display:flex;gap:10px;align-items:flex-start;padding:5px 0;font-size:14.5px}
+.ico-r{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+  border:1.5px solid currentColor;font-size:10.5px;font-weight:700;margin-top:2px}
+.iconlist.inc .ico-r{color:var(--v)}
+.iconlist.exc .ico-r{color:var(--ink-3)}
+.iconlist.info .ico-r{color:var(--ink-2);font-style:italic}
+/* links and accents inside the product page follow the portal's teal */
+.drawer a{color:var(--v)}
+.drawer .yes{color:var(--v)}
+.vback{background:none;border:0;padding:0;cursor:pointer;color:var(--v);font-weight:600;
+  font-size:14px}
+.vback:hover{text-decoration:underline}
 
 /* ---------- tables ---------- */
 .tblwrap{overflow-x:auto}

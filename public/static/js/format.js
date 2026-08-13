@@ -258,12 +258,34 @@ export const chips = arr => `<div class="chips">${arr.filter(x=>x!=null&&x!=='')
 export const list = arr => `<ul class="plain">${arr.filter(Boolean)
   .map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
 export const sub = t => el('div','subhead', esc(t));
+/* One titled block, the way the portal draws one: a white card, its heading top-left and
+   room for an "Edit" button top-right (drawer.js fills that in for blocks that hold
+   editable fields). Every section on every tab goes through here, so they all get the
+   same shape rather than each tab inventing its own. */
 export function section(title, node){
   if (!node) return null;
-  const f = document.createDocumentFragment();
-  if (title) f.appendChild(sub(title));
-  f.appendChild(node);
-  return f;
+  const s = el('section','vsec');
+  const h = el('div','vsec-top');
+  h.appendChild(el('h4','vsec-h', esc(title || '')));
+  s.appendChild(h);
+  const b = el('div','vsec-b');
+  b.appendChild(node);
+  s.appendChild(b);
+  return s;
+}
+
+/* The portal marks what is included with a ringed tick and what is not with a ringed
+   cross, rather than running both down the same bulleted list. `kind` picks the mark. */
+export function iconList(arr, kind){
+  const ul = el('ul','iconlist ' + (kind || 'inc'));
+  (arr || []).forEach(t => {
+    const li = el('li');
+    li.innerHTML = `<span class="ico-r" aria-hidden="true">${
+      kind === 'exc' ? '&#10005;' : kind === 'info' ? 'i' : '&#10003;'}</span>`;
+    li.appendChild(document.createTextNode(String(t)));
+    ul.appendChild(li);
+  });
+  return ul;
 }
 
 /* ---------- badges ---------- */

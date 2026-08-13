@@ -1,9 +1,9 @@
 import { S } from '../state.js';
 import { $, api, el, esc } from '../core.js';
-import { connBadge, label, list, qualBadge, rows, setEditContext, statusBadge, sub, valueBox } from '../format.js';
+import { getPath, label, qualBadge, setEditContext, statusBadge, valueBox } from '../format.js';
 import { skLines } from '../ui.js';
 import { buildSections, commissionOf, totalDuration, tree } from '../sections.js';
-import { editValue, uploadImage, deleteImage } from '../edit.js';
+import { editSection, editValue, uploadImage, deleteImage } from '../edit.js';
 import { secs } from '../progress.js';
 
 /* ======================= drawer ======================= */
@@ -25,18 +25,18 @@ export async function openDrawer(pid){
   // the product code on one quiet line beneath it. The thumbnail that used to sit here is
   // gone — Viator shows the photos in the Photos strip, and so do we, right below.
   const head = el('div','dhead');
-  head.innerHTML = `<div class="dhead-top">
+  head.innerHTML = `<button class="vback" id="xClose">&lsaquo; Back to product list</button>
+    <div class="dhead-top">
       <div style="flex:1;min-width:0">
         <h2 class="vtitle">${esc(p.title||'(untitled)')}</h2>
         <div class="vsubline">
           ${p.is_draft_stub?'<span class="badge b-stub">Draft — recorded only</span>':''}
-          ${statusBadge(p.status)}${qualBadge(p.quality_level)}
+          ${statusBadge(p.status)}
           <span class="hint">Product code: <span class="mono">${esc(p.product_code)}</span></span>
           <span class="hint">${esc(p.account_name||p.viator_account_id)}${
             p.location?' · '+esc(p.location):''}</span>
         </div>
       </div>
-      <button class="btn ghost" id="xClose">Close</button>
     </div>`;
   dr.appendChild(head);
   const body = el('div','dbody');
@@ -130,6 +130,7 @@ export async function openDrawer(pid){
   /* readable sections — every field row carries its own pen, wired through this
      context so sections.js stays pure rendering */
   if (cur && cur.product){
+    EDITSNAP = {snapshot: cur, edits: d.edits || {}};
     setEditContext({
       pid: p.id,
       edits: d.edits || {},
@@ -149,6 +150,7 @@ export async function openDrawer(pid){
       const pane = el('div',i===0?'':'hidden');
       pane.style.marginTop='16px';
       pane.appendChild(node);
+      addBlockEditButtons(pane, p.id);
       btn.onclick = ()=>{
         [...strip.children].forEach(x=>x.classList.remove('on'));
         [...panes.children].forEach(x=>x.classList.add('hidden'));
@@ -224,6 +226,38 @@ export async function openDrawer(pid){
   dr.appendChild(body); host.appendChild(dr);
   head.querySelector('#xClose').onclick = closeDrawer;
 }
+/* The portal puts one "Edit" button at the top-right of each block, not a pencil beside
+   each field. The pencils are still what knows which fields can be edited and what they
+   currently hold, so this reads them out of the block, hangs a single Edit button on its
+   heading, and hides them (CSS, .drawer .penbtn). Nothing about the edit itself changes:
+   same paths, same override layer, same email prompt. */
+function addBlockEditButtons(pane, pid){
+  pane.querySelectorAll('.vsec').forEach(sec => {
+    const pens = [...sec.querySelectorAll('.penbtn[data-path]')];
+    if (!pens.length) return;
+    const top = sec.querySelector('.vsec-top');
+    if (!top || top.querySelector('.vedit')) return;
+    const b = el('button','btn sm vedit','Edit');
+    b.title = `Edit ${pens.length} field${pens.length===1?'':'s'} in this section`;
+    b.onclick = () => {
+      // read the values at click time, so an edit made a moment ago is reflected
+      const items = pens.map(pen => ({
+        path: pen.dataset.path,
+        label: (pen.getAttribute('aria-label')||'').replace(/^Edit /,''),
+        value: getPath(EDITSNAP.snapshot, pen.dataset.path),
+      }));
+      const edits = EDITSNAP.edits || {};
+      items.forEach(it => { if (edits[it.path]) it.value = edits[it.path].value; });
+      editSection(pid, top.querySelector('.vsec-h').textContent, items,
+                  () => openDrawer(pid));
+    };
+    top.appendChild(b);
+  });
+}
+/* The rendering context is cleared as soon as the sections are built (so no other view
+   inherits it), but the Edit buttons are clicked long after. Keep what they need. */
+let EDITSNAP = {snapshot: null, edits: {}};
+
 export const trunc = s => { s = (s===null||s===undefined)?'(none)':String(s);
   try{ const p=JSON.parse(s); if(p&&typeof p==='object')
     s = Array.isArray(p)?`${p.length} item(s)`:Object.keys(p).slice(0,3).join(', ');

@@ -136,6 +136,68 @@ export async function editAll(pid, product, edits, onSaved){
   };
 }
 
+/** One BLOCK's fields at once — what the portal's per-section "Edit" button opens.
+
+    Viator edits a product a block at a time, not a field at a time, so this takes the
+    fields that block is showing and puts them in one form. Same override semantics as
+    every other edit here: the snapshot is untouched, only what actually changed is sent,
+    and each save carries the editor's email. */
+export async function editSection(pid, title, items, onSaved){
+  if (!items.length) return;
+  const who = await askEditor();
+  if (!who) return;
+  const host = $('#modalHost'); host.innerHTML = '';
+  const wrap = el('div');
+  const val = it => it.value == null ? ''
+    : (typeof it.value === 'object' ? JSON.stringify(it.value, null, 1) : String(it.value));
+  wrap.innerHTML = `<div class="scrim"></div>
+    <div class="modal card wide">
+      <h2 style="font-size:18px;margin-bottom:5px">Edit ${esc(title)}</h2>
+      <p class="hint" style="margin:0 0 6px">Saved as corrections on top of what Viator
+        gave us. The captured value is kept and the next sync will not overwrite this.</p>
+      <div class="hint" style="margin-bottom:12px">Signed as <b>${esc(who)}</b></div>
+      <div class="formgrid">${items.map((it, i) => {
+        const v = val(it);
+        const long = v.length > 60 || v.includes('\n');
+        return `<label>${esc(it.label)}
+          ${long ? `<textarea data-i="${i}" rows="3">${esc(v)}</textarea>`
+                 : `<input type="text" data-i="${i}" value="${esc(v)}">`}</label>`;
+      }).join('')}</div>
+      <label class="fl" style="margin-top:16px">Reason for these changes (optional)
+        <input type="text" id="fNote" placeholder="why"></label>
+      <div id="fErr" class="banner hidden" style="margin:12px 0"></div>
+      <div style="display:flex;gap:9px;justify-content:flex-end;position:sticky;bottom:0;
+                  background:var(--surface);padding-top:12px">
+        <button class="btn ghost" id="fCancel">Cancel</button>
+        <button class="btn primary" id="fGo">Save changes</button>
+      </div></div>`;
+  host.appendChild(wrap);
+  const close = () => { host.innerHTML = ''; };
+  wrap.querySelector('.scrim').onclick = close;
+  $('#fCancel').onclick = close;
+  $('#fGo').onclick = async () => {
+    const btn = $('#fGo');
+    const changed = items
+      .map((it, i) => [it, (wrap.querySelector(`[data-i="${i}"]`) || {}).value ?? ''])
+      .filter(([it, v]) => String(v) !== val(it));
+    if (!changed.length){ close(); toast('Nothing changed', {kind: 'info'}); return; }
+    btn.disabled = true; btn.textContent = `Saving ${changed.length}…`;
+    const note = $('#fNote').value.trim() || null;
+    const failed = [];
+    for (const [it, v] of changed){
+      try { await post(`/api/product/${pid}/edit`,
+                       {field: it.path, value: v, editor_email: who, note}); }
+      catch (ex){ failed.push(`${it.label}: ${ex.message}`); }
+    }
+    close();
+    if (failed.length) toast(`${changed.length - failed.length} of ${changed.length} saved`,
+                             {kind: 'err', detail: failed[0]});
+    else toast(`Saved ${changed.length} change${changed.length === 1 ? '' : 's'}`,
+               {kind: 'ok', detail: changed.map(([it]) => it.label).join(', ')});
+    if (onSaved) onSaved();
+  };
+}
+
 /** Edit ANY captured field, identified by its dotted path in the snapshot.
 
     This is what the pen next to each field calls. The server validates the path against

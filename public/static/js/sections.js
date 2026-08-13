@@ -1,5 +1,5 @@
 import { el, esc, q } from './core.js';
-import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, label, list, readable, rows, section, sentence } from './format.js';
+import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, iconList, label, list, readable, rows, section, sentence } from './format.js';
 import { when } from './views/drawer.js';
 
 /* ======================= per-product readable sections ======================= */
@@ -63,8 +63,9 @@ export function secOverview(p){
   };
   const inc = (p.inclusions||[]).map(itemLine).filter(Boolean);
   const exc = (p.exclusions||[]).map(itemLine).filter(Boolean);
-  if (inc.length) f.appendChild(section("What's included", el('div','',list(inc))));
-  if (exc.length) f.appendChild(section("What's excluded", el('div','',list(exc))));
+  // ringed tick / ringed cross, the marks the portal itself uses for these two lists
+  if (inc.length) f.appendChild(section("What's included", iconList(inc, 'inc')));
+  if (exc.length) f.appendChild(section("What's excluded", iconList(exc, 'exc')));
   /* Every traveller note, with its Yes/No answer. Previously only the "true" ones were
      listed, so facts like "Wheelchair accessible: No" disappeared entirely. */
   const ais = (p.additionalInfo||[]).slice().sort((a,b)=>
@@ -710,18 +711,29 @@ export function secQuality(cur){
   ])));
   return f;
 }
-/* Several headings under one tab, stacked and separated by a rule — the way the portal's
-   own "Product content" page reads (Product Setup, Meeting & pickup, Categories & themes,
-   Tour details… one after another) rather than as separate tabs. */
+/* A tab's content as a FLAT stack of blocks, which is how the portal builds a page:
+   Connectivity, then the option, then Product pricing attributes — never a card inside a
+   card. A section builder emits its main field list loose and its extra parts already
+   wrapped by section(); this makes the loose part the first block, named for the section,
+   and lets the rest follow as its siblings. */
+function stack(title, node){
+  if (!node) return [];
+  const out = [], loose = document.createDocumentFragment();
+  [...node.childNodes].forEach(n => {
+    if (n.nodeType === 1 && n.classList && n.classList.contains('vsec')) out.push(n);
+    else loose.appendChild(n);
+  });
+  if (loose.childNodes.length){
+    const holder = el('div');
+    holder.appendChild(loose);
+    out.unshift(section(title, holder));
+  }
+  return out;
+}
 function group(...parts){
   const wrap = el('div','vsecs');
-  parts.forEach(([title, node]) => {
-    if (!node) return;
-    const s = el('section','vsec');
-    s.appendChild(el('h4','vsec-h', esc(title)));
-    s.appendChild(node);
-    wrap.appendChild(s);
-  });
+  parts.forEach(([title, node]) =>
+    stack(title, node).forEach(b => wrap.appendChild(b)));
   return wrap.children.length ? wrap : null;
 }
 
@@ -733,15 +745,15 @@ export function buildSections(cur){
   const p = cur.product||{};
   const out = [];
   const add = (n, node) => { if (node) out.push([n,node]); };
-  add('Product content', group(['Overview', secOverview(p)],
+  add('Product content', group(['Product setup', secOverview(p)],
                                ['Tour details', secTourDetails(p)],
                                ['Meeting & pickup', secMeeting(p)]));
-  add('Schedules & prices', secPricing(p, cur));
-  add('Booking details', secBooking(p));
-  add('Tickets', secTickets(p));
-  add('Product connection', secConnection(p, cur));
-  add('Special offers', secOffers(p));
-  add('Quality', secQuality(cur));
+  add('Schedules & prices', group(['Pricing', secPricing(p, cur)]));
+  add('Booking details', group(['Booking settings', secBooking(p)]));
+  add('Tickets', group(['Ticket settings', secTickets(p)]));
+  add('Product connection', group(['Connection', secConnection(p, cur)]));
+  add('Special offers', group(['Special offers', secOffers(p)]));
+  add('Quality', group(['Quality', secQuality(cur)]));
   return out;
 }
 
