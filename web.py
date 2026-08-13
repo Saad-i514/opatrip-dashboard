@@ -370,12 +370,20 @@ def overview(account: str | None = None):
       if True:
         # SAME bucketing as /api/stats — see db.blank_bucket(). This one still said
         # 'Unknown', so the Dashboard and the Breakdown page disagreed about the same rows.
-        by = lambda col: {r[0]: r[1] for r in con.execute(
-            f"""SELECT {db.blank_bucket(col)}, COUNT(*) {P}
-                GROUP BY 1 ORDER BY 2 DESC""", args)}
-        dist = {"status": by("status_canonical"), "connection": by("connection_state"),
-                "quality": by("quality_level"), "location": dict(
-                    list(by("location").items())[:8])}
+        # All four distributions in ONE round trip. They were four separate queries, and
+        # against a database ~175-360 ms away four trips is most of a second spent waiting
+        # rather than computing. Sorting moved to Python for the same reason it always
+        # should here: it costs nothing locally and keeps the SQL dialect-free.
+        DISTS = [("status", "status_canonical"), ("connection", "connection_state"),
+                 ("quality", "quality_level"), ("location", "location")]
+        raw = {}
+        for r in con.execute(" UNION ALL ".join(
+                f"SELECT '{k}' AS k, {db.blank_bucket(col)} AS v, COUNT(*) AS n {P}"
+                f" GROUP BY 1, 2" for k, col in DISTS), args * len(DISTS)):
+            raw.setdefault(r[0], {})[r[1]] = r[2]
+        srt = lambda d: dict(sorted(d.items(), key=lambda kv: -kv[1]))
+        dist = {k: srt(raw.get(k, {})) for k, _col in DISTS}
+        dist["location"] = dict(list(dist["location"].items())[:8])
         plats, tours = db.platform_matrix(con, account)
         cover = []
         for p in plats:
@@ -393,18 +401,9 @@ def overview(account: str | None = None):
         # Written out rather than reusing C_: that fragment already ENDS with the WHERE
         # clause, so appending a JOIN after it produced "WHERE ... JOIN ..." — a syntax
         # error that 500'd the whole dashboard the moment an account filter was applied.
-        recent_changes = rows(f"""SELECT c.field_path, c.old_value, c.new_value,
-                                     c.detected_at, c.operator_email, p.product_code,
-                                     p.title
-                                  FROM changes c
-                                  JOIN accounts a ON a.id=c.account_id
-                                  JOIN products p ON p.id=c.product_id
-                                  {where}
-                                  ORDER BY c.id DESC LIMIT 8""", args)
-        recent_syncs = rows(f"""SELECT s.id, s.status, s.started_at, s.products_seen,
-                                       s.changes_found, s.operator_email
-                                FROM syncs s JOIN accounts a ON a.id=s.account_id
-                                {where} ORDER BY s.id DESC LIMIT 5""", args)
+        # The "Latest changes" and "Recent sync runs" feeds were removed from the dashboard
+        # long ago; the queries behind them stayed, costing two round trips per load for
+        # data nothing rendered. Change history and Sync runs have their own tabs.
 
     return {
         "kpis": {
@@ -426,7 +425,6 @@ def overview(account: str | None = None):
         "dist": dist, "coverage": cover,
         "series": {"changes": list(reversed(series_changes)),
                    "added": list(reversed(series_added))},
-        "recent_changes": recent_changes, "recent_syncs": recent_syncs,
     }
 
 
@@ -570,27 +568,16 @@ def progress(account: str | None = None, months: int = 6):
     growth = sorted(per_acct.values(),
                     key=lambda x: (-x["this_month"], -x["total"]))[:12]
 
-    with db.session() as con:
-        bands = {}
-        for key, (label, cond) in REVIEW_BANDS.items():
-            if key in ("any", "none"):
-                continue
-            bands[key] = {"label": label, "n": con.execute(
-                f"""SELECT COUNT(*) FROM products p JOIN accounts a ON a.id=p.account_id
-                    {where} {'AND' if where else 'WHERE'} {cond}""",
-                args).fetchone()[0]}
-        chg_series = [dict(r) for r in con.execute(
-            f"""SELECT substr(c.detected_at,1,7) m, COUNT(*) n FROM changes c
-                JOIN accounts a ON a.id=c.account_id {where}
-                GROUP BY 1 ORDER BY 1 DESC LIMIT 12""", args)]
+    # The review bands (one COUNT per band, five round trips) and the monthly change
+    # series were computed here for cards that have since been removed from the dashboard.
+    # Nothing read them, and a second db.session() was opened to produce them. The bands
+    # themselves still exist as REVIEW_BANDS, which is what the Products filter uses.
 
     return {
         "series": series,
         "current": cur, "previous": prev,
         "deltas": {f: delta(f) for f in ("total", "added", *ORDER)},
         "growth": growth,
-        "reviews": bands,
-        "status_changes": list(reversed(chg_series)),
         "history_note": (
             "A product's history starts when this tool first captured it, so nothing is "
             "drawn before that. Earlier months are reconstructed from recorded status "

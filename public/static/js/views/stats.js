@@ -27,6 +27,12 @@ export function bars(title, obj, badge){
 export async function viewStats(){
   const v = $('#v-stats');
   skeleton(v, 'kpis', 'dashboard figures');
+  // Both calls at once. They were sequential, so the page waited for one full round trip
+  // to Supabase before even asking for the second — and the database is ~200-350 ms away.
+  // Neither depends on the other. `pgP` is caught where it is used, so a failing Progress
+  // card still cannot take the rest of the dashboard down.
+  const pgP = api('/api/progress'+q('months='+(S.pgMonths||6)));
+  pgP.catch(()=>{});                    // no unhandled rejection while overview is awaited
   const o = await api('/api/overview'+q());
   v.innerHTML='';
 
@@ -93,7 +99,7 @@ export async function viewStats(){
      /api/progress). The note under the table says so, because a chart that quietly
      assumes is worse than one that admits. */
   try {
-    const pg = await api('/api/progress'+q('months='+(S.pgMonths||6)));
+    const pg = await pgP;               // already in flight since the top of this function
     const D = pg.deltas || {};
     const pc = el('div','card'); pc.style.marginTop='16px';
     const head = el('div','card-h');
