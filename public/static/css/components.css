@@ -162,6 +162,35 @@ ul.plain li{margin:3px 0}
 .tabbtn:hover{border-color:var(--ink-3);color:var(--ink)}
 .tabbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
+/* ---------- the product page, laid out the way the Viator portal lays it out ----------
+   Someone who works in the supplier portal all day should find the same product in the
+   same shape here: title, status and code; a flat underlined tab strip carrying the
+   portal's own tab names; then headings stacked down the page with a hairline between
+   them, each field written as "Label: value" on one line rather than as a two-column
+   table. Scoped to .drawer so the rest of the dashboard keeps its own table styling. */
+.vtitle{font-size:25px;line-height:1.25;font-weight:700;letter-spacing:-.01em}
+.vsubline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:9px}
+.vpage .tabstrip{gap:24px;border-bottom:1px solid var(--line);margin-bottom:0}
+.vpage .tabbtn{background:none;border:0;border-bottom:2px solid transparent;
+  border-radius:0;padding:9px 1px;font-size:14px;font-weight:600;color:var(--ink-2)}
+.vpage .tabbtn:hover{color:var(--ink);border-bottom-color:var(--line-2)}
+.vpage .tabbtn.on{background:none;color:var(--accent);border-bottom-color:var(--accent)}
+.vsec{padding:22px 0;border-bottom:1px solid var(--line)}
+.vsec:first-child{padding-top:6px}
+.vsec:last-child{border-bottom:0;padding-bottom:4px}
+.vsec-h{font-size:17px;font-weight:700;margin:0 0 13px}
+/* "Product Title: Private Car Tour…" — label bold, value beside it, no rules between */
+.drawer .rows{grid-template-columns:minmax(0,max-content) 1fr;column-gap:8px}
+.drawer .rows.editable{grid-template-columns:minmax(0,max-content) 1fr 42px}
+.drawer .rows>div{padding:5px 0;border-bottom:0}
+.drawer .rows>.k{color:var(--ink);font-size:14px;font-weight:700;white-space:nowrap}
+.drawer .rows>.k::after{content:":"}
+.drawer .rows>.act{padding:3px 0 3px 8px}
+/* the portal's own sub-labels ("What's included", "Listing name") are plain bold, not
+   the uppercase letter-spaced kind this dashboard uses elsewhere */
+.drawer .subhead{font-size:14px;font-weight:700;text-transform:none;letter-spacing:0;
+  color:var(--ink);margin:16px 0 7px;padding-top:0;border-top:0}
+
 /* ---------- tables ---------- */
 .tblwrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse}

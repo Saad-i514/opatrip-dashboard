@@ -21,21 +21,19 @@ export async function openDrawer(pid){
   const scrim = el('div','scrim'); scrim.onclick = closeDrawer; host.appendChild(scrim);
   const dr = el('div','drawer');
 
-  const thumb = p.thumbnail_path ? `<img src="/api/thumb/${p.id}" alt="">`
-    : (p.thumbnail_url ? `<img src="${esc(p.thumbnail_url)}" alt="">` : '');
+  // Laid out the way the portal's own product page opens: the title, then the status and
+  // the product code on one quiet line beneath it. The thumbnail that used to sit here is
+  // gone — Viator shows the photos in the Photos strip, and so do we, right below.
   const head = el('div','dhead');
   head.innerHTML = `<div class="dhead-top">
-      ${thumb}
       <div style="flex:1;min-width:0">
-        <h2 style="font-size:19px">${esc(p.title||'(untitled)')}</h2>
-        <div class="pmeta" style="margin-top:6px">
-          <span class="mono">${esc(p.product_code)}</span>
-          · ${esc(p.account_name||p.viator_account_id)}
-          ${p.location?'· '+esc(p.location):''}
-        </div>
-        <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
+        <h2 class="vtitle">${esc(p.title||'(untitled)')}</h2>
+        <div class="vsubline">
           ${p.is_draft_stub?'<span class="badge b-stub">Draft — recorded only</span>':''}
-          ${qualBadge(p.quality_level)}${connBadge(p.connection_state)}${statusBadge(p.status)}
+          ${statusBadge(p.status)}${qualBadge(p.quality_level)}
+          <span class="hint">Product code: <span class="mono">${esc(p.product_code)}</span></span>
+          <span class="hint">${esc(p.account_name||p.viator_account_id)}${
+            p.location?' · '+esc(p.location):''}</span>
         </div>
       </div>
       <button class="btn ghost" id="xClose">Close</button>
@@ -141,9 +139,10 @@ export async function openDrawer(pid){
     });
     const secs = buildSections(cur);
     const c = el('div','card');
-    c.appendChild(el('div','card-h','<h3>Product details</h3>'+
-      '<span class="sub">everything captured in one page load</span>'));
-    const b = el('div','pad');
+    // No card header: the portal puts the tab strip straight under the title, and a
+    // "Product details" banner above tabs named after the portal's own tabs is a label
+    // for something the tabs already say.
+    const b = el('div','pad vpage');
     const strip = el('div','tabstrip'), panes = el('div');
     secs.forEach(([name,node],i)=>{
       const btn = el('button','tabbtn'+(i===0?' on':''),esc(name));
@@ -232,14 +231,18 @@ export const trunc = s => { s = (s===null||s===undefined)?'(none)':String(s);
   return s.length>72 ? s.slice(0,72)+'…' : s; };
 export const when = t => String(t||'').replace('T',' ').replace('+00:00','').slice(0,16);
 /* "product.voucher.ticketType" -> "Tickets › Ticket format" */
+/* Section names match the portal's tabs, so a field path resolves to the place someone
+   would go looking for it in Viator itself. */
 export const PATH_SEC = {pricing:'Schedules & prices', ageBands:'Schedules & prices',
   productOptions:'Schedules & prices', currency:'Schedules & prices',
   bookingSettings:'Booking details', bookingConfirmationSettings:'Booking details',
   cancellationPolicy:'Booking details', travellerRequiredInfo:'Booking details',
-  voucher:'Tickets', connectionDetails:'Connection', externalReference:'Connection',
+  voucher:'Tickets', connectionDetails:'Product connection',
+  externalReference:'Product connection',
   specialOfferInfo:'Special offers', media:'Photos', heroPhoto:'Photos',
-  itinerary:'Overview', inclusions:'Overview', exclusions:'Overview',
-  taxonomy:'Overview', additionalInfo:'Overview'};
+  itinerary:'Product content', inclusions:'Product content',
+  exclusions:'Product content', taxonomy:'Product content',
+  additionalInfo:'Product content'};
 export function fieldLabel(path){
   // "[=VALUE]" is an identity key from a set-like list — show the value, not "=VALUE"
   const parts = String(path||'').replace(/^product\./,'').split(/[.\[]/)

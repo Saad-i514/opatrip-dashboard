@@ -702,17 +702,36 @@ export function secQuality(cur){
   ])));
   return f;
 }
+/* Several headings under one tab, stacked and separated by a rule — the way the portal's
+   own "Product content" page reads (Product Setup, Meeting & pickup, Categories & themes,
+   Tour details… one after another) rather than as separate tabs. */
+function group(...parts){
+  const wrap = el('div','vsecs');
+  parts.forEach(([title, node]) => {
+    if (!node) return;
+    const s = el('section','vsec');
+    s.appendChild(el('h4','vsec-h', esc(title)));
+    s.appendChild(node);
+    wrap.appendChild(s);
+  });
+  return wrap.children.length ? wrap : null;
+}
+
+/* The tabs, and their names, are the portal's own — so someone who works in Viator all
+   day finds the same thing in the same place here. Translations is the one tab the portal
+   has that this never will: the client's rule is that it is never opened, and capture
+   satisfies that structurally (see strip_translations). */
 export function buildSections(cur){
   const p = cur.product||{};
   const out = [];
   const add = (n, node) => { if (node) out.push([n,node]); };
-  add('Overview', secOverview(p));
-  add('Tour details', secTourDetails(p));
-  add('Meeting & pickup', secMeeting(p));
+  add('Product content', group(['Overview', secOverview(p)],
+                               ['Tour details', secTourDetails(p)],
+                               ['Meeting & pickup', secMeeting(p)]));
   add('Schedules & prices', secPricing(p, cur));
   add('Booking details', secBooking(p));
   add('Tickets', secTickets(p));
-  add('Connection', secConnection(p, cur));
+  add('Product connection', secConnection(p, cur));
   add('Special offers', secOffers(p));
   add('Quality', secQuality(cur));
   return out;
