@@ -15,6 +15,5 @@ export const S = {
   // same word the dashboard cards use; `status` is the platform's own raw word.
   pf: {q: '', status: '', lifecycle: '', platform: '', connection: '', reviews: ''},
   pgMonths: 6,           // how far back the Progress card looks
-  plMonth: '',            // "Where tours were made": '' = every month
   rsince: '', runtil: '', // report period
 };

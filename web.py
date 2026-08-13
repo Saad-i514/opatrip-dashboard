@@ -476,27 +476,6 @@ def filter_options(account: str | None = None):
                         if k not in ("none",)]}
 
 
-@app.get("/api/places")
-def places(account: str | None = None, month: str | None = None):
-    """How many products were first captured in each place, optionally for one month.
-
-    There is no COUNTRY anywhere in the captured data — `accounts.country` is empty for
-    every row and no product carries one (the portal gives only
-    `primaryLocationDetails.name`, a city). Deriving a country from the city, or from the
-    account name, would be a guess: account 197133 is "Local Tours in Pakistan" and holds
-    Barcelona, Rome and Washington DC tours. So this groups by the place Viator does give.
-    """
-    where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
-    sql = (f"SELECT {db.blank_bucket('location')} AS place, COUNT(*) AS n "
-           f"FROM products p JOIN accounts a ON a.id=p.account_id {where}")
-    if month:
-        sql += f" {'AND' if where else 'WHERE'} substr(p.first_seen_at,1,7)=?"
-        args = args + [month]
-    sql += " GROUP BY 1 ORDER BY 2 DESC, 1"
-    with db.session() as con:
-        return {"places": [{"place": r[0], "n": r[1]} for r in con.execute(sql, args)]}
-
-
 @app.get("/api/progress")
 def progress(account: str | None = None, months: int = 6):
     """Month-over-month movement, reconstructed rather than guessed.

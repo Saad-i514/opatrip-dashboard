@@ -209,10 +209,9 @@ export async function viewStats(){
       k==='NOT_LISTED'?'Not uploaded':sentence(k))}</div>`).join('')));
   cov.appendChild(cb); v.appendChild(cov);
 
-  // The "Book on Connection", "Quality" and "Top locations" bar charts were removed on
-  // request. What replaced the last one answers the actual question: pick a month and see
-  // how many tours were made in each place. Those three still exist on the Breakdown tab.
-  await placesCard(v);
+  // The "Book on Connection", "Quality" and "Top locations" bar charts were removed from
+  // this page on request, as was the "Where tours were made" card that briefly replaced
+  // the last of them. All three breakdowns still exist on the Breakdown tab.
 
   // The dashboard used to end with two raw feeds — "Latest changes" and "Recent sync
   // runs". Both were tables of field paths, run ids and operator emails: true, but
@@ -224,59 +223,4 @@ export async function viewStats(){
   $('#cntChanges').textContent = K.changes.value;
 }
 
-/* ---- Tours by place, for one month or all of them ------------------------------------
-   The client asked for country + month. There is no country in anything the portal
-   returns — every accounts.country is empty and no product carries one — and the account
-   name is not a substitute: "Local Tours in Pakistan" holds Barcelona, Rome and
-   Washington DC tours. So this filters by the place Viator does give, and says so. */
-async function placesCard(v){
-  const c = el('div','card'); c.style.marginTop='16px';
-  const head = el('div','card-h');
-  head.innerHTML = `<h3>Where tours were made</h3>
-    <span class="sub">products by place, first captured in the chosen month</span>
-    <span style="flex:1"></span><select id="plmonth" title="Month"></select>`;
-  c.appendChild(head);
-  const body = el('div','pad');
-  c.appendChild(body); v.appendChild(c);
-
-  const sel = head.querySelector('#plmonth');
-  const opts = await api('/api/filters'+q());
-  sel.innerHTML = '<option value="">All months</option>' + (opts.months||[]).map(m=>
-    `<option value="${esc(m.month)}" ${S.plMonth===m.month?'selected':''}
-      >${esc(monthName(m.month))} (${m.n})</option>`).join('');
-
-  const paint = async () => {
-    body.innerHTML = '<div class="hint">Loading…</div>';
-    const d = await api('/api/places'+q(S.plMonth?'month='+encodeURIComponent(S.plMonth):''));
-    const rows = d.places || [];
-    if (!rows.length){
-      body.innerHTML = '<div class="hint">No products were first captured in that month.</div>';
-      return;
-    }
-    const total = rows.reduce((n,r)=>n+r.n, 0);
-    const max = Math.max(1, ...rows.map(r=>r.n));
-    body.innerHTML = `<div class="hint" style="margin-bottom:10px"><b>${total}</b>
-      product(s) across <b>${rows.length}</b> place(s)${
-      S.plMonth?` in ${esc(monthName(S.plMonth))}`:''}. Click a place to see them.</div>`;
-    rows.forEach(r=>{
-      const row = el('div','bar rev-bar');
-      row.setAttribute('role','button'); row.tabIndex = 0;
-      row.innerHTML = `<div class="bar-top"><span class="nm">${esc(r.place)}</span>
-          <span class="vl">${r.n}</span></div>
-        <div class="track"><div class="fill" style="width:${r.n/max*100}%"></div></div>`;
-      // "Not captured (draft)" and "Unknown" are labels, not searchable place names
-      const real = r.place !== 'Not captured (draft)' && r.place !== 'Unknown';
-      const open = () => {
-        Object.assign(S.pf, {q: real ? r.place : '', status:'', lifecycle:'', platform:'',
-                             connection:'', reviews:'', missing:'', month: S.plMonth||''});
-        go('products');
-      };
-      row.onclick = open;
-      row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
-      body.appendChild(row);
-    });
-  };
-  sel.onchange = e => { S.plMonth = e.target.value; paint(); };
-  await paint();
-}
 
