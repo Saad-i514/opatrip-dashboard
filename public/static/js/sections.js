@@ -1,5 +1,5 @@
 import { el, esc, q } from './core.js';
-import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, label, list, rows, section, sentence } from './format.js';
+import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, label, list, readable, rows, section, sentence } from './format.js';
 import { when } from './views/drawer.js';
 
 /* ======================= per-product readable sections ======================= */
@@ -486,9 +486,17 @@ export function secPricing(p, cur){
   const noPrice = (p.ageBandsWithNoPricing||[]).map(x=>x.name||x).filter(Boolean);
   if (noPrice.length) f.appendChild(section('Age bands with NO pricing set',
     el('div','', chips(noPrice.map(sentence)))));
+  /* "Entrance fee Mozart's Birthplace — Morning tour". The option titles are only worth
+     printing when the product actually has named options: DEFAULT is the portal's word
+     for the single unnamed one, so saying it would add noise, not information. */
   const extras = p.extraChargesWithOptions||[];
   if (extras.length) f.appendChild(section(`Extra charges (${extras.length})`,
-    el('div','', list(extras.map(x=>x.displayText||x.type||JSON.stringify(x))))));
+    el('div','', list(extras.map(x=>{
+      const opts = (x.productOptions||[]).map(o=>o.productOptionTitle)
+        .filter(t=>t && t !== 'DEFAULT');
+      const name = readable(x);
+      return opts.length ? `${name} — ${opts.join(', ')}` : name;
+    }).filter(Boolean)))));
   const bands = (p.ageBands||[]).filter(b=>b.name);
   if (bands.length){
     const t = el('div','tblwrap');
@@ -536,7 +544,7 @@ export function secBooking(p){
     el('div','', chips(perm))));
   const faqs = p.productFaqs||[];
   if (faqs.length) f.appendChild(section(`FAQs (${faqs.length})`,
-    el('div','', list(faqs.map(x=>x.question||x.title||JSON.stringify(x))))));
+    el('div','', list(faqs.map(x=>x.question||x.title||readable(x)).filter(Boolean)))));
   return f;
 }
 export function secTickets(p){
@@ -643,7 +651,7 @@ export function secOffers(p){
   const viol = elig.eligibilityViolations||[];
   if (viol.length) f.appendChild(section('Why an offer cannot run now',
     el('div','', list(viol.map(v=>{
-      const why = sentence(v.type||v.name||JSON.stringify(v));
+      const why = sentence(v.type||v.name||readable(v));
       const kind = v.value && v.value.offerType ? ` (${sentence(v.value.offerType)})` : '';
       return why + kind;
     })))));
@@ -683,7 +691,7 @@ export function secQuality(cur){
         <td>${x.isSatisfied?'<span class="yes">Yes</span>':'<span class="no">No</span>'}</td>
         <td>${(x.violations||[]).length
           ? esc((x.violations||[]).map(v=>typeof v==='string'?sentence(v)
-              :sentence(v.type||v.name||JSON.stringify(v))).join(', '))
+              :sentence(v.type||v.name||readable(v))).filter(Boolean).join(', '))
           : '<span class="hint">—</span>'}</td></tr>`).join('')}</tbody></table>`;
     const failed = tlist.filter(x=>!x.isSatisfied).length;
     f.appendChild(section(

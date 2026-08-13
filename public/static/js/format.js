@@ -149,6 +149,29 @@ export function rows(pairs){
    `tone`: 'old' colours it as the superseded value. No line-through — striking out 700
    characters makes the text people came here to read hard to read.
    `label` titles the popup ("Viator had", "Before", …).                                */
+/* readable(x) — the last resort for an object no renderer has a specific shape for.
+   That fallback used to be JSON.stringify(x), which put this in front of someone who
+   only wanted to read a price list:
+
+     {"exclusionRef":"dfe37607-…","extraChargeName":"Entrance fee Mozart's Birthplace",
+      "productOptions":[{"productOptionRef":"OPT-…","productOptionTitle":"DEFAULT"}]}
+
+   It fired whenever the portal named a field something we had not listed — here the name
+   lives in `extraChargeName`, and only `displayText`/`type` were being checked. So the
+   fix is not another key in the list: it is to stop dumping JSON at all. Take the field
+   that holds the name, and drop every ref, id and code — nobody reading a listing needs
+   a UUID. Returns '' when there is genuinely nothing sayable, so callers can skip it. */
+const NAMEY = /(name|title|text|label|question|description|type)$/i;
+const REFY = /(ref|id|uuid|code|key)$/i;
+export function readable(x){
+  if (x === null || x === undefined) return '';
+  if (typeof x !== 'object') return String(x);
+  if (Array.isArray(x)) return x.map(readable).filter(Boolean).join(', ');
+  const said = k => typeof x[k] === 'string' && x[k].trim() ? x[k].trim() : null;
+  const keys = Object.keys(x).filter(k => !REFY.test(k) && said(k));
+  const main = keys.find(k => NAMEY.test(k));
+  return main ? said(main) : keys.map(said).join(' · ');
+}
 export function fullText(v){
   let s = (v === null || v === undefined) ? '' : String(v);
   // pretty-print JSON: a one-line blob is exactly the thing that most needs unpacking
