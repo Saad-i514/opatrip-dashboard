@@ -1199,7 +1199,7 @@ async def add_image(pid: int, file: UploadFile = File(...),
 def remove_image(pid: int, image_id: int, editor_email: str):
     """Remove a MANUALLY added image. Captured Viator images are never deleted — they are
     evidence of what the portal showed, which is the point of the audit."""
-    editor_email = who_edits(editor_email)
+    editor_email = acting_email(editor_email)
     with db.session() as con:
         r = con.execute("""SELECT is_manual, r2_key FROM product_images
                            WHERE id=? AND product_id=?""", (image_id, pid)).fetchone()
@@ -1213,12 +1213,17 @@ def remove_image(pid: int, image_id: int, editor_email: str):
     return {"ok": True}
 
 
-def who_edits(supplied=""):
-    """Who gets the credit — or the blame — for an edit.
+def acting_email(supplied=""):
+    """Who gets the credit — or the blame — for whatever this request does.
 
-    Whoever is signed in, always. It used to be typed into a box, which meant it was
-    traceability on trust: anyone could put a colleague's address on their own edit. The
-    server knows who sent the request, so the browser no longer gets a say.
+    Whoever is signed in, always. Both the edit box and the Add Account dialog used to
+    ask for it, which made it traceability on trust: anyone could type a colleague's
+    address onto their own work. The server knows who sent the request, so the browser no
+    longer gets a say.
+
+    Note this is NOT the Viator portal login. A sync still records three separate
+    identities — this one (who ran it), `portal_email` (who the portal says is signed in)
+    and `viator_account_id` — and they are deliberately independent.
 
     The typed value is still accepted when auth is switched off entirely (a developer on
     a local SQLite copy), because there is nobody signed in to ask.
@@ -1228,13 +1233,13 @@ def who_edits(supplied=""):
         return u["email"].strip().lower()
     email = (supplied or "").strip()
     if not EMAIL_RE.match(email):
-        raise HTTPException(400, "Please enter your email so the edit can be traced.")
+        raise HTTPException(400, "Please enter your email so this can be traced.")
     return email.lower()
 
 
 @app.post("/api/product/{pid}/edit")
 def edit_product(pid: int, e: EditIn):
-    email = who_edits(e.editor_email)
+    email = acting_email(e.editor_email)
     try:
         with db.session() as con:
             guard_product(con, pid)
