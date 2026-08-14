@@ -1,5 +1,5 @@
 import { $, api, el, esc, q } from '../core.js';
-import { connBadge, qualBadge, rows, statusBadge, sub, valueBox } from '../format.js';
+import { connBadge, groupChanges, photoSummary, qualBadge, statusBadge, valueBox } from '../format.js';
 import { skeleton } from '../ui.js';
 import { bars } from './stats.js';
 import { trunc, when } from './drawer.js';
@@ -53,25 +53,36 @@ export async function viewAudit(){
     // field paths, run ids and operator emails — accurate, but you had to know the schema
     // to read it. The same facts are here; the reader no longer has to.
     const feed = el('div','feed'); feed.style.marginTop='12px';
-    d.changes.forEach(c=>{
+    // Photo edits arrive as dozens of rows per photo (see groupChanges). Grouped here so
+    // one edit reads as one line; the full detail stays in `changes`.
+    groupChanges(d.changes).forEach(g=>{
+      const c = g.c;
       const it = el('div','feeditem chg');
-      it.innerHTML = `<div class="dot3">⟳</div>
-        <div style="min-width:0">
-          <div style="font-weight:600">${esc(trunc(c.title))}</div>
-          <div class="hint" style="margin:2px 0 7px">
-            <span class="mono">${esc(c.product_code)}</span>
-            · ${esc(c.account_name||c.viator_account_id)}</div>
-          <div class="chg-what">Something on this product was changed</div>
-          <div class="chg-vals">
-            <div><div class="chg-lbl">Before</div>${valueBox(c.old_value,'old','Value before')}</div>
-            <div class="chg-arrow">→</div>
-            <div><div class="chg-lbl">After</div>${valueBox(c.new_value,null,'Value after')}</div>
-          </div>
-        </div>
-        <div class="hint" style="text-align:right;white-space:nowrap">
+      const who = `<div class="hint" style="text-align:right;white-space:nowrap">
           ${esc(when(c.detected_at))}<br>
           <span title="the person who ran the check that spotted it"
             >found by ${esc((c.operator_email||'').split('@')[0])}</span></div>`;
+      const head = `<div style="font-weight:600">${esc(trunc(c.title))}</div>
+          <div class="hint" style="margin:2px 0 7px">
+            <span class="mono">${esc(c.product_code)}</span>
+            · ${esc(c.account_name||c.viator_account_id)}</div>`;
+      it.innerHTML = g.photos
+        ? `<div class="dot3">▤</div>
+           <div style="min-width:0">${head}
+             <div class="chg-what">The photos on this product were changed on Viator —
+               <b>${esc(photoSummary(g))}</b></div>
+             <div class="hint">Photos themselves are not stored; this records that they
+               changed, when, and under which account.</div>
+           </div>${who}`
+        : `<div class="dot3">⟳</div>
+           <div style="min-width:0">${head}
+             <div class="chg-what">Something on this product was changed</div>
+             <div class="chg-vals">
+               <div><div class="chg-lbl">Before</div>${valueBox(c.old_value,'old','Value before')}</div>
+               <div class="chg-arrow">→</div>
+               <div><div class="chg-lbl">After</div>${valueBox(c.new_value,null,'Value after')}</div>
+             </div>
+           </div>${who}`;
       feed.appendChild(it);
     });
     b.appendChild(feed);

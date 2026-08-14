@@ -109,7 +109,7 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 /* ---------- product list ---------- */
 .filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
 .plist{display:grid;gap:11px}
-.prow{display:grid;grid-template-columns:72px 1fr auto;gap:16px;align-items:center;
+.prow{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;
   padding:13px 16px;background:var(--surface);border:1px solid var(--line);
   border-radius:var(--r);cursor:pointer;transition:.13s;box-shadow:var(--shadow)}
 .prow:hover{border-color:var(--accent-line);box-shadow:0 3px 14px rgba(249,115,22,.1)}

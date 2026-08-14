@@ -114,16 +114,11 @@ export async function loadStorage(){
     // name the real backend, so every "Loading … from X" line is accurate
     S.source = s.cloud ? 'Supabase' : 'the local database';
     const dot = ok => `<span style="color:${ok?'var(--green)':'var(--red)'}">●</span>`;
-    const pend = s.images.pending || 0;
+    // The image queue line went with photo storage. Nothing new is downloaded or
+    // uploaded, so a draining-queue indicator would only ever describe an old backlog.
     host.innerHTML =
       `<div style="font-weight:600;color:var(--ink-2);margin-bottom:3px">Storage</div>
-       <div>${dot(s.postgres.ok)} ${s.cloud?'Supabase Postgres':'local SQLite'}</div>
-       <div>${dot(s.r2.ok)} R2 · ${s.images.in_r2}/${s.images.total} images</div>`
-       // photos are uploaded after a capture, not during it — show the queue draining so
-       // "not in R2 yet" is visible rather than something you have to trust
-       + (pend ? `<div style="color:var(--amber);margin-top:4px">${
-             s.images.uploading ? '⟳ uploading' : '⏳ waiting'} ${pend} photo${
-             pend===1?'':'s'}</div>` : '')
+       <div>${dot(s.postgres.ok)} ${s.cloud?'Supabase Postgres':'local SQLite'}</div>`
        + (!s.cloud ? `<div style="color:var(--red);margin-top:4px">saving locally only</div>`
                    : '');
   }catch(e){ host.innerHTML = '<span style="color:var(--red)">storage status unavailable</span>'; }

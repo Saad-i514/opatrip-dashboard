@@ -127,19 +127,15 @@ export async function viewProducts(){
   const L = el('div','plist');
   d.products.forEach(p=>{
     const row = el('div','prow');
-    const img = p.thumbnail_path
-      ? `<img class="thumb" src="/api/thumb/${p.id}" loading="lazy" alt=""${
-          p.thumbnail_url?` onerror="this.src='${esc(p.thumbnail_url)}'"`:''}>`
-      : (p.thumbnail_url?`<img class="thumb" src="${esc(p.thumbnail_url)}" loading="lazy" alt="">`
-                        :`<div class="thumb ph">no photo</div>`);
-    row.innerHTML = `${img}
+    // No thumbnail, and no photo count: photos are not stored. A photo CHANGED on Viator
+    // still shows up — in Change history, as one line naming the account.
+    row.innerHTML = `
       <div style="min-width:0">
         <div class="ptitle">${esc(p.title||'(untitled)')}</div>
         <div class="pmeta">
           <span class="mono">${esc(p.product_code)}</span>
           ${p.location?'· '+esc(p.location):''}
           ${!S.acct?'· '+esc(p.account_name||p.viator_account_id):''}
-          ${p.image_count?`· ${p.image_count} photo${p.image_count===1?'':'s'}`:''}
           ${reviewChip(p)}
           ${p.change_count?`· <b style="color:var(--accent)">${p.change_count} change${p.change_count===1?'':'s'}</b>`:''}
         </div>

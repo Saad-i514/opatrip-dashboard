@@ -1,9 +1,10 @@
 import { S } from '../state.js';
 import { $, api, el, esc } from '../core.js';
-import { getPath, label, qualBadge, setEditContext, statusBadge, valueBox } from '../format.js';
+import { getPath, groupChanges, label, photoSummary, qualBadge, setEditContext,
+         statusBadge, valueBox } from '../format.js';
 import { skLines } from '../ui.js';
 import { buildSections, commissionOf, totalDuration, tree } from '../sections.js';
-import { editSection, editValue, uploadImage, deleteImage } from '../edit.js';
+import { editSection, editValue } from '../edit.js';
 import { secs } from '../progress.js';
 
 /* ======================= drawer ======================= */
@@ -63,7 +64,6 @@ export async function openDrawer(pid){
         && (pp.pricing||{}).productProgramMargin.isOptedIn ? 'incl. boost' : ''],
      ['Duration', totalDuration(it)||'—',''],
      ['Currency', pp.currency||'—',''],
-     ['Photos', d.images.length, 'saved locally'],
      ['Reviews', rr.totalReviewCount||0, rr.totalReviewCount?`rated ${rr.rating}`:'none yet'],
      ['Changes', d.changes.length, 'since first capture']]
      .forEach(([l,n,s])=>tiles.appendChild(el('div','tile',
@@ -71,61 +71,9 @@ export async function openDrawer(pid){
     body.appendChild(tiles);
   }
 
-  /* Photos — viewable, and now manageable: anyone can add one, and anything they added
-     can be removed. Captured Viator photos are deliberately NOT removable; they are the
-     evidence of what the portal showed. */
-  {
-    const c = el('div','card');
-    c.appendChild(el('div','card-h',
-      `<h3>Photos</h3><span class="sub">${d.images.length} on this product</span>`));
-    const b = el('div','pad');
-    const caps = {};
-    ((cur&&cur.product&&cur.product.media)||[]).forEach(m=>{
-      const ref = (m.media||{}).ref || m.mediaRef;
-      if (ref && m.descriptiveText) caps[ref] = m.descriptiveText;
-    });
-    if (d.images.length){
-      const g = el('div','photogrid');
-      d.images.forEach(im=>{
-        const cap = im.caption || caps[im.image_ref] || '';
-        const manual = !!im.is_manual;
-        const tile = el('div','photo');
-        tile.innerHTML = `
-          <img src="/api/image/${im.id}" loading="lazy" alt="${esc(cap)}">
-          ${manual?'<span class="tag">added</span>':''}
-          <div class="meta">${cap?esc(cap):'<span class="hint">no caption</span>'}
-            ${manual&&im.added_by?`<div class="hint">by ${esc(im.added_by)}</div>`:''}</div>`;
-        tile.querySelector('img').onclick = ()=>window.open(
-          `/api/image/${im.id}`, '_blank', 'noopener');
-        if (manual){
-          const rm = el('button','rm','×');
-          rm.title = 'Remove this photo';
-          rm.onclick = e=>{ e.stopPropagation();
-            deleteImage(p.id, im.id, ()=>openDrawer(p.id)); };
-          tile.appendChild(rm);
-        }
-        g.appendChild(tile);
-      });
-      b.appendChild(g);
-    } else {
-      b.appendChild(el('div','hint','No photos yet.'));
-    }
-    const dz = el('div','dropzone');
-    dz.style.marginTop = d.images.length ? '14px' : '0';
-    dz.innerHTML = '<b>Add a photo</b><div>click to choose, or drop an image here · '
-      + 'JPEG, PNG, WebP or GIF, up to 12 MB</div>';
-    const inp = el('input'); inp.type='file'; inp.accept='image/*'; inp.className='hidden';
-    dz.onclick = ()=>inp.click();
-    inp.onchange = ()=>{ if(inp.files[0])
-      uploadImage(p.id, inp.files[0], ()=>openDrawer(p.id)); };
-    dz.ondragover = e=>{ e.preventDefault(); dz.classList.add('over'); };
-    dz.ondragleave = ()=>dz.classList.remove('over');
-    dz.ondrop = e=>{ e.preventDefault(); dz.classList.remove('over');
-      const f = e.dataTransfer.files[0];
-      if (f) uploadImage(p.id, f, ()=>openDrawer(p.id)); };
-    b.appendChild(dz); b.appendChild(inp);
-    c.appendChild(b); body.appendChild(c);
-  }
+  /* The Photos card — the gallery, the captions and the upload box — was removed with
+     photo storage itself. What a photo change did to the listing is still recorded: it
+     appears in Change history below as one line per edit. */
 
   /* readable sections — every field row carries its own pen, wired through this
      context so sections.js stays pure rendering */
@@ -178,13 +126,24 @@ export async function openDrawer(pid){
       'No changes yet — the first capture is the baseline to compare against.'));
   } else {
     const t = el('div','tblwrap');
+    // grouped the same way as the Change history tab: one photo edit, one line
     t.innerHTML = `<table><thead><tr><th>What changed</th><th>Before</th><th>After</th>
-      <th>When</th><th>Run by</th></tr></thead><tbody>${d.changes.map(c=>`<tr>
-        <td>${esc(fieldLabel(c.field_path))}</td>
-        <td>${valueBox(c.old_value, 'old', 'Value before')}</td>
-        <td>${valueBox(c.new_value, null, 'Value after')}</td>
-        <td class="hint" style="white-space:nowrap">${esc(when(c.detected_at))}</td>
-        <td class="hint">${esc(c.operator_email)}</td></tr>`).join('')}</tbody></table>`;
+      <th>When</th><th>Run by</th></tr></thead><tbody>${
+      groupChanges(d.changes).map(g=>{
+        const c = g.c;
+        if (g.photos) return `<tr>
+          <td><b>Photos</b><div class="hint">${esc(photoSummary(g))}</div></td>
+          <td colspan="2" class="hint">changed on Viator — the photos themselves are
+            not stored</td>
+          <td class="hint" style="white-space:nowrap">${esc(when(c.detected_at))}</td>
+          <td class="hint">${esc(c.operator_email)}</td></tr>`;
+        return `<tr>
+          <td>${esc(fieldLabel(c.field_path))}</td>
+          <td>${valueBox(c.old_value, 'old', 'Value before')}</td>
+          <td>${valueBox(c.new_value, null, 'Value after')}</td>
+          <td class="hint" style="white-space:nowrap">${esc(when(c.detected_at))}</td>
+          <td class="hint">${esc(c.operator_email)}</td></tr>`;
+      }).join('')}</tbody></table>`;
     chb.appendChild(t);
   }
   ch.appendChild(chb); body.appendChild(ch);

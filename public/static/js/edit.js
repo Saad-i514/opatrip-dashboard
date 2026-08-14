@@ -8,11 +8,11 @@
      askEditor()   – identify the person
      editAll()     – the full grouped form, every field at once
      editField()   – one field
-     uploadImage() / deleteImage() – photos, stored in R2 like any captured image
+     editSection() – every editable field in one block, what the portal's Edit opens
 */
 import { S } from './state.js';
 import { $, api, el, esc, post } from './core.js';
-import { toast, confirmDialog } from './toast.js';
+import { toast } from './toast.js';
 
 export const EMAIL_OK = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
@@ -299,49 +299,7 @@ export async function editField(pid, key, current, onSaved){
   const inp = $(`#f_${key}`); if (inp) inp.focus();
 }
 
-/** Attach a photo. Goes straight to R2 and is flagged as manually added. */
-export async function uploadImage(pid, file, onSaved){
-  if (!file) return;
-  if (!/^image\//.test(file.type))
-    return toast('That is not an image', {kind: 'err', detail: file.name});
-  const who = await askEditor();
-  if (!who) return;
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('editor_email', who);
-  const close = toast(`Uploading ${file.name}…`, {kind: 'info', timeout: 120000});
-  try{
-    const r = await fetch(`/api/product/${pid}/image`, {method: 'POST', body: fd});
-    const j = await r.json().catch(() => ({}));
-    close();
-    if (!r.ok) throw new Error(j.detail || r.statusText);
-    toast('Photo added', {kind: 'ok',
-      detail: `${(j.bytes / 1024).toFixed(0)} KB stored in Cloudflare R2`});
-    if (onSaved) onSaved();
-  }catch(ex){
-    close();
-    toast('Upload failed', {kind: 'err', detail: ex.message});
-  }
-}
-
-export async function deleteImage(pid, imageId, onSaved){
-  const who = await askEditor();
-  if (!who) return;
-  const yes = await confirmDialog({
-    title: 'Remove this photo?',
-    body: 'It will be deleted from this product. Photos captured from Viator cannot be '
-        + 'removed — they are part of the audit record.',
-    okLabel: 'Remove photo', danger: true});
-  if (!yes) return;
-  try{
-    const r = await fetch(
-      `/api/product/${pid}/image/${imageId}?editor_email=${encodeURIComponent(who)}`,
-      {method: 'DELETE'});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.detail || r.statusText);
-    toast('Photo removed', {kind: 'ok'});
-    if (onSaved) onSaved();
-  }catch(ex){
-    toast('Could not remove it', {kind: 'err', detail: ex.message});
-  }
-}
+/* uploadImage() and deleteImage() were removed with photo storage. The dashboard
+   no longer shows or accepts photos; POST /api/product/<id>/image refuses too, so
+   there is no client left for them. A photo CHANGED on Viator is still recorded --
+   see groupChanges() in format.js. */

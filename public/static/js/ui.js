@@ -24,7 +24,7 @@ export function skeleton(host, kind, what){
     body = `<div class="card pad"><span class="sk sk-title"></span>${skLines(9)}</div>`;
   } else if (kind === 'list'){
     body = `<div class="plist">${Array.from({length:7},()=>
-      `<div class="prow"><span class="sk" style="width:72px;height:54px"></span>
+      `<div class="prow">
        <div style="min-width:0"><span class="sk sk-line" style="width:58%"></span>
        <span class="sk sk-line" style="width:34%"></span></div>
        <span class="sk" style="width:90px;height:22px;border-radius:99px"></span></div>`
