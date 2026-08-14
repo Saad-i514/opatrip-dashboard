@@ -1,7 +1,7 @@
 import { S } from '../state.js';
-import { $, api, el, esc } from '../core.js';
-import { getPath, groupChanges, label, photoSummary, qualBadge, setEditContext,
-         statusBadge, valueBox } from '../format.js';
+import { $, api, el, esc, session } from '../core.js';
+import { getPath, historyFor, label, personName, qualBadge, setEditContext,
+         statusBadge, valueBox, whenLong } from '../format.js';
 import { skLines } from '../ui.js';
 import { buildSections, commissionOf, totalDuration, tree } from '../sections.js';
 import { editSection, editValue } from '../edit.js';
@@ -116,63 +116,11 @@ export async function openDrawer(pid){
     body.appendChild(c);
   }
 
-  /* change history */
-  const ch = el('div','card');
-  ch.appendChild(el('div','card-h',
-    `<h3>Change history</h3><span class="sub">${d.changes.length} recorded</span>`));
-  const chb = el('div','pad');
-  if (!d.changes.length){
-    chb.appendChild(el('div','hint',
-      'No changes yet — the first capture is the baseline to compare against.'));
-  } else {
-    const t = el('div','tblwrap');
-    // grouped the same way as the Change history tab: one photo edit, one line
-    t.innerHTML = `<table><thead><tr><th>What changed</th><th>Before</th><th>After</th>
-      <th>When</th><th>Run by</th></tr></thead><tbody>${
-      groupChanges(d.changes).map(g=>{
-        const c = g.c;
-        if (g.photos) return `<tr>
-          <td><b>Photos</b><div class="hint">${esc(photoSummary(g))}</div></td>
-          <td colspan="2" class="hint">changed on Viator — the photos themselves are
-            not stored</td>
-          <td class="hint" style="white-space:nowrap">${esc(when(c.detected_at))}</td>
-          <td class="hint">${esc(c.operator_email)}</td></tr>`;
-        return `<tr>
-          <td>${esc(fieldLabel(c.field_path))}</td>
-          <td>${valueBox(c.old_value, 'old', 'Value before')}</td>
-          <td>${valueBox(c.new_value, null, 'Value after')}</td>
-          <td class="hint" style="white-space:nowrap">${esc(when(c.detected_at))}</td>
-          <td class="hint">${esc(c.operator_email)}</td></tr>`;
-      }).join('')}</tbody></table>`;
-    chb.appendChild(t);
-  }
-  ch.appendChild(chb); body.appendChild(ch);
-
-  /* Manual edits — the counterpart to Change history: that shows what VIATOR changed,
-     this shows what a person changed, and who. Removing the old top panel must not remove
-     the audit trail with it. */
-  if ((d.edit_history||[]).length){
-    const c = el('div','card');
-    c.appendChild(el('div','card-h',
-      `<h3>Manual edits</h3><span class="sub">${d.edit_history.length} recorded</span>`));
-    const b2 = el('div','pad');
-    const t = el('div','tblwrap');
-    t.innerHTML = `<table><thead><tr><th>Field</th><th>Value</th><th>Viator had</th>
-      <th>By</th><th>When</th><th>Reason</th></tr></thead><tbody>${
-      d.edit_history.map(h=>`<tr>
-        <td class="mono">${esc(h.field)}</td>
-        <td>${valueBox(h.value, null, 'Value after the edit')}${h.is_current
-          ?'<span class="badge b-active">current</span>':''}</td>
-        <td>${valueBox(h.captured_value, 'old', 'What Viator had')}</td>
-        <td class="hint">${esc(h.editor_email)}</td>
-        <td class="hint" style="white-space:nowrap">${esc(when(h.edited_at))}</td>
-        <td class="hint">${esc(h.note||'')}</td></tr>`).join('')}</tbody></table>`;
-    b2.appendChild(t);
-    b2.appendChild(el('div','hint',
-      'Edits never change the captured snapshot — the portal value is kept beside them, '
-      + 'so a later sync cannot overwrite anyone’s work.'));
-    c.appendChild(b2); body.appendChild(c);
-  }
+  /* Edit history — everything that ever happened to this product, in one list.
+     Viator's own changes and this dashboard's corrections used to sit in two separate
+     tables (and one of them on a different tab entirely), which meant nobody could see
+     the order things happened in. */
+  body.appendChild(editHistoryCard(d));
 
   /* The "Earlier captures" snapshot browser lived here. It listed run ids and raw
      JSON dumps — a debugging tool on a page people open to read a product. What
@@ -185,6 +133,57 @@ export async function openDrawer(pid){
   dr.appendChild(body); host.appendChild(dr);
   head.querySelector('#xClose').onclick = closeDrawer;
 }
+/* One entry per edit, told the way a person would tell it: who, when, and what they
+   replaced with what. Modelled on the edit-history card in Google Sheets, which is the
+   shape the client asked for.
+
+   Every entry is shown — not just the newest. The `changes` table has never been capped
+   (only the full snapshots are, at two), so the whole chain from the original value to
+   today's is here. */
+function editHistoryCard(d){
+  const items = historyFor(d);
+  const c = el('div','card');
+  c.appendChild(el('div','card-h', '<h3>Edit history</h3>'
+    + `<span class="sub">${items.length} ${items.length===1?'entry':'entries'} · newest first</span>`));
+  const b = el('div','pad');
+  if (!items.length){
+    b.appendChild(el('div','empty','<div class="big">Nothing has changed yet</div>'
+      + 'The first capture is the starting point. From the next check onwards, anything '
+      + 'Viator changes — and anything anyone corrects here — is listed on this page.'));
+    c.appendChild(b); return c;
+  }
+  b.appendChild(el('div','hint','Everything that has happened to this product, whoever '
+    + 'did it. Click a value to see all of it.'));
+  const feed = el('div','ehist');
+  items.forEach(it => {
+    const name = personName(it.who, session.people);
+    const row = el('div','eh');
+    // A photo edit writes one row per field per photo; saying "Photos" once is the whole
+    // point of grouping them on the change feed, and the same applies here.
+    const what = /^product\.(media|heroPhoto)\b/.test(it.path || '')
+      ? 'Photos' : fieldLabel(it.path);
+    row.innerHTML = `
+      <div class="eh-av" title="${esc(it.who)}">${esc((name[0]||'?').toUpperCase())}</div>
+      <div style="min-width:0">
+        <div class="eh-top"><b>${esc(name)}</b>
+          <span class="eh-when">${esc(whenLong(it.at))}</span>
+          ${it.byUs ? '<span class="badge b-stub">edited here</span>'
+                    : '<span class="badge b-draft">changed on Viator</span>'}
+          ${it.current ? '<span class="badge b-active">current</span>' : ''}</div>
+        <div class="eh-what">${esc(what)}</div>
+        <div class="eh-rep">Replaced ${valueBox(it.old,'old','Value before')}
+          <span class="eh-arrow">with</span> ${valueBox(it.now,null,'Value after')}</div>
+        ${it.note ? `<div class="hint">Reason: ${esc(it.note)}</div>` : ''}
+        ${it.byUs ? '' : `<div class="hint">Spotted by ${esc(name)}’s sync — Viator does
+           not say which of its own users made the change.</div>`}
+      </div>`;
+    feed.appendChild(row);
+  });
+  b.appendChild(feed);
+  c.appendChild(b);
+  return c;
+}
+
 /* The portal puts one "Edit" button at the top-right of each block, not a pencil beside
    each field. The pencils are still what knows which fields can be edited and what they
    currently hold, so this reads them out of the block, hangs a single Edit button on its

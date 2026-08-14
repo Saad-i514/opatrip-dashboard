@@ -28,11 +28,12 @@
     <button class="navbtn" data-t="products" aria-selected="false"><span class="ico">◧</span>Products<span class="cnt" id="cntProducts">–</span></button>
     <button class="navbtn" data-t="accounts" aria-selected="false"><span class="ico">⌂</span>Accounts<span class="cnt" id="cntAccounts">–</span></button>
     <div class="navgrp">Traceability</div>
-    <button class="navbtn" data-t="audit" aria-selected="false"><span class="ico">⟳</span>Change history<span class="cnt" id="cntChanges">–</span></button>
     <button class="navbtn" data-t="syncs" aria-selected="false"><span class="ico">⎘</span>Sync runs</button>
     <button class="navbtn" data-t="activity" aria-selected="false"><span class="ico">≡</span>Activity</button>
     <div class="navgrp">Insights</div>
     <button class="navbtn" data-t="categories" aria-selected="false"><span class="ico">◱</span>Breakdown</button>
+    <div class="navgrp hidden" data-admin-only>Manage</div>
+    <button class="navbtn hidden" data-admin-only data-t="admin" aria-selected="false"><span class="ico">☗</span>Admin</button>
   </nav>
   <div id="storagebar" class="hint" style="padding:9px 11px;border-radius:10px;
        background:var(--surface-2);margin-top:auto;font-size:12px;line-height:1.5"></div>
@@ -71,13 +72,15 @@
   <section id="v-accounts" class="hidden"></section>
   <section id="v-products" class="hidden"></section>
   <section id="v-categories" class="hidden"></section>
-  <section id="v-audit" class="hidden"></section>
   <section id="v-syncs" class="hidden"></section>
+  <section id="v-admin" class="hidden"></section>
   <section id="v-activity" class="hidden"></section>
 </main>
 </div>
 </div>
 
+<!-- Covers everything until someone signs in. -->
+<div id="authHost"></div>
 <div id="loadbar"></div>
 <div id="loadchip" class="loadchip hidden"></div>
 <div id="drawerHost"></div>

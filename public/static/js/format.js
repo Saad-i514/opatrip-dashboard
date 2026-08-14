@@ -200,6 +200,51 @@ export function photoSummary(g){
           say(mov, 'reordered')].filter(Boolean).join(' · ') || 'photos changed';
 }
 
+/* ---------- one product's whole history, told as a list of edits -----------------------
+   Two things change a product, and they used to live on separate pages:
+     * Viator changed it — found by comparing this capture against the last one;
+     * somebody here corrected it in the dashboard.
+   Both belong on the product, in one list, newest first.
+
+   ON NAMING THE PERSON. For a dashboard edit we know exactly who: they were signed in.
+   For a Viator-side change we do NOT, and cannot — scraping a page cannot reveal which
+   human edited it on Viator's side. All we honestly know is which account it happened
+   under and who was running the sync that spotted it, so that is what it says. Inventing
+   an author would be worse than saying less. */
+export function historyFor(d){
+  const out = [];
+  (d.changes || []).forEach(c => out.push({
+    kind: 'viator', at: c.detected_at, path: c.field_path,
+    old: c.old_value, now: c.new_value,
+    who: c.operator_email || c.sync_operator || '', byUs: false,
+  }));
+  (d.edit_history || []).forEach(e => out.push({
+    kind: 'edit', at: e.edited_at, path: e.field,
+    old: e.captured_value, now: e.value,
+    who: e.editor_email || '', note: e.note || '', current: !!e.is_current, byUs: true,
+  }));
+  out.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  return out;
+}
+/* "June 29, 3:58 PM" — the way a person writes a time, not an ISO stamp. */
+export function whenLong(t){
+  const d = parseTs(t);
+  if (!d) return String(t || '');
+  const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, `
+       + `${((h + 11) % 12) + 1}:${m} ${h < 12 ? 'AM' : 'PM'}`;
+}
+/* A person's name from whatever we hold. An email is not a name, but "quality4" reads
+   better than "quality4@opatrip.com" and is still recognisably them. */
+export function personName(email, names){
+  const e = String(email || '').trim();
+  if (!e) return 'Unknown';
+  const known = (names || {})[e.toLowerCase()];
+  if (known) return known;
+  const local = e.split('@')[0];
+  return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 /* readable(x) — the last resort for an object no renderer has a specific shape for.
    That fallback used to be JSON.stringify(x), which put this in front of someone who
    only wanted to read a price list:

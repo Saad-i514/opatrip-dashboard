@@ -72,10 +72,39 @@ export const api = async (p,o) => {
     LOADING.delete(id); paintLoading();
   }
 };
+/* The signed-in session. Kept here rather than in state.js because every request needs
+   it: attaching the token in ONE place means no call site can forget, and a request that
+   comes back 401 signs out from one place too. */
+export const TOKEN_KEY = 'authToken';
+export const session = {
+  token: localStorage.getItem(TOKEN_KEY) || '',
+  user: null,                       // filled by /api/auth/me once the token is accepted
+  required: true,                   // until /api/auth/config says otherwise
+  // email -> full name, loaded once at start-up, so the edit history can say
+  // "Maniha Hussain" where the database only records an email address
+  people: {},
+};
+export function setToken(t){
+  session.token = t || '';
+  if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY);
+}
+/* Set by app.js. Called when the server stops accepting our token — the session expired
+   or an admin deleted the account — so the login screen comes back instead of every
+   panel filling with "Please sign in to continue." */
+let onSignedOut = () => {};
+export const setSignedOutHandler = fn => { onSignedOut = fn; };
+
 export const apiRaw = async (p,o) => {
-  const r = await fetch(p,o);
+  const opt = {...(o||{})};
+  if (session.token)
+    opt.headers = {...(opt.headers||{}), Authorization: `Bearer ${session.token}`};
+  const r = await fetch(p,opt);
   if(!r.ok){
     const d = (await r.json().catch(()=>({}))).detail;
+    if (r.status === 401 && !p.startsWith('/api/auth/')){
+      setToken(''); session.user = null; onSignedOut();
+      throw new Error(d || 'Your session has ended — please sign in again.');
+    }
     // A 404 on an API path almost always means the running server is older than these
     // files — the HTML is re-read from disk but the Python isn't.
     if (r.status === 404 && p.startsWith('/api/'))
@@ -87,6 +116,9 @@ export const apiRaw = async (p,o) => {
 };
 export const post = (p,b) => api(p,{method:'POST',headers:{'Content-Type':'application/json'},
   body:JSON.stringify(b)});
+export const patch = (p,b) => api(p,{method:'PATCH',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify(b)});
+export const del = p => api(p,{method:'DELETE'});
 
 
 

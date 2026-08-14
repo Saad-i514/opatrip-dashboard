@@ -16,6 +16,7 @@ What still works here: every report, filter and chart; the change history; manua
 edits with their audit trail; photo uploads; and images served from R2.
 """
 import asyncio
+import contextvars
 import json
 import os
 import re
@@ -23,12 +24,13 @@ import time
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import auth
 import cloud
 import config as C
 import db
@@ -118,6 +120,99 @@ class TaskIn(BaseModel):
     completed_at: str | None = None
 
 
+# --------------------------------------------------------------------- who is asking
+# Set by the gate below and read wherever a query needs narrowing. A ContextVar rather
+# than a FastAPI dependency because the alternative is adding a parameter to all 33
+# endpoints and remembering to do it on the 34th — the gate cannot be forgotten.
+CURRENT_USER = contextvars.ContextVar("current_user", default=None)
+
+# Everything a browser needs before anyone has signed in.
+OPEN_PATHS = {"/api/auth/login", "/api/auth/config"}
+
+# With no Supabase keys the app runs open, exactly as it did before auth existed, so a
+# developer on a local SQLite copy still gets a working dashboard.
+LOCAL_USER = {"id": None, "email": "", "name": "Local", "role": "admin", "scope": "all",
+              "local": True}
+
+
+@app.middleware("http")
+async def gate(request: Request, call_next):
+    """One place that decides whether a request is allowed. Static files and the shell are
+    public; every /api/ route needs a session, and /api/admin/ needs an admin."""
+    path = request.url.path
+    if not auth.enabled():
+        user = LOCAL_USER
+    else:
+        token = (request.headers.get("authorization") or "")
+        token = token[7:].strip() if token[:7].lower() == "bearer " else ""
+        user = auth.user_from_token(token)
+        if path.startswith("/api/") and path not in OPEN_PATHS:
+            if not user:
+                return JSONResponse({"detail": "Please sign in to continue."},
+                                    status_code=401)
+            if path.startswith("/api/admin/") and user["role"] != "admin":
+                return JSONResponse(
+                    {"detail": "Only an administrator can do that."}, status_code=403)
+    tok = CURRENT_USER.set(user)
+    try:
+        return await call_next(request)
+    finally:
+        CURRENT_USER.reset(tok)
+
+
+def me():
+    return CURRENT_USER.get() or LOCAL_USER
+
+
+# Which accounts may the caller see? None means all of them. A "own" user sees the
+# accounts they have actually captured — derived from syncs.operator_email rather than a
+# list an admin has to maintain, so it stays true on its own.
+_scope_cache = {}
+
+
+def scope_accounts():
+    u = me()
+    if u.get("scope") == "all":
+        return None
+    email = (u.get("email") or "").strip().lower()
+    if not email:
+        return []
+    hit = _scope_cache.get(email)
+    if hit and hit[0] > time.time():
+        return hit[1]
+    with db.session() as con:
+        rows = [r[0] for r in con.execute(
+            """SELECT DISTINCT a.viator_account_id
+               FROM syncs s JOIN accounts a ON a.id=s.account_id
+               WHERE lower(s.operator_email)=?""", (email,))]
+    _scope_cache[email] = (time.time() + 60, rows)
+    return rows
+
+
+def account_where(account=None, alias="a"):
+    """The WHERE clause every data endpoint shares: the account the user picked, AND the
+    accounts they are allowed to see at all. Returns ('', []) when nothing constrains it,
+    so callers can keep appending ' AND ...' the way they always did."""
+    conds, args = [], []
+    if account:
+        conds.append(f"{alias}.viator_account_id=?")
+        args.append(account)
+    allowed = scope_accounts()
+    if allowed is not None:
+        if not allowed:
+            conds.append("1=0")          # scoped user who has captured nothing yet
+        else:
+            conds.append(f"{alias}.viator_account_id IN "
+                         f"({','.join('?' * len(allowed))})")
+            args += allowed
+    return (("WHERE " + " AND ".join(conds)) if conds else "", args)
+
+
+def may_see_account(acct_id):
+    allowed = scope_accounts()
+    return allowed is None or acct_id in allowed
+
+
 def LIMIT_Q(default):
     """A row cap that FastAPI validates before it reaches SQL.
 
@@ -205,6 +300,117 @@ def index():
 
 
 # ----------------------------------------------------------------------- accounts
+# ------------------------------------------------------------------- sign in / users
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class UserIn(BaseModel):
+    email: str | None = None
+    password: str | None = None
+    name: str | None = None
+    role: str | None = None
+    scope: str | None = None
+
+
+@app.get("/api/auth/config")
+def auth_config():
+    """Does this server require a sign-in? Asked before the login screen is drawn."""
+    return {"required": auth.enabled()}
+
+
+@app.post("/api/auth/login")
+def auth_login(i: LoginIn):
+    try:
+        return auth.sign_in(i.email, i.password)
+    except auth.AuthError as e:
+        # Deliberately vague: saying "no such user" tells an attacker which emails exist.
+        raise HTTPException(401, str(e) or "That email and password don't match.")
+
+
+@app.get("/api/auth/me")
+def auth_me():
+    return {"user": me()}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request):
+    token = (request.headers.get("authorization") or "")
+    auth.forget(token[7:].strip() if token[:7].lower() == "bearer " else "")
+    return {"ok": True}
+
+
+# Names, so the edit history can say "Maniha Hussain" instead of "maniha@opatrip.com".
+# Available to anyone signed in — it is only what people are called, no roles and no
+# permissions — and cached, because it is read on every dashboard load.
+_people = {"at": 0.0, "names": {}}
+
+
+@app.get("/api/people")
+def people():
+    if not auth.enabled():
+        return {"names": {}}
+    if time.time() - _people["at"] > 120:
+        try:
+            _people["names"] = {u["email"].lower(): u["name"] for u in auth.list_users()
+                                if u.get("email")}
+            _people["at"] = time.time()
+        except auth.AuthError:
+            pass                    # keep whatever we had; a name is not worth a 500
+    return {"names": _people["names"]}
+
+
+@app.get("/api/admin/users")
+def admin_users():
+    return {"users": auth.list_users(), "me": me()}
+
+
+@app.post("/api/admin/users")
+def admin_create_user(u: UserIn):
+    try:
+        user = auth.create_user(u.email or "", u.password or "", u.name or "",
+                                u.role or "member", u.scope or "own")
+    except auth.AuthError as e:
+        raise HTTPException(400, str(e))
+    log(f"{me()['email']} created the user {user['email']} ({user['role']})")
+    return {"user": user}
+
+
+@app.patch("/api/admin/users/{user_id}")
+def admin_update_user(user_id: str, u: UserIn):
+    # An admin who removes their own admin rights locks everyone out of user management,
+    # because only an admin can grant it back.
+    if user_id == me().get("id") and u.role and u.role != "admin":
+        raise HTTPException(400, "You can't remove your own administrator rights — ask "
+                                 "another administrator to do it.")
+    try:
+        user = auth.update_user(user_id, name=u.name, role=u.role, scope=u.scope,
+                                password=u.password)
+    except auth.AuthError as e:
+        raise HTTPException(400, str(e))
+    log(f"{me()['email']} updated the user {user['email']}")
+    return {"user": user}
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: str):
+    if user_id == me().get("id"):
+        raise HTTPException(400, "You can't delete your own account while signed in.")
+    users = auth.list_users()
+    victim = next((x for x in users if x["id"] == user_id), None)
+    if victim and victim["role"] == "admin" \
+            and sum(1 for x in users if x["role"] == "admin") <= 1:
+        raise HTTPException(400, "That's the only administrator — make someone else an "
+                                 "administrator first.")
+    try:
+        auth.delete_user(user_id)
+    except auth.AuthError as e:
+        raise HTTPException(400, str(e))
+    log(f"{me()['email']} deleted the user {(victim or {}).get('email', user_id)}")
+    return {"ok": True}
+
+
 @app.get("/api/accounts")
 def accounts():
     # One query, not one-per-account: the old version ran a COUNT per row inside a Python
@@ -233,6 +439,11 @@ def accounts():
               (SELECT COUNT(*) FROM product_images i JOIN products p ON p.id=i.product_id
                  WHERE p.account_id=a.id) AS image_count
             FROM accounts a ORDER BY a.name IS NULL, a.name""")]
+    # A member scoped to their own work must not even see that other accounts exist —
+    # the account dropdown is built from this list.
+    allowed = scope_accounts()
+    if allowed is not None:
+        rows = [r for r in rows if r["viator_account_id"] in allowed]
     for r in rows:
         # no browser is ever open on the server — captures run on staff laptops
         r["browser_open"] = False
@@ -258,7 +469,7 @@ def add_account(a: AccountIn):
 @app.get("/api/stats")
 def stats(account: str | None = None):
     with db.session() as con:
-        where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
+        where, args = account_where(account)
         # A missing value has two very different meanings, and lumping both under
         # "Unknown" made a deliberate design decision look like a data fault.
         #   * on a DRAFT it means "not captured": the client's rule is that drafts are
@@ -297,7 +508,7 @@ def overview(account: str | None = None):
     detected_at) — never invented. Where a comparison isn't computable the delta comes
     back as None and the UI omits the chip rather than showing a made-up number.
     """
-    where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
+    where, args = account_where(account)
 
     # ONE connection for the whole endpoint. Each helper used to open its own session, so
     # this handler alone made ~15 separate round trips to Supabase (~11s). Reusing the
@@ -456,7 +667,7 @@ def filter_options(account: str | None = None):
     only ever offer a month that has products in it — an empty option that returns
     nothing is a small betrayal of trust in the filter.
     """
-    where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
+    where, args = account_where(account)
     with db.session() as con:
         # the COUNT matters: with products captured in only two months, a two-option
         # dropdown looks broken until each option says how many it holds
@@ -493,7 +704,7 @@ def progress(account: str | None = None, months: int = 6):
     begins when this tool first saw it, and the response says so rather than drawing a
     line back to zero that would read as growth that never happened.
     """
-    where, args = ("WHERE a.viator_account_id=?", [account]) if account else ("", [])
+    where, args = account_where(account)
     with db.session() as con:
         prods = [dict(r) for r in con.execute(
             f"""SELECT p.id, p.status_canonical, p.first_seen_at,
@@ -606,6 +817,12 @@ def products(account: str | None = None, q: str | None = None,
     if account:
         sql += " AND a.viator_account_id=?"
         args.append(account)
+    # the accounts this user may see at all, whatever they asked for
+    allowed = scope_accounts()
+    if allowed is not None:
+        sql += (f" AND a.viator_account_id IN ({','.join('?' * len(allowed))})"
+                if allowed else " AND 1=0")
+        args += allowed
     if q:
         sql += " AND (p.title LIKE ? OR p.product_code LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
@@ -662,7 +879,9 @@ def product_detail(pid: int):
         p = con.execute("""SELECT p.*, a.viator_account_id, a.name AS account_name
                            FROM products p JOIN accounts a ON a.id=p.account_id
                            WHERE p.id=?""", (pid,)).fetchone()
-        if not p:
+        # 404 rather than 403 when it belongs to an account this user can't see: telling
+        # them it exists but is forbidden is itself information.
+        if not p or not may_see_account(p["viator_account_id"]):
             raise HTTPException(404, "no such product")
         prow = dict(p)
         db.apply_edits(con, [prow])
@@ -694,9 +913,22 @@ def editable():
     return {"fields": db.EDITABLE_META}
 
 
+def guard_product(con, pid):
+    """404 unless the caller may see the account this product belongs to. Used by every
+    route addressed by a product id rather than by an account filter."""
+    if scope_accounts() is None:
+        return
+    r = con.execute("""SELECT a.viator_account_id FROM products p
+                       JOIN accounts a ON a.id=p.account_id WHERE p.id=?""",
+                    (pid,)).fetchone()
+    if not r or not may_see_account(r[0]):
+        raise HTTPException(404, "no such product")
+
+
 @app.get("/api/product/{pid}/edits")
 def product_edits(pid: int):
     with db.session() as con:
+        guard_product(con, pid)
         cur, hist = db.edits_for(con, pid)
     return {"current": cur, "history": hist}
 
@@ -719,6 +951,8 @@ def all_edits(limit: int = LIMIT_Q(200)):
 def snapshot(sid: int):
     with db.session() as con:
         r = con.execute("SELECT * FROM snapshots WHERE id=?", (sid,)).fetchone()
+        if r:
+            guard_product(con, r["product_id"])
     if not r:
         raise HTTPException(404, "no such snapshot")
     return {"captured_at": r["captured_at"], "sync_id": r["sync_id"],
@@ -734,6 +968,11 @@ def audit(account: str | None = None, limit: int = LIMIT_Q(300)):
     if account:
         sql += " AND a.viator_account_id=?"
         args.append(account)
+    allowed = scope_accounts()
+    if allowed is not None:
+        sql += (f" AND a.viator_account_id IN ({','.join('?' * len(allowed))})"
+                if allowed else " AND 1=0")
+        args += allowed
     sql += " ORDER BY c.id DESC LIMIT ?"
     args.append(limit)
     with db.session() as con:
@@ -851,6 +1090,11 @@ def syncs(account: str | None = None):
              FROM syncs s
              JOIN accounts a ON a.id=s.account_id WHERE 1=1"""
     args = []
+    allowed = scope_accounts()
+    if allowed is not None:
+        sql += (f" AND a.viator_account_id IN ({','.join('?' * len(allowed))})"
+                if allowed else " AND 1=0")
+        args += allowed
     if account:
         sql += " AND a.viator_account_id=?"
         args.append(account)
@@ -973,6 +1217,7 @@ def edit_product(pid: int, e: EditIn):
         raise HTTPException(400, f"{email!r} doesn't look like an email address")
     try:
         with db.session() as con:
+            guard_product(con, pid)
             out = db.set_edit(con, pid, e.field, e.value, email, e.note)
     except ValueError as ex:
         raise HTTPException(400, str(ex))

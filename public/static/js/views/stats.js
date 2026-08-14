@@ -224,9 +224,9 @@ export async function viewStats(){
   // written for whoever built the tool rather than whoever uses it. Change history has
   // its own tab, in plain English, and run history lives under Sync runs.
 
-  // sidebar counters
-  $('#cntProducts').textContent = K.products.value;
-  $('#cntChanges').textContent = K.changes.value;
+  // sidebar counters — guarded, because the Change history tab (and its counter) is gone
+  const setCnt = (id, v) => { const n = $(id); if (n) n.textContent = v; };
+  setCnt('#cntProducts', K.products.value);
 }
 
 

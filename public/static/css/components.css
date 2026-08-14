@@ -225,6 +225,60 @@ ul.plain li{margin:3px 0}
   font-size:14px}
 .vback:hover{text-decoration:underline}
 
+/* ---------- sign in ----------
+   A single centred card on a calm background. Deliberately not a modal: there is nothing
+   behind it worth seeing, and a dialog floating over an empty dashboard reads as a bug. */
+body.locked{overflow:hidden}
+#authHost:empty{display:none}
+.authwrap{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;
+  background:radial-gradient(1200px 600px at 50% -10%,var(--accent-soft),var(--bg) 60%)}
+.authcard{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);
+  border-radius:18px;padding:34px 32px 28px;box-shadow:0 26px 70px rgba(28,25,23,.16)}
+.authbrand{display:flex;align-items:center;gap:11px;margin-bottom:26px}
+.authbrand .mark{width:36px;height:36px;border-radius:10px;background:var(--accent);
+  color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+.authbrand b{display:block;font-size:15px;line-height:1.2}
+.authbrand span{color:var(--ink-3);font-size:12.5px}
+.authcard h1{font-size:26px;letter-spacing:-.02em;margin-bottom:5px}
+.authsub{color:var(--ink-2);font-size:14px;margin:0 0 22px;line-height:1.5}
+.authcard .fl{margin-bottom:15px}
+.authcard input{width:100%;padding:11px 13px;font-size:15px}
+.authgo{width:100%;padding:12px;font-size:15px;margin-top:6px}
+.authfoot{color:var(--ink-3);font-size:12.5px;line-height:1.6;margin:18px 0 0}
+
+/* ---------- admin panel ---------- */
+.av-sm{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:none;
+  background:var(--accent-soft);color:#9A3412;font-weight:700;font-size:12.5px}
+.picklabel{display:block;font-size:13.5px;font-weight:600;margin-bottom:8px}
+.picks{display:grid;gap:9px}
+.pick{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;cursor:pointer;
+  border:1px solid var(--line-2);border-radius:11px;background:var(--surface);
+  transition:.13s}
+.pick:hover{border-color:var(--ink-3)}
+.pick.on{border-color:var(--accent);background:var(--accent-soft)}
+.pick.muted{opacity:.45;cursor:not-allowed}
+.pick input{margin-top:3px;flex:none;accent-color:var(--accent)}
+.pick b{display:block;font-size:14px}
+.pick .hint{display:block;margin-top:1px}
+.btn.danger{color:var(--red)}
+.btn.danger:hover{border-color:var(--red);background:var(--red-bg)}
+
+/* ---------- edit history, on the product page ----------
+   Who, when, and what they replaced with what — the shape of a Google Sheets edit
+   history, which is what the client asked for. */
+.ehist{display:grid;gap:2px;margin-top:12px}
+.eh{display:grid;grid-template-columns:36px 1fr;gap:12px;padding:14px 2px;
+  border-bottom:1px solid var(--line)}
+.eh:last-child{border-bottom:0}
+.eh-av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  background:var(--accent-soft);color:#9A3412;font-weight:700;font-size:14px}
+.eh-top{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.eh-top b{font-size:14.5px}
+.eh-when{color:var(--ink-3);font-size:13px}
+.eh-what{font-weight:600;color:var(--ink-2);font-size:13.5px;margin:5px 0 6px}
+.eh-rep{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+.eh-arrow{color:var(--ink-3)}
+
 /* ---------- tables ---------- */
 .tblwrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse}

@@ -1,15 +1,17 @@
 import { S } from './state.js';
-import { $, api, esc, post } from './core.js';
+import { $, api, esc, post, session, setSignedOutHandler } from './core.js';
 import { label } from './format.js';
 import { loadAccounts, renderFilterBar } from './ui.js';
 import { renderSyncProgress } from './progress.js';
 import { confirmDialog } from './toast.js';
 import { installReadOnly, automationNotice, setOwner } from './readonly.js';
+import { ensureSignedIn, renderWhoAmI, showLogin } from './login.js';
 import { viewStats } from './views/stats.js';
 import { viewProducts } from './views/products.js';
 import { when } from './views/drawer.js';
-import { viewActivity, viewAudit, viewCategories, viewSyncs } from './views/misc.js';
+import { viewActivity, viewCategories, viewSyncs } from './views/misc.js';
 import { viewAccounts } from './views/accounts.js';
+import { viewAdmin } from './views/admin.js';
 
 /* ======================= status polling ======================= */
 export async function poll(){
@@ -63,14 +65,14 @@ export async function poll(){
 // The Platforms tab was removed on request — which platforms a tour is listed on is now
 // a badge on the product row itself. /api/matrix still exists for anything that needs it.
 export const VIEWS = {stats:viewStats, products:viewProducts, accounts:viewAccounts,
-  categories:viewCategories, audit:viewAudit, syncs:viewSyncs,
+  categories:viewCategories, syncs:viewSyncs, admin:viewAdmin,
   activity:()=>viewActivity(null)};
 export const TITLES = {stats:['Dashboard','Everything at a glance'],
   accounts:['Accounts','Coverage and capture freshness'],
   products:['Products','Every captured listing'],
   categories:['Breakdown','Distribution by category'],
-  audit:['Change history','What changed, when and by whom'],
   syncs:['Sync runs','Every capture run'],
+  admin:['Admin','Who can sign in, and what they can see'],
   activity:['Activity','Live log of the current run']};
 export function refresh(){
   // Promise.resolve: not every view is async (Activity renders synchronously), and
@@ -124,6 +126,24 @@ export async function loadStorage(){
   }catch(e){ host.innerHTML = '<span style="color:var(--red)">storage status unavailable</span>'; }
 }
 
-loadStorage();          // names S.source for every label below
-loadAccounts().then(()=>go('stats'));
-poll();
+/* ======================= start up =======================
+   Nothing is fetched until we know who is asking. The login screen calls back here on a
+   successful sign-in, so this runs once as a guest (and stops) and once as a user. */
+let started = false;
+async function boot(){
+  if (!await ensureSignedIn()) return;      // login screen is up; it will call us back
+  if (started) return;
+  started = true;
+  renderWhoAmI();
+  const admin = (session.user || {}).role === 'admin';
+  document.querySelectorAll('[data-admin-only]').forEach(n =>
+    n.classList.toggle('hidden', !admin));
+  loadStorage();          // names S.source for every label below
+  api('/api/people').then(p => { session.people = p.names || {}; }).catch(() => {});
+  await loadAccounts();
+  go('stats');
+  poll();
+}
+window.addEventListener('signed-in', boot);
+setSignedOutHandler(() => showLogin('Your session has ended — please sign in again.'));
+boot();

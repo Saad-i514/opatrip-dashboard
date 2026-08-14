@@ -1,5 +1,5 @@
 import { $, api, el, esc, q } from '../core.js';
-import { connBadge, groupChanges, photoSummary, qualBadge, statusBadge, valueBox } from '../format.js';
+import { connBadge, qualBadge, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { bars } from './stats.js';
 import { trunc, when } from './drawer.js';
@@ -31,64 +31,9 @@ export async function viewCategories(){
     v.appendChild(note);
   }
 }
-export async function viewAudit(){
-  const v = $('#v-audit');
-  skeleton(v, 'rows', 'change history');
-  const d = await api('/api/audit'+q('limit=300'));
-  v.innerHTML='';
-  const c = el('div','card');
-  c.appendChild(el('div','card-h',
-    `<h3>Change history</h3><span class="sub">${d.changes.length} most recent</span>`));
-  const b = el('div','pad');
-  if (!d.changes.length){
-    b.appendChild(el('div','empty','<div class="big">Nothing has changed yet</div>'+
-      'The first time a product is captured it becomes the starting point. From the '+
-      'second check onwards, anything Viator changes shows up here — with the old and '+
-      'new value side by side.'));
-  } else {
-    b.appendChild(el('div','hint',
-      'Every line is one thing that changed on Viator between two checks. '
-      + 'Click a value to see it in full.'));
-    // One card per change, written as a sentence. The old version was a table of dotted
-    // field paths, run ids and operator emails — accurate, but you had to know the schema
-    // to read it. The same facts are here; the reader no longer has to.
-    const feed = el('div','feed'); feed.style.marginTop='12px';
-    // Photo edits arrive as dozens of rows per photo (see groupChanges). Grouped here so
-    // one edit reads as one line; the full detail stays in `changes`.
-    groupChanges(d.changes).forEach(g=>{
-      const c = g.c;
-      const it = el('div','feeditem chg');
-      const who = `<div class="hint" style="text-align:right;white-space:nowrap">
-          ${esc(when(c.detected_at))}<br>
-          <span title="the person who ran the check that spotted it"
-            >found by ${esc((c.operator_email||'').split('@')[0])}</span></div>`;
-      const head = `<div style="font-weight:600">${esc(trunc(c.title))}</div>
-          <div class="hint" style="margin:2px 0 7px">
-            <span class="mono">${esc(c.product_code)}</span>
-            · ${esc(c.account_name||c.viator_account_id)}</div>`;
-      it.innerHTML = g.photos
-        ? `<div class="dot3">▤</div>
-           <div style="min-width:0">${head}
-             <div class="chg-what">The photos on this product were changed on Viator —
-               <b>${esc(photoSummary(g))}</b></div>
-             <div class="hint">Photos themselves are not stored; this records that they
-               changed, when, and under which account.</div>
-           </div>${who}`
-        : `<div class="dot3">⟳</div>
-           <div style="min-width:0">${head}
-             <div class="chg-what">Something on this product was changed</div>
-             <div class="chg-vals">
-               <div><div class="chg-lbl">Before</div>${valueBox(c.old_value,'old','Value before')}</div>
-               <div class="chg-arrow">→</div>
-               <div><div class="chg-lbl">After</div>${valueBox(c.new_value,null,'Value after')}</div>
-             </div>
-           </div>${who}`;
-      feed.appendChild(it);
-    });
-    b.appendChild(feed);
-  }
-  c.appendChild(b); v.appendChild(c);
-}
+/* viewAudit() lived here. The Change history TAB was removed: a change belongs to a
+   product, so it is now the Edit history at the bottom of the product page, where
+   Viator's changes and this dashboard's own edits are told as one story. */
 export async function viewSyncs(){
   const v = $('#v-syncs');
   skeleton(v, 'rows', 'sync runs');
