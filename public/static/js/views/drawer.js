@@ -174,6 +174,10 @@ function editHistoryCard(d){
         <div class="eh-rep">Replaced ${valueBox(it.old,'old','Value before')}
           <span class="eh-arrow">with</span> ${valueBox(it.now,null,'Value after')}</div>
         ${it.note ? `<div class="hint">Reason: ${esc(it.note)}</div>` : ''}
+        ${it.byUs && !it.first && it.captured != null && it.captured !== it.old
+          ? `<div class="hint">Viator’s own value is still
+               ${valueBox(it.captured,'old','What Viator has')} — edits never overwrite
+               it.</div>` : ''}
         ${it.byUs ? '' : `<div class="hint">Spotted by ${esc(name)}’s sync — Viator does
            not say which of its own users made the change.</div>`}
       </div>`;

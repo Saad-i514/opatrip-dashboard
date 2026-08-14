@@ -213,16 +213,34 @@ export function photoSummary(g){
    an author would be worse than saying less. */
 export function historyFor(d){
   const out = [];
+  // A change row already holds the two CONSECUTIVE captures it sits between — the diff
+  // runs against the previous snapshot, not the original — so old/new are the right pair.
   (d.changes || []).forEach(c => out.push({
     kind: 'viator', at: c.detected_at, path: c.field_path,
     old: c.old_value, now: c.new_value,
     who: c.operator_email || c.sync_operator || '', byUs: false,
   }));
-  (d.edit_history || []).forEach(e => out.push({
-    kind: 'edit', at: e.edited_at, path: e.field,
-    old: e.captured_value, now: e.value,
-    who: e.editor_email || '', note: e.note || '', current: !!e.is_current, byUs: true,
-  }));
+  // Manual edits are not chained in the database: every row stores `captured_value`,
+  // which is what VIATOR had when the edit was made, so a field edited three times read
+  // "original → v1", "original → v2", "original → v3". Each entry should say what it
+  // actually replaced — the value immediately before it. Walk oldest first and carry the
+  // previous value per field; `captured_value` is right only for the first edit, where
+  // the captured value genuinely IS what came before.
+  const prev = {};
+  (d.edit_history || []).slice()
+    .sort((a, b) => (a.id ?? 0) - (b.id ?? 0)
+                    || String(a.edited_at || '').localeCompare(String(b.edited_at || '')))
+    .forEach(e => {
+      const before = Object.prototype.hasOwnProperty.call(prev, e.field)
+        ? prev[e.field] : e.captured_value;
+      out.push({
+        kind: 'edit', at: e.edited_at, path: e.field,
+        old: before, now: e.value, captured: e.captured_value,
+        first: !Object.prototype.hasOwnProperty.call(prev, e.field),
+        who: e.editor_email || '', note: e.note || '', current: !!e.is_current, byUs: true,
+      });
+      prev[e.field] = e.value;
+    });
   out.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
   return out;
 }
