@@ -37,7 +37,8 @@ export async function viewProducts(){
   // every filter travels as a query param, so a filtered view is a shareable URL and the
   // server does the narrowing — filtering 1,100 rows in the browser would mean shipping
   // all of them first
-  for (const k of ['q','lifecycle','platform','connection','reviews','missing','month'])
+  for (const k of ['q','lifecycle','platform','connection','reviews','missing','month',
+                   'changed'])
     if (S.pf[k]) ps.set(k, S.pf[k]);
   if (S.pf.status) ps.set('status', S.pf.status);
   const [d, opts0] = await Promise.all([
@@ -51,6 +52,10 @@ export async function viewProducts(){
                      ['REJECTED','Rejected'],['REMOVED','Removed']];
   const REVIEWS = [['0','No reviews yet'],['1','Exactly 1 review'],['2-5','2 to 5 reviews'],
                    ['6-20','6 to 20 reviews'],['21+','21 or more'],['any','Has reviews']];
+  // "has anything about this listing moved since we first saw it?" — the two states
+  // people actually ask about when they open this page
+  const CHANGED = [['yes','Changed since first capture'],
+                   ['no','Not changed yet']];
   const opts = (list, cur) => list.map(([val,lab]) =>
     `<option value="${esc(val)}" ${cur===val?'selected':''}>${esc(lab)}</option>`).join('');
 
@@ -70,6 +75,9 @@ export async function viewProducts(){
     <select id="pconn" title="Book on Connection"><option value="">Any connection</option>
       ${opts([['Connected','Connected'],['Partially connected','Partially connected'],
               ['Not connected','Not connected']], S.pf.connection)}</select>
+    <select id="pchanged" title="Whether anything has changed since the first capture">
+      <option value="">Changed or not</option>
+      ${opts(CHANGED, S.pf.changed)}</select>
     <span class="pill">${d.products.length} shown</span>
     <button class="btn ghost sm" id="pclear">Clear</button>`;
   v.appendChild(f);
@@ -80,9 +88,10 @@ export async function viewProducts(){
   f.querySelector('#plife').onchange   = e=>set('lifecycle', e.target.value);
   f.querySelector('#previews').onchange= e=>set('reviews', e.target.value);
   f.querySelector('#pconn').onchange   = e=>set('connection', e.target.value);
+  f.querySelector('#pchanged').onchange= e=>set('changed', e.target.value);
   f.querySelector('#pclear').onclick = ()=>{
     Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',connection:'',
-                         reviews:'',missing:'',month:''});
+                         reviews:'',missing:'',month:'',changed:''});
     viewProducts();
   };
   // Say what is being filtered in words. A count alone ("447 shown") leaves people
@@ -94,6 +103,7 @@ export async function viewProducts(){
     S.pf.reviews && (REVIEWS.find(x=>x[0]===S.pf.reviews)||[,S.pf.reviews])[1],
     S.pf.connection, S.pf.missing && 'no longer listed on the platform',
     S.pf.month && `first captured in ${monthName(S.pf.month)}`,
+    S.pf.changed && (CHANGED.find(x=>x[0]===S.pf.changed)||[,S.pf.changed])[1],
   ].filter(Boolean);
   if (active.length){
     const note = el('div','hint');

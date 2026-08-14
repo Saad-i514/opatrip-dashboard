@@ -284,9 +284,25 @@ body.locked{overflow:hidden}
 .eh-top{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .eh-top b{font-size:14.5px}
 .eh-when{color:var(--ink-3);font-size:13px}
-.eh-what{font-weight:600;color:var(--ink-2);font-size:13.5px;margin:5px 0 6px}
-.eh-rep{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13.5px}
-.eh-arrow{color:var(--ink-3)}
+.eh-what{font-weight:700;color:var(--ink);font-size:14px;margin:6px 0 9px}
+/* Before and after as two labelled panels rather than a run-on sentence. Values here can
+   be a paragraph of description; inline they collided with the "with" between them and
+   wrapped into an unreadable ribbon. A fixed grid keeps them side by side and equal, and
+   the arrow column stops them touching. */
+.eh-rep{display:grid;grid-template-columns:1fr 26px 1fr;gap:10px;align-items:stretch}
+.eh-side{min-width:0;border:1px solid var(--line);border-radius:9px;padding:9px 11px;
+  background:var(--surface-2)}
+.eh-side.after{background:var(--surface);border-color:var(--accent-line)}
+.eh-lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
+.eh-arrow{align-self:center;text-align:center;color:var(--ink-3);font-size:16px}
+/* the preview text is 12.5px in a table cell; here there is room to read it */
+.eh .valcell{font-size:13.5px;line-height:1.55;margin:0;padding:0}
+.eh .valcell:hover{background:transparent;outline:0;text-decoration:underline;
+  text-decoration-color:var(--accent-line);text-underline-offset:2px}
+@media(max-width:720px){
+  .eh-rep{grid-template-columns:1fr;gap:7px}
+  .eh-arrow{transform:rotate(90deg);text-align:left;width:26px}}
 
 /* ---------- tables ---------- */
 .tblwrap{overflow-x:auto}

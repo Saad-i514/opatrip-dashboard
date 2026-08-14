@@ -804,7 +804,7 @@ def products(account: str | None = None, q: str | None = None,
              status: str | None = None, connection: str | None = None,
              platform: str | None = None, lifecycle: str | None = None,
              reviews: str | None = None, missing: str | None = None,
-             month: str | None = None):
+             month: str | None = None, changed: str | None = None):
     sql = """SELECT p.*, a.viator_account_id, a.name AS account_name,
                pl.code AS platform_code, pl.name AS platform_name,
                (SELECT COUNT(*) FROM product_images i WHERE i.product_id=p.id) AS image_count,
@@ -848,6 +848,12 @@ def products(account: str | None = None, q: str | None = None,
         args.append(month)
     if missing:
         sql += " AND p.missing_since IS NOT NULL"
+    # "has anything about this product ever changed since we first captured it?"
+    # EXISTS rather than the change_count alias: an alias in the SELECT list cannot be
+    # used in WHERE on Postgres, and EXISTS stops at the first row it finds.
+    if changed in ("yes", "no"):
+        sql += (" AND " + ("" if changed == "yes" else "NOT ")
+                + "EXISTS (SELECT 1 FROM changes c WHERE c.product_id=p.id)")
     if reviews:
         band = REVIEW_BANDS.get(reviews)
         if not band:

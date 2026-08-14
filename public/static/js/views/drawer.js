@@ -171,8 +171,13 @@ function editHistoryCard(d){
                     : '<span class="badge b-draft">changed on Viator</span>'}
           ${it.current ? '<span class="badge b-active">current</span>' : ''}</div>
         <div class="eh-what">${esc(what)}</div>
-        <div class="eh-rep">Replaced ${valueBox(it.old,'old','Value before')}
-          <span class="eh-arrow">with</span> ${valueBox(it.now,null,'Value after')}</div>
+        <div class="eh-rep">
+          <div class="eh-side"><span class="eh-lbl">Before</span>
+            ${valueBox(it.old,'old','Value before')}</div>
+          <div class="eh-arrow" aria-hidden="true">→</div>
+          <div class="eh-side after"><span class="eh-lbl">After</span>
+            ${valueBox(it.now,null,'Value after')}</div>
+        </div>
         ${it.note ? `<div class="hint">Reason: ${esc(it.note)}</div>` : ''}
         ${it.byUs && !it.first && it.captured != null && it.captured !== it.old
           ? `<div class="hint">Viator’s own value is still

@@ -84,7 +84,7 @@ export async function viewStats(){
   const drill = el2 => {
     const f = JSON.parse(el2.dataset.filter);
     Object.assign(S.pf, {q:'', status:'', lifecycle:'', platform:'', connection:'',
-                         reviews:'', missing:''}, f);
+                         reviews:'', missing:'', changed:''}, f);
     go('products');
   };
   v.querySelectorAll('.kpi-click').forEach(c => {

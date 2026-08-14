@@ -13,7 +13,8 @@ export const S = {
   opEmail: localStorage.getItem('opEmail') || '',
   // product filters. `lifecycle` is the canonical status (LIVE/DRAFT/...), the
   // same word the dashboard cards use; `status` is the platform's own raw word.
-  pf: {q: '', status: '', lifecycle: '', platform: '', connection: '', reviews: ''},
+  pf: {q: '', status: '', lifecycle: '', platform: '', connection: '', reviews: '',
+       changed: ''},   // '' any · 'yes' changed since first capture · 'no' not yet
   pgMonths: 6,           // how far back the Progress card looks
   rsince: '', runtil: '', // report period
 };
