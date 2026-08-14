@@ -11,7 +11,7 @@
      editSection() – every editable field in one block, what the portal's Edit opens
 */
 import { S } from './state.js';
-import { $, api, el, esc, post } from './core.js';
+import { $, api, el, esc, post, session } from './core.js';
 import { toast } from './toast.js';
 
 export const EMAIL_OK = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
@@ -24,7 +24,17 @@ export async function editableFields(){
   return FIELDS;
 }
 
+/* Who is making this change?
+
+   Nobody is asked any more. You signed in, so the server already knows, and it uses the
+   signed-in identity regardless of what the browser sends — an edit can no longer be
+   filed under a colleague's address by typing theirs into a box.
+
+   The prompt is only reached when the app is running with no sign-in at all (no Supabase
+   keys — a developer on a local copy), where there is genuinely nobody to ask. */
 export function askEditor(){
+  const u = session.user;
+  if (u && !u.local && u.email) return Promise.resolve(u.email);
   return new Promise(resolve => {
     const host = $('#modalHost'); host.innerHTML = '';
     const wrap = el('div');

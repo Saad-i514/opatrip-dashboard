@@ -257,7 +257,13 @@ body.locked{overflow:hidden}
 .pick:hover{border-color:var(--ink-3)}
 .pick.on{border-color:var(--accent);background:var(--accent-soft)}
 .pick.muted{opacity:.45;cursor:not-allowed}
-.pick input{margin-top:3px;flex:none;accent-color:var(--accent)}
+/* These radios sit inside a .fl, and `.fl input` stretches every input to display:block
+   width:100% — which put the dot in the middle of the card and pushed the label off the
+   right-hand edge of the dialog. Undo it here rather than weakening the .fl rule that
+   every other form on the dashboard depends on. */
+.pick input{display:inline-block;width:auto;margin:2px 0 0;flex:none;
+  accent-color:var(--accent)}
+.pick>span{flex:1;min-width:0}
 .pick b{display:block;font-size:14px}
 .pick .hint{display:block;margin-top:1px}
 .btn.danger{color:var(--red)}

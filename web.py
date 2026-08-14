@@ -1193,8 +1193,7 @@ async def add_image(pid: int, file: UploadFile = File(...),
 def remove_image(pid: int, image_id: int, editor_email: str):
     """Remove a MANUALLY added image. Captured Viator images are never deleted — they are
     evidence of what the portal showed, which is the point of the audit."""
-    if not EMAIL_RE.match((editor_email or "").strip()):
-        raise HTTPException(400, "a valid email is required")
+    editor_email = who_edits(editor_email)
     with db.session() as con:
         r = con.execute("""SELECT is_manual, r2_key FROM product_images
                            WHERE id=? AND product_id=?""", (image_id, pid)).fetchone()
@@ -1208,13 +1207,28 @@ def remove_image(pid: int, image_id: int, editor_email: str):
     return {"ok": True}
 
 
+def who_edits(supplied=""):
+    """Who gets the credit — or the blame — for an edit.
+
+    Whoever is signed in, always. It used to be typed into a box, which meant it was
+    traceability on trust: anyone could put a colleague's address on their own edit. The
+    server knows who sent the request, so the browser no longer gets a say.
+
+    The typed value is still accepted when auth is switched off entirely (a developer on
+    a local SQLite copy), because there is nobody signed in to ask.
+    """
+    u = me()
+    if auth.enabled() and u.get("email"):
+        return u["email"].strip().lower()
+    email = (supplied or "").strip()
+    if not EMAIL_RE.match(email):
+        raise HTTPException(400, "Please enter your email so the edit can be traced.")
+    return email.lower()
+
+
 @app.post("/api/product/{pid}/edit")
 def edit_product(pid: int, e: EditIn):
-    email = (e.editor_email or "").strip()
-    if not email:
-        raise HTTPException(400, "Please enter your email so the edit can be traced.")
-    if not EMAIL_RE.match(email):
-        raise HTTPException(400, f"{email!r} doesn't look like an email address")
+    email = who_edits(e.editor_email)
     try:
         with db.session() as con:
             guard_product(con, pid)
