@@ -66,6 +66,16 @@ TASK_TYPES = [
 # Raise it if you ever want more depth; nothing else needs to change.
 SNAPSHOT_HISTORY = 2
 
+# Photos are NOT stored or shown (client decision). Must match the desktop tool: this app
+# is the one exposed to the internet, so a photo-upload endpoint left open here would keep
+# writing to R2 no matter what the capture tool does.
+#
+# It costs no traceability. A photo swapped on Viator is still detected, because detection
+# never looked at the bytes: the snapshot holds product.media — each photo's ref, CDN URL,
+# caption and order — and diff() compares those paths like any other field. The dashboard
+# collapses the result into one readable line (see groupChanges in format.js).
+CAPTURE_IMAGES = False
+
 # --- change-detection noise control (used when rendering stored snapshots) -----
 VOLATILE_PREFIXES = (
     "_capture",

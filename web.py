@@ -887,6 +887,13 @@ async def add_image(pid: int, file: UploadFile = File(...),
                     editor_email: str = Form(...), caption: str | None = Form(None)):
     """Attach a photo to a product. Uploaded straight to R2 and recorded like any other
     image, but flagged is_manual so it is never confused with what Viator published."""
+    # Photos are off by client decision, so the dashboard no longer offers an upload box.
+    # Refuse here too — this app is the one on the public internet, and a disabled button
+    # is not a closed door.
+    if not C.CAPTURE_IMAGES:
+        raise HTTPException(410, "Photos are not stored by this system any more. "
+                                 "Photo changes on Viator are still recorded in Change "
+                                 "history.")
     email = (editor_email or "").strip()
     if not EMAIL_RE.match(email):
         raise HTTPException(400, "Please enter a valid email so the upload can be traced.")
