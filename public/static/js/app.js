@@ -47,12 +47,10 @@ export async function poll(){
     renderSyncProgress(st);
     viewActivity(st);
     if (st.status==='done' && poll._last==='running'){
-      refresh(); loadAccounts(); loadStorage();   // the upload queue starts now
+      refresh(); loadAccounts();
     }
     poll._last = st.status;
     poll._n = (poll._n||0)+1;
-    // watch the photo queue drain; the reachability probe behind this is cached
-    if (poll._n%5===0) loadStorage();
   }catch(e){}
   setTimeout(poll,2000);
 }
@@ -107,24 +105,10 @@ $('#btnStop').onclick = automationNotice;
 $('#btnFetch').onclick = automationNotice;
 installReadOnly();
 
-/* Where is data actually being written? Shown permanently, because "is it saving to the
-   cloud?" should never require reading a log file. */
-export async function loadStorage(){
-  const host = $('#storagebar'); if (!host) return;
-  try{
-    const s = await api('/api/storage');
-    // name the real backend, so every "Loading … from X" line is accurate
-    S.source = s.cloud ? 'Supabase' : 'the local database';
-    const dot = ok => `<span style="color:${ok?'var(--green)':'var(--red)'}">●</span>`;
-    // The image queue line went with photo storage. Nothing new is downloaded or
-    // uploaded, so a draining-queue indicator would only ever describe an old backlog.
-    host.innerHTML =
-      `<div style="font-weight:600;color:var(--ink-2);margin-bottom:3px">Storage</div>
-       <div>${dot(s.postgres.ok)} ${s.cloud?'Supabase Postgres':'local SQLite'}</div>`
-       + (!s.cloud ? `<div style="color:var(--red);margin-top:4px">saving locally only</div>`
-                   : '');
-  }catch(e){ host.innerHTML = '<span style="color:var(--red)">storage status unavailable</span>'; }
-}
+/* The Storage box is gone from the sidebar, and loadStorage() with it. It also set
+   S.source, which named the backend in every "Loading products from ..." label;
+   those now just say "Loading products...". That removes a request at start-up and
+   another every fifth status poll. /api/storage still exists.  */
 
 /* ======================= start up =======================
    Nothing is fetched until we know who is asking. The login screen calls back here on a
@@ -138,7 +122,6 @@ async function boot(){
   const admin = (session.user || {}).role === 'admin';
   document.querySelectorAll('[data-admin-only]').forEach(n =>
     n.classList.toggle('hidden', !admin));
-  loadStorage();          // names S.source for every label below
   api('/api/people').then(p => { session.people = p.names || {}; }).catch(() => {});
   await loadAccounts();
   go('stats');
