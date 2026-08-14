@@ -258,10 +258,13 @@ body.locked{overflow:hidden}
 .pick.on{border-color:var(--accent);background:var(--accent-soft)}
 .pick.muted{opacity:.45;cursor:not-allowed}
 /* These radios sit inside a .fl, and `.fl input` stretches every input to display:block
-   width:100% — which put the dot in the middle of the card and pushed the label off the
-   right-hand edge of the dialog. Undo it here rather than weakening the .fl rule that
-   every other form on the dashboard depends on. */
-.pick input{display:inline-block;width:auto;margin:2px 0 0;flex:none;
+   width:100% — which put the dot in the middle of the card and squeezed the label into a
+   one-word-per-line column hanging off the edge of the dialog.
+   `[type=radio]` is not decoration: `.pick input` and `.fl input` have the SAME
+   specificity, and loading.css (where .fl lives) is linked after this file, so the plain
+   selector lost on source order alone. The attribute selector wins it outright, without
+   weakening the .fl rule every other form depends on. */
+.pick input[type=radio]{display:inline-block;width:auto;margin:2px 0 0;flex:none;
   accent-color:var(--accent)}
 .pick>span{flex:1;min-width:0}
 .pick b{display:block;font-size:14px}
