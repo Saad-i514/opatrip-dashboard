@@ -314,4 +314,4 @@ export async function editField(pid, key, current, onSaved){
 /* uploadImage() and deleteImage() were removed with photo storage. The dashboard
    no longer shows or accepts photos; POST /api/product/<id>/image refuses too, so
    there is no client left for them. A photo CHANGED on Viator is still recorded --
-   see groupChanges() in format.js. */
+   see the Edit history on the product page. */

@@ -32,11 +32,9 @@
 .stack span{display:block;height:100%}
 .covrow{display:grid;grid-template-columns:130px 1fr 60px;gap:12px;align-items:center;
   margin:12px 0}
-.feed{display:grid;gap:10px}
-.feeditem{display:grid;grid-template-columns:34px 1fr auto;gap:11px;align-items:start;
-  padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}
-.feeditem .dot3{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
-  background:var(--accent-soft);color:var(--accent);font-size:14px}
+
+
+
 
 /* ---------- controls ---------- */
 select,input[type=text],input[type=email]{background:var(--surface);
@@ -104,7 +102,7 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 .b-bad{background:var(--red-bg);color:var(--red)}
 .b-stub{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent-line)}
 /* which platform a listing is on — replaced the Platforms tab on the product row */
-.b-plat{background:var(--surface-2);color:var(--ink-2);border-color:var(--line)}
+
 
 /* ---------- product list ----------
    What the listing IS on the left, where it lives on the right. The left column is
@@ -155,10 +153,10 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 .dhead img{width:96px;height:72px;border-radius:10px;object-fit:cover;
   background:var(--surface-2);flex:none}
 .dbody{padding:20px 22px 70px;display:grid;gap:18px}
-.gal{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
-.gal a{display:block;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
-.gal img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;transition:.2s}
-.gal a:hover img{transform:scale(1.04)}
+
+
+
+
 
 /* ---------- readable field rows ---------- */
 .rows{display:grid;grid-template-columns:minmax(150px,34%) 1fr;gap:0}
@@ -372,7 +370,7 @@ tbody tr:hover{background:var(--surface-2)}
 .fullval{white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.65;
   max-height:58vh;overflow:auto;background:var(--surface-2);border:1px solid var(--line);
   border-radius:10px;padding:14px 16px;user-select:text}
-.arrow{color:var(--ink-3);padding:0 5px}
+
 
 /* ---------- misc ---------- */
 .pill{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:99px;
@@ -399,19 +397,16 @@ tbody tr:hover{background:var(--surface-2)}
    immediately after the value text, so each button started wherever its text happened to
    end — a ragged staircase down the panel. A grid column pins every button to the same
    x-position regardless of how long the value is. */
-.editgrid{display:grid;grid-template-columns:minmax(150px,190px) 1fr auto;
-  align-items:start;gap:0}
-.editgrid>*{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);min-width:0}
+
+
 .editgrid>.act{padding-right:0;justify-self:end;align-self:center}
-.editgrid>*:nth-last-child(-n+3){border-bottom:0}
+
 .editgrid .k{color:var(--ink-3);font-size:13.5px;font-weight:500;line-height:1.5}
 .editgrid .v{overflow-wrap:anywhere;line-height:1.5}
 .editgrid .v .was{display:block;margin-top:4px;font-size:12.5px;color:var(--ink-3)}
-.editgrid .empty-v{color:var(--ink-3)}
-.grouphead{grid-column:1/-1;padding:16px 0 7px;font-size:11.5px;font-weight:700;
-  letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);
-  border-bottom:1px solid var(--line)}
-.grouphead:first-child{padding-top:0}
+
+
+
 
 /* consistent alignment for the plain label/value rows too */
 .rows{align-items:start}
@@ -421,20 +416,16 @@ tbody tr:hover{background:var(--surface-2)}
 .btn.danger:hover{filter:brightness(1.08)}
 
 /* ---------- photo manager ---------- */
-.photogrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
-.photo{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--surface);
-  position:relative;display:flex;flex-direction:column}
-.photo img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
-.photo .meta{padding:8px 10px;font-size:12px;color:var(--ink-3);flex:1}
+
+
+
+
 .photo .tag{position:absolute;top:8px;left:8px;font-size:10.5px;font-weight:700;
   padding:3px 8px;border-radius:99px;background:rgba(28,25,23,.72);color:#fff;
   letter-spacing:.03em}
-.photo .rm{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;
-  border:0;background:rgba(28,25,23,.72);color:#fff;cursor:pointer;font-size:15px;
-  line-height:1;display:grid;place-items:center}
-.photo .rm:hover{background:var(--red)}
-.dropzone{border:2px dashed var(--line-2);border-radius:11px;padding:26px 18px;
-  text-align:center;color:var(--ink-3);cursor:pointer;transition:.15s;font-size:13.5px}
+
+
+
 .dropzone:hover,.dropzone.over{border-color:var(--accent);background:var(--accent-soft);
   color:var(--accent-ink)}
 
@@ -505,16 +496,15 @@ tbody tr:hover{background:var(--surface-2)}
 .mv-l{font-size:12px;color:var(--ink-3);font-weight:600}
 .mv-n{font-size:23px;font-weight:700;letter-spacing:-.02em;margin-top:2px;
   font-variant-numeric:tabular-nums}
-.mv-d{font-size:11.5px;font-weight:600;margin-top:2px}
+
 .mv-d .hint{font-weight:400;margin-left:4px}
-.mv-up{color:var(--green)} .mv-dn{color:var(--red)} .mv-flat{color:var(--ink-3)}
+
 
 /* ---------- review bands ---------- */
-.rev-bar{cursor:pointer;border-radius:8px;padding:6px 8px;margin:0 -8px;
-  transition:background .12s}
-.rev-bar:hover{background:var(--accent-soft)}
-.rev-bar:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.fill-warn{background:var(--accent)!important}
+
+
+
+
 
 /* status/connection dots — the state readable before the word is */
 .badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;
@@ -522,18 +512,16 @@ tbody tr:hover{background:var(--surface-2)}
 .b-removed{background:#F1EDE7;color:#7C2D12}
 
 /* the raw-JSON escape hatch: present, quiet, out of the way */
-.rawbox{margin-top:18px;padding:10px 14px;border:1px dashed var(--line-2);
-  border-radius:10px;background:var(--surface-2)}
+
 
 /* ---------- change history, written as sentences ---------- */
-.feeditem.chg{grid-template-columns:34px 1fr auto}
-.chg-what{font-size:13.5px;color:var(--ink-2);margin-bottom:6px}
-.chg-vals{display:grid;grid-template-columns:1fr 22px 1fr;gap:10px;align-items:start}
+
+
+
 @media(max-width:720px){.chg-vals{grid-template-columns:1fr;gap:6px}
-  .chg-arrow{transform:rotate(90deg);text-align:left}}
-.chg-lbl{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-  color:var(--ink-3);margin-bottom:3px}
-.chg-arrow{align-self:center;color:var(--ink-3);font-size:15px;text-align:center}
+}
+
+
 
 /* Numbers line up when they are centred under a centred heading. Left-aligned figures
    in a wide column drift away from their header and become hard to compare down a

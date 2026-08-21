@@ -72,7 +72,6 @@ export function fmtVal(v, key){
    before it builds them. */
 let EDITCTX = null;
 export function setEditContext(ctx){ EDITCTX = ctx; }
-export function editContext(){ return EDITCTX; }
 
 /** Read a dotted path out of the captured snapshot. */
 export function getPath(obj, path){
@@ -149,56 +148,10 @@ export function rows(pairs){
    `tone`: 'old' colours it as the superseded value. No line-through — striking out 700
    characters makes the text people came here to read hard to read.
    `label` titles the popup ("Viator had", "Before", …).                                */
-/* ---------- photo changes, told as one sentence ----------------------------------------
-   Photos are no longer stored, but a photo swapped on Viator is still detected: the
-   snapshot holds product.media (each photo's ref, CDN URL, caption and order) and diff()
-   walks those paths like any other field.
-
-   The trouble is the volume. Because a photo is keyed by its Viator ref, REPLACING one
-   rewrites every field under the old ref to null and writes a new ref beside it — one
-   deletion measured 64 change rows for what a person would call three edits, reading
-   "Photos › IMG-fd6375b7… › Is Error: False → None". True, and useless.
-
-   So the rows are grouped for DISPLAY only — one line per product per moment, naming what
-   happened and to how many photos. Nothing is dropped from the audit trail; `changes`
-   still holds every path, which is the point of having it. */
-const PHOTO_PATH = /^product\.(media|heroPhoto)\b/;
-const isSet = v => v !== null && v !== undefined && v !== '';
-export function groupChanges(list){
-  const out = [], bucket = new Map();
-  (list || []).forEach(c => {
-    const path = c.field_path || '';
-    if (!PHOTO_PATH.test(path)){ out.push({photos: false, c}); return; }
-    // one group per product per detection moment — that is one sync noticing one edit
-    const key = `${c.product_code || ''}|${c.detected_at || ''}`;
-    let g = bucket.get(key);
-    if (!g){ g = {photos: true, c, refs: new Map()}; bucket.set(key, g); out.push(g); }
-    const m = /\[([^\]]+)\]/.exec(path);
-    const ref = m ? m[1] : '(photo)';
-    if (!g.refs.has(ref)) g.refs.set(ref, {added: 0, removed: 0, moved: 0, edited: 0});
-    const s = g.refs.get(ref);
-    const had = isSet(c.old_value), has = isSet(c.new_value);
-    if (!had && has) s.added++;
-    else if (had && !has) s.removed++;
-    else if (/sortOrder$/.test(path)) s.moved++;
-    else s.edited++;
-  });
-  return out;
-}
-/* "2 photos added · 1 photo removed". Deliberately NOT "replaced": a replacement looks
-   exactly like an add plus a remove from here, and saying which it was would be a guess. */
-export function photoSummary(g){
-  let add = 0, rem = 0, mov = 0, edt = 0;
-  g.refs.forEach(s => {
-    if (s.added && !s.removed) add++;
-    else if (s.removed && !s.added) rem++;
-    else if (s.edited) edt++;
-    else if (s.moved) mov++;
-  });
-  const say = (n, word) => n ? `${n} ${n === 1 ? 'photo' : 'photos'} ${word}` : null;
-  return [say(add, 'added'), say(rem, 'removed'), say(edt, 'updated'),
-          say(mov, 'reordered')].filter(Boolean).join(' · ') || 'photos changed';
-}
+/* groupChanges()/photoSummary() lived here. A photo edit writes one row per field
+   per photo — one real deletion measured 185 — and these folded them into a line.
+   The product page now groups by field itself (see editHistoryCard in drawer.js),
+   which does the same job for every field rather than only for photos. */
 
 /* ---------- one product's whole history, told as a list of edits -----------------------
    Two things change a product, and they used to live on separate pages:
@@ -262,6 +215,8 @@ export function personName(email, names){
   const local = e.split('@')[0];
   return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
+
+
 
 /* readable(x) — the last resort for an object no renderer has a specific shape for.
    That fallback used to be JSON.stringify(x), which put this in front of someone who
