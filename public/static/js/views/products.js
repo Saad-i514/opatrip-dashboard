@@ -15,7 +15,8 @@ import { openDrawer, when } from './drawer.js';
    holds several listings on the same platform — 72 of them here, under different
    accounts. Keeping whichever arrived last made a Live product's own Viator row read
    "Draft" because a namesake in another account was a draft. Match on product_code
-   first; only fall back to a sibling when this product isn't on that platform at all. */
+   first; only fall back to a sibling when this product isn't on that platform at all.
+   The siblings are not marked: the product code already says which listing this is. */
 function platformGrid(p, platforms){
   const by = {};
   (p.tour_listings || []).forEach(l => { (by[l.platform] = by[l.platform] || []).push(l); });
@@ -25,17 +26,11 @@ function platformGrid(p, platforms){
   if (!known.length) return '';
   return `<div class="pp-h">Listed on</div><div class="pp-grid">${known.map(pl => {
     const ls = by[pl.code] || [];
-    const mine = ls.find(l => l.code === p.product_code);
-    const l = mine || ls[0];
-    // other listings of the same tour on this platform — real, but not this product
-    const others = ls.filter(x => x !== l);
-    const more = others.length
-      ? `<span class="pp-more" title="${esc(others.map(o =>
-           `${o.code} (${o.account}) — ${o.status}`).join(', '))}">+${others.length}</span>`
-      : '';
-    return `<div class="pp-row"><span class="pp-n">${esc(pl.name)}</span>
-      <span class="pp-s">${more}${l ? statusBadge(l.status)
-        : '<span class="badge b-notlisted">Not uploaded</span>'}</span></div>`;
+    // this product's own listing, never a namesake's from another account
+    const l = ls.find(x => x.code === p.product_code) || ls[0];
+    return `<div class="pp-row"><span class="pp-n">${esc(pl.name)}</span>${
+      l ? statusBadge(l.status)
+        : '<span class="badge b-notlisted">Not uploaded</span>'}</div>`;
   }).join('')}</div>`;
 }
 
