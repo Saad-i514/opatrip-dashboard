@@ -40,26 +40,57 @@ export async function viewStats(){
   const acc = S.accounts.find(a=>a.viator_account_id===S.acct);
   const hero = el('div','hero');
   hero.innerHTML = `
-    <div class="tag">◆ Complete change traceability</div>
-    <div class="herotop">
-      <span class="heromark"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"
-        ><path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"
-          stroke="#AD68E2" stroke-width="7" stroke-linejoin="round"/><circle cx="24"
-          cy="24" r="5.2" fill="#AD68E2"/></svg></span>
-      <h2>Opatrip Trace</h2>
+    <div class="herotext">
+      <div class="tag">✦ Complete change traceability</div>
+      <div class="herotop">
+        <span class="heromark"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z" stroke="#AD68E2" stroke-width="7" stroke-linejoin="round"/><circle cx="24" cy="24" r="5.2" fill="#AD68E2"/></svg></span>
+        <h2><span class="hname">Opatrip</span> Trace</h2>
+      </div>
+      <div class="acts">
+        <button class="solid" data-go="products">View products <i>›</i></button>
+        <button class="ghost2" data-go="accounts">View accounts <i>›</i></button>
+      </div>
     </div>
-    <div class="acts">
-      <button class="solid" data-go="products">View products</button>
-      <button class="ghost2" data-go="accounts">View accounts</button>
-    </div>
-    <svg class="art" width="230" height="150" viewBox="0 0 230 150" fill="none">
-      <rect x="10" y="40" width="26" height="80" rx="5" fill="#AD68E2"/>
-      <rect x="48" y="18" width="26" height="102" rx="5" fill="#AD68E2"/>
-      <rect x="86" y="60" width="26" height="60" rx="5" fill="#AD68E2"/>
-      <rect x="124" y="32" width="26" height="88" rx="5" fill="#AD68E2"/>
-      <polyline points="14,96 60,52 100,74 140,30 200,16" stroke="#7C3AED" stroke-width="5"
-        fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="200" cy="16" r="9" fill="#AD68E2"/></svg>`;
+    <svg class="art" viewBox="0 0 520 340" fill="none" aria-hidden="true">
+      <defs>
+        <radialGradient id="gl" cx="42%" cy="34%" r="72%">
+          <stop offset="0" stop-color="#C9AEF5"/><stop offset="1" stop-color="#7C3AED"/>
+        </radialGradient>
+        <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#EDE4FE"/>
+        </linearGradient>
+      </defs>
+      <circle cx="250" cy="160" r="140" fill="url(#gl)"/>
+      <g stroke="#fff" stroke-opacity=".38" fill="none">
+        <ellipse cx="250" cy="160" rx="140" ry="52"/>
+        <ellipse cx="250" cy="160" rx="140" ry="100"/>
+        <ellipse cx="250" cy="160" rx="52" ry="140"/>
+        <ellipse cx="250" cy="160" rx="100" ry="140"/>
+        <circle cx="250" cy="160" r="140"/>
+      </g>
+      <g stroke="#fff" stroke-opacity=".75" fill="none" stroke-linecap="round">
+        <path d="M140 120 Q250 40 350 105"/><path d="M160 215 Q265 265 355 200"/>
+        <path d="M195 95 Q300 150 330 245"/>
+      </g>
+      <g fill="#fff">
+        <circle cx="140" cy="120" r="4"/><circle cx="350" cy="105" r="4"/>
+        <circle cx="160" cy="215" r="4"/><circle cx="355" cy="200" r="4"/>
+        <circle cx="195" cy="95" r="3"/><circle cx="330" cy="245" r="3"/>
+        <circle cx="268" cy="132" r="2.5" fill-opacity=".8"/>
+        <circle cx="222" cy="188" r="2.5" fill-opacity=".8"/>
+      </g>
+      <g fill="url(#bar)">
+        <rect x="352" y="262" width="22" height="52" rx="5"/>
+        <rect x="384" y="238" width="22" height="76" rx="5"/>
+        <rect x="416" y="252" width="22" height="62" rx="5"/>
+        <rect x="448" y="206" width="22" height="108" rx="5"/>
+      </g>
+      <polyline points="363,268 395,244 427,256 459,212 496,178" fill="none" stroke="#fff"
+        stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="496" cy="178" r="6" fill="#fff"/>
+      <path d="M486 190 L500 174 L488 172" stroke="#fff" stroke-width="3" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
   hero.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   v.appendChild(hero);
 
