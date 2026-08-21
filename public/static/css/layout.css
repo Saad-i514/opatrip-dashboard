@@ -7,7 +7,9 @@ aside{background:var(--surface);border-right:1px solid var(--line);position:stic
    white, exactly as in the client's design, so no background and no shadow. */
 .brand .mark{width:36px;height:36px;display:grid;place-items:center;flex:none}
 .brand .mark svg{width:36px;height:36px;display:block}
-.brand b{display:block;font-size:15px;letter-spacing:-.02em}
+/* set in caps, so it needs positive tracking — the -.02em here was tuned for the
+   old lowercase wordmark and made the capitals run together */
+.brand b{display:block;font-size:15px;font-weight:700;letter-spacing:.07em}
 .brand span{display:block;font-size:11.5px;color:var(--ink-3)}
 .navgrp{font-size:10.5px;font-weight:700;letter-spacing:.09em;color:var(--ink-3);
   text-transform:uppercase;padding:16px 10px 6px}
