@@ -40,7 +40,12 @@ main{padding:24px 28px 90px;max-width:1500px}
 .hero{border-radius:18px;padding:32px 34px;margin-bottom:22px;position:relative;
   overflow:hidden;background:linear-gradient(135deg,#F3EBFD 0%,#EDE6FB 55%,#E9E4FA 100%);
   color:var(--ink);border:1px solid var(--line)}
-.hero h2{font-size:29px;line-height:1.15;letter-spacing:-.03em;max-width:15ch}
+/* the mark beside the name, as it reads on the sidebar */
+.herotop{display:flex;align-items:center;gap:14px}
+.heromark{flex:none;width:46px;height:46px;display:grid;place-items:center;
+  background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(124,58,237,.14)}
+.heromark svg{width:32px;height:32px;display:block}
+.hero h2{font-size:32px;line-height:1.1;letter-spacing:-.03em}
 .hero p{margin:12px 0 0;max-width:62ch;color:var(--ink-2);font-size:14.5px}
 .hero .tag{display:inline-flex;align-items:center;gap:7px;background:#fff;
   border:1px solid var(--accent-line);color:var(--accent-ink);border-radius:99px;

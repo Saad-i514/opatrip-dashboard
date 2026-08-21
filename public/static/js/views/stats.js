@@ -41,10 +41,13 @@ export async function viewStats(){
   const hero = el('div','hero');
   hero.innerHTML = `
     <div class="tag">◆ Complete change traceability</div>
-    <h2>Product audit command centre</h2>
-    <p>Every product captured, every field compared against the last snapshot, and every
-       change attributed to the account and the person who ran the sync — across
-       ${o.coverage.length} platforms.</p>
+    <div class="herotop">
+      <span class="heromark"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"
+        ><path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"
+          stroke="#AD68E2" stroke-width="7" stroke-linejoin="round"/><circle cx="24"
+          cy="24" r="5.2" fill="#AD68E2"/></svg></span>
+      <h2>Opatrip Trace</h2>
+    </div>
     <div class="acts">
       <button class="solid" data-go="products">View products</button>
       <button class="ghost2" data-go="accounts">View accounts</button>
