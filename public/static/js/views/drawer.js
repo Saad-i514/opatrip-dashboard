@@ -133,44 +133,56 @@ export async function openDrawer(pid){
   dr.appendChild(body); host.appendChild(dr);
   head.querySelector('#xClose').onclick = closeDrawer;
 }
-/* One entry per edit, told the way a person would tell it: who, when, and what they
-   replaced with what. Modelled on the edit-history card in Google Sheets, which is the
-   shape the client asked for.
+/* One box per FIELD, not per change.
 
-   Every entry is shown — not just the newest. The `changes` table has never been capped
-   (only the full snapshots are, at two), so the whole chain from the original value to
-   today's is here. */
+   A field edited four times used to be four full-height cards, which pushed everything
+   else off the page and buried the thing people actually want: what it says now. Each
+   field gets a single box showing its LATEST change; clicking it opens the earlier ones,
+   one at a time, with arrows — the shape of a spreadsheet's edit history.
+
+   Every entry is still kept. Nothing is dropped, only folded. */
 function editHistoryCard(d){
   const items = historyFor(d);
   const c = el('div','card');
-  c.appendChild(el('div','card-h', '<h3>Edit history</h3>'
-    + `<span class="sub">${items.length} ${items.length===1?'entry':'entries'} · newest first</span>`));
   const b = el('div','pad');
-  if (!items.length){
+
+  // group by what changed. Photos arrive as dozens of rows per edit (one per field per
+  // photo), so they fold into a single "Photos" group rather than dozens of boxes.
+  const groups = new Map();
+  items.forEach(it => {
+    const photo = /^product\.(media|heroPhoto)/.test(it.path || '');
+    const key = photo ? 'Photos' : it.path;
+    const label = photo ? 'Photos' : fieldLabel(it.path);
+    if (!groups.has(key)) groups.set(key, {label, list: []});
+    groups.get(key).list.push(it);
+  });
+  // newest first, by each field's most recent change
+  const ordered = [...groups.values()].sort((a, b2) =>
+    String(b2.list[0].at || '').localeCompare(String(a.list[0].at || '')));
+
+  c.appendChild(el('div','card-h', '<h3>Edit history</h3>'
+    + `<span class="sub">${ordered.length} field${ordered.length===1?'':'s'} changed · `
+    + `${items.length} change${items.length===1?'':'s'} in total</span>`));
+
+  if (!ordered.length){
     b.appendChild(el('div','empty','<div class="big">Nothing has changed yet</div>'
       + 'The first capture is the starting point. From the next check onwards, anything '
       + 'Viator changes — and anything anyone corrects here — is listed on this page.'));
     c.appendChild(b); return c;
   }
-  b.appendChild(el('div','hint','Everything that has happened to this product, whoever '
-    + 'did it. Click a value to see all of it.'));
+  b.appendChild(el('div','hint','One box per field, showing its most recent change. '
+    + 'Click a box to step back through that field’s earlier changes.'));
+
   const feed = el('div','ehist');
-  items.forEach(it => {
+  ordered.forEach(g => {
+    const it = g.list[0];                       // the latest change to this field
     const name = personName(it.who, session.people);
     const row = el('div','eh');
-    // A photo edit writes one row per field per photo; saying "Photos" once is the whole
-    // point of grouping them on the change feed, and the same applies here.
-    const what = /^product\.(media|heroPhoto)\b/.test(it.path || '')
-      ? 'Photos' : fieldLabel(it.path);
+    row.setAttribute('role','button'); row.tabIndex = 0;
     row.innerHTML = `
       <div class="eh-av" title="${esc(it.who)}">${esc((name[0]||'?').toUpperCase())}</div>
       <div style="min-width:0">
-        <div class="eh-top"><b>${esc(name)}</b>
-          <span class="eh-when">${esc(whenLong(it.at))}</span>
-          ${it.byUs ? '<span class="badge b-stub">edited here</span>'
-                    : '<span class="badge b-draft">changed on Viator</span>'}
-          ${it.current ? '<span class="badge b-active">current</span>' : ''}</div>
-        <div class="eh-what">${esc(what)}</div>
+        <div class="eh-what">${esc(g.label)}</div>
         <div class="eh-rep">
           <div class="eh-side"><span class="eh-lbl">Before</span>
             ${valueBox(it.old,'old','Value before')}</div>
@@ -178,15 +190,82 @@ function editHistoryCard(d){
           <div class="eh-side after"><span class="eh-lbl">After</span>
             ${valueBox(it.now,null,'Value after')}</div>
         </div>
-        ${it.note ? `<div class="hint">Reason: ${esc(it.note)}</div>` : ''}
-        ${it.byUs ? '' : `<div class="hint">Spotted by ${esc(name)}’s sync — Viator does
-           not say which of its own users made the change.</div>`}
+        <div class="eh-foot"><b>${esc(name)}</b>
+          <span class="eh-when">${esc(whenLong(it.at))}</span>
+          ${it.byUs ? '<span class="badge b-stub">edited here</span>'
+                    : '<span class="badge b-draft">changed on Viator</span>'}
+          ${g.list.length > 1
+            ? `<span class="eh-more">${g.list.length} changes · click to see them</span>`
+            : ''}</div>
       </div>`;
+    const open = () => fieldHistory(g, 0);
+    row.onclick = open;
+    row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
     feed.appendChild(row);
   });
   b.appendChild(feed);
   c.appendChild(b);
   return c;
+}
+
+/* One field's changes, one at a time, with arrows — the spreadsheet edit-history card the
+   client asked for. `i` is the index into the group's list, which is newest first, so
+   "back" walks towards the original value. */
+function fieldHistory(g, i){
+  const host = $('#modalHost');
+  const it = g.list[i];
+  const name = personName(it.who, session.people);
+  const wrap = el('div');
+  wrap.innerHTML = `<div class="scrim"></div>
+    <div class="modal card fh">
+      <div class="fh-top">
+        <h2>Edit history</h2>
+        <span class="fh-nav">
+          <button class="fh-arrow" id="fhPrev" title="Newer change"
+            ${i === 0 ? 'disabled' : ''}>&lsaquo;</button>
+          <button class="fh-arrow" id="fhNext" title="Older change"
+            ${i >= g.list.length - 1 ? 'disabled' : ''}>&rsaquo;</button>
+        </span>
+      </div>
+      <div class="fh-who">
+        <div class="eh-av">${esc((name[0]||'?').toUpperCase())}</div>
+        <div><b>${esc(name)}</b>
+          <div class="eh-when">${esc(whenLong(it.at))}</div></div>
+        ${it.byUs ? '<span class="badge b-stub">edited here</span>'
+                  : '<span class="badge b-draft">changed on Viator</span>'}
+      </div>
+      <div class="fh-field">${esc(g.label)}</div>
+      <div class="eh-rep">
+        <div class="eh-side"><span class="eh-lbl">Before</span>
+          ${valueBox(it.old,'old','Value before')}</div>
+        <div class="eh-arrow" aria-hidden="true">→</div>
+        <div class="eh-side after"><span class="eh-lbl">After</span>
+          ${valueBox(it.now,null,'Value after')}</div>
+      </div>
+      ${it.note ? `<div class="hint" style="margin-top:12px">Reason: ${esc(it.note)}</div>` : ''}
+      ${it.byUs ? '' : `<div class="hint" style="margin-top:12px">Spotted by
+         ${esc(name)}’s sync — Viator does not say which of its own users made the
+         change.</div>`}
+      <div class="fh-foot">
+        <span class="hint">${i + 1} of ${g.list.length}${
+          i === g.list.length - 1 ? ' · the first one recorded' : ''}</span>
+        <button class="btn ghost" id="fhClose">Close</button>
+      </div>
+    </div>`;
+  host.innerHTML = '';
+  host.appendChild(wrap);
+  const close = () => { host.innerHTML = ''; };
+  wrap.querySelector('.scrim').onclick = close;
+  $('#fhClose').onclick = close;
+  const prev = $('#fhPrev'), next = $('#fhNext');
+  if (!prev.disabled) prev.onclick = () => fieldHistory(g, i - 1);
+  if (!next.disabled) next.onclick = () => fieldHistory(g, i + 1);
+  // arrow keys, because a card with ‹ › on it invites them
+  wrap.tabIndex = -1; wrap.focus();
+  wrap.onkeydown = e => {
+    if (e.key === 'ArrowLeft'  && i > 0) fieldHistory(g, i - 1);
+    if (e.key === 'ArrowRight' && i < g.list.length - 1) fieldHistory(g, i + 1);
+  };
 }
 
 /* The portal puts one "Edit" button at the top-right of each block, not a pencil beside
