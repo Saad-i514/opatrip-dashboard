@@ -24,6 +24,98 @@ export function bars(title, obj, badge){
   }
   c.appendChild(body); return c;
 }
+/* ---- the hero globe -------------------------------------------------------------------
+   A dotted world: every dot is a real point on a sphere, projected orthographically, and
+   the land dots are brighter than the sea. Drawn rather than fetched — there is no build
+   step here and the dashboard has to work from its own origin alone.
+
+   The continents are rough lat/lon boxes, not real coastline data. A world map file would
+   be tens of kilobytes shipped for decoration; at this size the shapes only have to read
+   as "the world", and the arcs between cities are the part that carries the meaning. */
+const LAND = [
+  [ 60, 83, -58, -22], [ 50, 72,-168, -62], [ 30, 50,-126, -70], [ 14, 30,-112, -86],
+  [  7, 15, -85, -77], [-20, 12, -80, -35], [-56,-20, -76, -53], [ 36, 60, -10,  30],
+  [ 54, 70,   8,  60], [ 14, 36, -17,  34], [-35, 15,   8,  42], [ 40, 74,  58, 140],
+  [ 20, 45,  44,  76], [  8, 35,  68,  90], [ 20, 45, 100, 135], [-10, 22,  95, 125],
+  [-39,-11, 113, 154], [-90,-64,-180, 180],
+];
+const isLand = (lat, lon) => LAND.some(([a,b,c,d]) => lat>=a && lat<=b && lon>=c && lon<=d);
+
+/* Where the arcs land: real places this client sells in, so the picture is about the
+   catalogue rather than generic decoration. */
+const CITIES = [
+  [40.4,-3.7,'Madrid'], [41.9,12.5,'Rome'], [48.2,16.4,'Vienna'], [51.5,-0.1,'London'],
+  [19.4,-99.1,'Mexico City'], [38.9,-77.0,'Washington'], [-1.3,36.8,'Nairobi'],
+  [35.0,135.8,'Kyoto'], [24.9,67.0,'Karachi'], [-33.9,151.2,'Sydney'],
+];
+
+function heroGlobe(){
+  const R = 148, cx = 200, cy = 170, lon0 = -20;   // Atlantic-centred, as in the design
+  const rad = d => d * Math.PI / 180;
+  const project = (lat, lon) => {
+    const la = rad(lat), lo = rad(lon - lon0);
+    return [cx + R * Math.cos(la) * Math.sin(lo),
+            cy - R * Math.sin(la),
+            Math.cos(la) * Math.cos(lo)];        // z > 0 = facing us
+  };
+  const dots = [];
+  for (let lat = -86; lat <= 86; lat += 4){
+    // constant spacing along each parallel, so the poles don't clot with dots
+    const step = Math.max(4, 4 / Math.max(0.15, Math.cos(rad(lat))));
+    for (let lon = -180; lon < 180; lon += step){
+      const [x, y, z] = project(lat, lon);
+      if (z <= 0.02) continue;
+      const land = isLand(lat, lon);
+      const o = (land ? 0.95 : 0.30) * (0.35 + 0.65 * z);   // fade towards the rim
+      dots.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${
+        land ? 1.45 : 0.95}" fill="#fff" fill-opacity="${o.toFixed(2)}"/>`);
+    }
+  }
+  // great-circle-ish arcs between the cities that are facing us
+  const vis = CITIES.map(c => [...project(c[0], c[1]), c[2]]).filter(p => p[2] > 0.12);
+  const arcs = [];
+  for (let i = 0; i < vis.length - 1; i++){
+    const a = vis[i], b = vis[i + 1];
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    const dx = mx - cx, dy = my - cy, d = Math.hypot(dx, dy) || 1;
+    const lift = 34 + d * 0.28;                  // bow the arc away from the centre
+    arcs.push(`<path d="M${a[0].toFixed(1)} ${a[1].toFixed(1)} Q${
+      (mx + dx / d * lift).toFixed(1)} ${(my + dy / d * lift).toFixed(1)} ${
+      b[0].toFixed(1)} ${b[1].toFixed(1)}" fill="none" stroke="#fff" stroke-opacity=".8"
+      stroke-width="1.5" stroke-linecap="round"/>`);
+  }
+  const pins = vis.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}"
+    r="3.4" fill="#fff"><title>${esc(p[3])}</title></circle>
+    <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="7" fill="#fff"
+      fill-opacity=".22"/>`).join('');
+  return `<svg class="art" viewBox="0 0 560 340" fill="none" aria-hidden="true">
+    <defs>
+      <radialGradient id="gl" cx="40%" cy="32%" r="74%">
+        <stop offset="0" stop-color="#B792F0"/><stop offset="1" stop-color="#6D28D9"/>
+      </radialGradient>
+      <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+        <stop offset=".72" stop-color="#fff" stop-opacity="0"/>
+        <stop offset="1" stop-color="#fff" stop-opacity=".30"/>
+      </radialGradient>
+      <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="#7C3AED"/><stop offset="1" stop-color="#EDE4FE"/>
+      </linearGradient>
+    </defs>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#gl)"/>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#glow)"/>
+    ${dots.join('')}${arcs.join('')}${pins}
+    <g fill="url(#bar)">
+      <rect x="392" y="258" width="24" height="58" rx="6"/>
+      <rect x="426" y="230" width="24" height="86" rx="6"/>
+      <rect x="460" y="246" width="24" height="70" rx="6"/>
+      <rect x="494" y="196" width="24" height="120" rx="6"/>
+    </g>
+    <polyline points="404,264 438,236 472,250 506,202 540,168" fill="none" stroke="#fff"
+      stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="540" cy="168" r="6" fill="#fff"/>
+  </svg>`;
+}
+
 export async function viewStats(){
   const v = $('#v-stats');
   skeleton(v, 'kpis', 'dashboard figures');
@@ -51,46 +143,7 @@ export async function viewStats(){
         <button class="ghost2" data-go="accounts">View accounts <i>›</i></button>
       </div>
     </div>
-    <svg class="art" viewBox="0 0 520 340" fill="none" aria-hidden="true">
-      <defs>
-        <radialGradient id="gl" cx="42%" cy="34%" r="72%">
-          <stop offset="0" stop-color="#C9AEF5"/><stop offset="1" stop-color="#7C3AED"/>
-        </radialGradient>
-        <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#EDE4FE"/>
-        </linearGradient>
-      </defs>
-      <circle cx="250" cy="160" r="140" fill="url(#gl)"/>
-      <g stroke="#fff" stroke-opacity=".38" fill="none">
-        <ellipse cx="250" cy="160" rx="140" ry="52"/>
-        <ellipse cx="250" cy="160" rx="140" ry="100"/>
-        <ellipse cx="250" cy="160" rx="52" ry="140"/>
-        <ellipse cx="250" cy="160" rx="100" ry="140"/>
-        <circle cx="250" cy="160" r="140"/>
-      </g>
-      <g stroke="#fff" stroke-opacity=".75" fill="none" stroke-linecap="round">
-        <path d="M140 120 Q250 40 350 105"/><path d="M160 215 Q265 265 355 200"/>
-        <path d="M195 95 Q300 150 330 245"/>
-      </g>
-      <g fill="#fff">
-        <circle cx="140" cy="120" r="4"/><circle cx="350" cy="105" r="4"/>
-        <circle cx="160" cy="215" r="4"/><circle cx="355" cy="200" r="4"/>
-        <circle cx="195" cy="95" r="3"/><circle cx="330" cy="245" r="3"/>
-        <circle cx="268" cy="132" r="2.5" fill-opacity=".8"/>
-        <circle cx="222" cy="188" r="2.5" fill-opacity=".8"/>
-      </g>
-      <g fill="url(#bar)">
-        <rect x="352" y="262" width="22" height="52" rx="5"/>
-        <rect x="384" y="238" width="22" height="76" rx="5"/>
-        <rect x="416" y="252" width="22" height="62" rx="5"/>
-        <rect x="448" y="206" width="22" height="108" rx="5"/>
-      </g>
-      <polyline points="363,268 395,244 427,256 459,212 496,178" fill="none" stroke="#fff"
-        stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="496" cy="178" r="6" fill="#fff"/>
-      <path d="M486 190 L500 174 L488 172" stroke="#fff" stroke-width="3" fill="none"
-        stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>`;
+    ${heroGlobe()}`;
   hero.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   v.appendChild(hero);
 

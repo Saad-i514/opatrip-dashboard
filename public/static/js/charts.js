@@ -94,8 +94,13 @@ export function areaChart(series, color){
   </svg>`;
 }
 
-export const STATUS_COLOR = {LIVE:'#15803D', PENDING:'#B45309', DRAFT:'#8A817A',
-  REJECTED:'#B91C1C', REMOVED:'#7C2D12', NOT_LISTED:'#DED6C9'};
+/* Platform coverage, in the brand's own colours rather than the old traffic-light set.
+   LIVE is the strongest violet because it is the state the whole tool is driving towards;
+   the rest step down through it. REJECTED stays red on purpose — it is the one state that
+   asks somebody to go and do something, and a violet warning does not read as a warning.
+   NOT_LISTED is the palest grey: "not uploaded" should recede, not compete. */
+export const STATUS_COLOR = {LIVE:'#7C3AED', PENDING:'#B08AEE', DRAFT:'#8F86A8',
+  REJECTED:'#DC2626', REMOVED:'#5B5470', NOT_LISTED:'#E4E0EF'};
 
 export function kpiCard(icon, tint, label, k){
   const d = k.delta;
