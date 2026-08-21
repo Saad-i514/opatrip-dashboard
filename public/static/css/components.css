@@ -120,9 +120,12 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
   text-overflow:ellipsis;white-space:nowrap}
 .pmeta{color:var(--ink-3);font-size:12.5px;margin-top:4px;display:flex;gap:7px;
   flex-wrap:wrap}
-/* the fields, as a label column and a value column that line up down the card */
-.pfacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+/* the fields, in FIXED columns so the same label sits at the same x on every row.
+   auto-fit sized each row to its own content, which is what made them look like stairs. */
+.pfacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
   gap:7px 18px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+@media(max-width:1200px){.pfacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.pfacts{grid-template-columns:minmax(0,1fr)}}
 .pfact{display:flex;align-items:center;gap:8px;min-width:0}
 .pf-k{flex:none;width:62px;color:var(--ink-3);font-size:11px;font-weight:700;
   letter-spacing:.05em;text-transform:uppercase}

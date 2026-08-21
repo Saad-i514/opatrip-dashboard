@@ -145,9 +145,15 @@ export async function viewProducts(){
     const row = el('div','prow');
     // Left: what this listing IS. Right: where it lives. Every fact on the left is a
     // labelled pair rather than a run of dots, so the column can be read down.
-    const fact = (k, v) => v ? `<div class="pfact"><span class="pf-k">${esc(k)}</span>
-      <span class="pf-v">${v}</span></div>` : '';
-    const rr = p.review_count == null ? '' : (p.review_count === 0
+    //
+    // ALWAYS four cells, in the same order. Skipping a field when it had no value gave
+    // one row three columns and the next four, so the labels marched across the page
+    // instead of lining up. A blank says something too — for a draft it says the field
+    // was never fetched, which is not the same as zero.
+    const NOTCAP = '<span class="hint">Not captured</span>';
+    const fact = (k, v) => `<div class="pfact"><span class="pf-k">${esc(k)}</span>
+      <span class="pf-v">${v || NOTCAP}</span></div>`;
+    const rr = p.review_count == null ? NOTCAP : (p.review_count === 0
       ? '<b style="color:var(--accent)">None yet</b>'
       : `${p.review_count}${p.review_rating
           ? ` <span class="hint">★ ${Number(p.review_rating).toFixed(1)}</span>` : ''}`);
@@ -166,7 +172,7 @@ export async function viewProducts(){
           ${fact('Quality', qualBadge(p.quality_level))}
           ${fact('Reviews', rr)}
           ${fact('Changes', p.change_count
-            ? `<b style="color:var(--accent)">${p.change_count}</b>` : '0')}
+            ? `<b style="color:var(--accent)">${p.change_count}</b>` : '<span>0</span>')}
         </div>
       </div>
       <div class="pplat">${platformGrid(p, opts0.platforms)}</div>`;
