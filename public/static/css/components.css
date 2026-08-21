@@ -520,3 +520,8 @@ tbody tr:hover{background:var(--surface-2)}
    column, which is the only reason to put them in a table. */
 th.num, td.v.num, td.num{text-align:center}
 td.v.num, td.num{font-variant-numeric:tabular-nums}
+
+/* a tour can hold more than one listing on a platform — the row shows ITS OWN, and this
+   marks the others rather than pretending they are the same thing */
+.pp-s{display:flex;align-items:center;gap:6px}
+.pp-more{color:var(--ink-3);font-size:11px;font-weight:700;cursor:help}

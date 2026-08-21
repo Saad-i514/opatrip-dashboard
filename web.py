@@ -864,17 +864,27 @@ def products(account: str | None = None, q: str | None = None,
     with db.session() as con:
         rows = [dict(r) for r in con.execute(sql, args)]
         # Where this product's tour is listed, and with what status on each platform —
-        # the Platforms grid, per row, since that whole tab was removed. One unfiltered
-        # query (~2.4k rows) beats an IN list rebuilt per request, and a tour may well be
-        # listed under a different account than the one being viewed.
+        # the Platforms grid, per row, since that whole tab was removed.
+        #
+        # Tours are grouped by NORMALISED TITLE, so one tour routinely holds several
+        # listings on the same platform, often under different accounts. The row must
+        # still show its OWN status: the browser matches on product_code for that, and
+        # `code` is here so it can.
+        #
+        # Scoped to what the caller may see. Without that a member restricted to their own
+        # accounts would learn other accounts' product codes through this side door.
         by_tour = {}
-        for r in con.execute("""SELECT p.tour_id AS t, pl.code AS code, pl.name AS nm,
-                                       p.product_code AS pc, p.status_canonical AS st
-                                FROM products p JOIN platforms pl ON pl.id=p.platform_id
-                                WHERE p.tour_id IS NOT NULL"""):
+        lw, largs = account_where()
+        for r in con.execute(f"""SELECT p.tour_id AS t, pl.code AS code, pl.name AS nm,
+                                        p.product_code AS pc, p.status_canonical AS st,
+                                        a.viator_account_id AS acct
+                                 FROM products p JOIN platforms pl ON pl.id=p.platform_id
+                                 JOIN accounts a ON a.id=p.account_id
+                                 {lw} {'AND' if lw else 'WHERE'} p.tour_id IS NOT NULL""",
+                             largs):
             by_tour.setdefault(r["t"], []).append(
                 {"platform": r["code"], "name": r["nm"], "code": r["pc"],
-                 "status": r["st"] or "PENDING"})
+                 "status": r["st"] or "PENDING", "account": r["acct"]})
         for r in rows:
             listed = by_tour.get(r.get("tour_id")) or []
             r["tour_listings"] = sorted(listed, key=lambda x: x["name"])
