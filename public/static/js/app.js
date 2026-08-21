@@ -9,7 +9,8 @@ import { ensureSignedIn, renderWhoAmI, showLogin } from './login.js';
 import { viewStats } from './views/stats.js';
 import { viewProducts } from './views/products.js';
 import { when } from './views/drawer.js';
-import { viewActivity, viewCategories, viewSyncs } from './views/misc.js';
+// Activity is the live log of a capture run, and this deployment cannot capture.
+import { viewCategories, viewSyncs } from './views/misc.js';
 import { viewAccounts } from './views/accounts.js';
 import { viewAdmin } from './views/admin.js';
 
@@ -17,12 +18,8 @@ import { viewAdmin } from './views/admin.js';
 export async function poll(){
   try{
     const st = await api('/api/status');
-    const pill = $('#statusPill');
-    pill.className = 'pill '+(st.status==='running'?'run':st.status==='done'?'done'
-      :(st.status==='error'||String(st.status).startsWith('paused'))?'err':'');
-    $('#statusTxt').textContent = st.status==='running'
-      ? `capturing ${st.seen}/${st.total}${st.changes?` · ${st.changes} change(s)`:''}`
-      : (st.status==='done'?'finished':st.status==='idle'?'idle':String(st.status).replace(/_/g,' '));
+    // The "idle" pill was removed from the top bar. A run still announces itself through
+    // the progress panel and the Activity log, which say more than one word did.
     setOwner(st.automation_owner);
     if (st.read_only) installReadOnly();
     const b = $('#banner');
@@ -45,7 +42,6 @@ export async function poll(){
       b.className='banner'; b.textContent = 'Stopped: '+st.message;
     } else b.className='banner hidden';
     renderSyncProgress(st);
-    viewActivity(st);
     if (st.status==='done' && poll._last==='running'){
       refresh(); loadAccounts();
     }
@@ -63,15 +59,13 @@ export async function poll(){
 // The Platforms tab was removed on request — which platforms a tour is listed on is now
 // a badge on the product row itself. /api/matrix still exists for anything that needs it.
 export const VIEWS = {stats:viewStats, products:viewProducts, accounts:viewAccounts,
-  categories:viewCategories, syncs:viewSyncs, admin:viewAdmin,
-  activity:()=>viewActivity(null)};
+  categories:viewCategories, syncs:viewSyncs, admin:viewAdmin};
 export const TITLES = {stats:['Dashboard','Everything at a glance'],
   accounts:['Accounts','Coverage and capture freshness'],
   products:['Products','Every captured listing'],
   categories:['Breakdown','Distribution by category'],
   syncs:['Sync runs','Every capture run'],
-  admin:['Admin','Who can sign in, and what they can see'],
-  activity:['Activity','Live log of the current run']};
+  admin:['Admin','Who can sign in, and what they can see']};
 export function refresh(){
   // Promise.resolve: not every view is async (Activity renders synchronously), and
   // calling .catch on its undefined return threw.

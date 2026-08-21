@@ -106,20 +106,40 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 /* which platform a listing is on — replaced the Platforms tab on the product row */
 .b-plat{background:var(--surface-2);color:var(--ink-2);border-color:var(--line)}
 
-/* ---------- product list ---------- */
+/* ---------- product list ----------
+   What the listing IS on the left, where it lives on the right. The left column is
+   labelled pairs rather than a run of dots, so it can be read down instead of parsed. */
 .filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
 .plist{display:grid;gap:11px}
-.prow{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;
-  padding:13px 16px;background:var(--surface);border:1px solid var(--line);
+.prow{display:grid;grid-template-columns:1fr 250px;gap:20px;align-items:start;
+  padding:15px 17px;background:var(--surface);border:1px solid var(--line);
   border-radius:var(--r);cursor:pointer;transition:.13s;box-shadow:var(--shadow)}
 .prow:hover{border-color:var(--accent-line);box-shadow:0 3px 14px rgba(249,115,22,.1)}
-.thumb{width:72px;height:54px;border-radius:9px;object-fit:cover;background:var(--surface-2);
-  display:block}
-.thumb.ph{display:grid;place-items:center;color:var(--ink-3);font-size:11px}
-.ptitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pmeta{color:var(--ink-3);font-size:13px;margin-top:3px;display:flex;gap:7px;flex-wrap:wrap}
-.pbadges{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;
-  max-width:340px}
+.pmain{min-width:0}
+.ptitle{font-weight:600;font-size:15px;line-height:1.35;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.pmeta{color:var(--ink-3);font-size:12.5px;margin-top:4px;display:flex;gap:7px;
+  flex-wrap:wrap}
+/* the fields, as a label column and a value column that line up down the card */
+.pfacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:7px 18px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+.pfact{display:flex;align-items:center;gap:8px;min-width:0}
+.pf-k{flex:none;width:62px;color:var(--ink-3);font-size:11px;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase}
+.pf-v{min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+/* the Platforms grid, as it looked on its own tab, sized for a row */
+.pplat{border-left:1px solid var(--line);padding-left:18px;min-width:0}
+.pp-h{color:var(--ink-3);font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;margin-bottom:7px}
+.pp-grid{display:grid;gap:5px}
+.pp-row{display:flex;align-items:center;gap:9px;justify-content:space-between;
+  font-size:13px}
+.pp-n{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.b-notlisted{background:transparent;color:var(--ink-3);border-color:var(--line-2)}
+@media(max-width:900px){
+  .prow{grid-template-columns:1fr}
+  .pplat{border-left:0;border-top:1px solid var(--line);padding:12px 0 0}}
 
 /* ---------- drawer ---------- */
 .scrim{position:fixed;inset:0;background:rgba(28,25,23,.38);backdrop-filter:blur(3px);z-index:40}

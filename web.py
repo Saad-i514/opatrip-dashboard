@@ -863,17 +863,23 @@ def products(account: str | None = None, q: str | None = None,
     sql += " ORDER BY p.product_code"
     with db.session() as con:
         rows = [dict(r) for r in con.execute(sql, args)]
-        # Which platforms this product's tour is listed on. The Platforms grid was removed
-        # from the UI at the client's request, so the fact it existed to show now travels
-        # on the product row itself. One unfiltered query (~1.1k rows) beats an IN list
-        # rebuilt per request, and the tour may well be listed under another account.
+        # Where this product's tour is listed, and with what status on each platform —
+        # the Platforms grid, per row, since that whole tab was removed. One unfiltered
+        # query (~2.4k rows) beats an IN list rebuilt per request, and a tour may well be
+        # listed under a different account than the one being viewed.
         by_tour = {}
-        for r in con.execute("""SELECT p.tour_id AS t, pl.name AS nm FROM products p
-                                JOIN platforms pl ON pl.id=p.platform_id
+        for r in con.execute("""SELECT p.tour_id AS t, pl.code AS code, pl.name AS nm,
+                                       p.product_code AS pc, p.status_canonical AS st
+                                FROM products p JOIN platforms pl ON pl.id=p.platform_id
                                 WHERE p.tour_id IS NOT NULL"""):
-            by_tour.setdefault(r["t"], set()).add(r["nm"])
+            by_tour.setdefault(r["t"], []).append(
+                {"platform": r["code"], "name": r["nm"], "code": r["pc"],
+                 "status": r["st"] or "PENDING"})
         for r in rows:
-            r["tour_platforms"] = sorted(by_tour.get(r.get("tour_id")) or [])
+            listed = by_tour.get(r.get("tour_id")) or []
+            r["tour_listings"] = sorted(listed, key=lambda x: x["name"])
+            # kept for anything still reading the old shape
+            r["tour_platforms"] = sorted({x["name"] for x in listed})
         # manual overrides win for display, and carry who made them
         db.apply_edits(con, rows)
     return {"products": rows}

@@ -68,13 +68,5 @@ export function installReadOnly(){
     b.onclick = automationNotice;
     b.title = `Captures run on your laptop — click for ${OWNER.name}'s details`;
   }
-  // Keep it reading "limit". Replacing the placeholder with "n/a" turned a label into
-  // a shrug — it told you the box was dead without saying what the box was.
-  const lim = $('#limit');
-  if (lim){
-    lim.disabled = true;
-    lim.placeholder = 'limit';
-    lim.title = 'A product limit applies to a capture run, and captures happen on your '
-              + 'laptop with the Automation Tool.';
-  }
+  // The limit box was removed from the top bar, so there is nothing to disable here.
 }

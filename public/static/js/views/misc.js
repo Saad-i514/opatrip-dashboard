@@ -74,6 +74,9 @@ export async function viewSyncs(){
 }
 export function viewActivity(st){
   const v = $('#v-activity');
+  // The deployed dashboard has no Activity page — it cannot capture, so there is no run
+  // to log. Called from the status poll either way, so it has to tolerate the absence.
+  if (!v) return;
   if (!v.dataset.init){
     v.innerHTML = '<div class="card"><div class="card-h"><h3>Activity</h3>'+
       '<span class="sub">live log of the current run</span></div>'+

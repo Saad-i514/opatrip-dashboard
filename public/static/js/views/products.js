@@ -1,31 +1,28 @@
 import { S } from '../state.js';
 import { $, api, el, esc, q } from '../core.js';
-import { monthName, qualBadge } from '../format.js';
+import { monthName, qualBadge, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { openDrawer, when } from './drawer.js';
 
 /* ======================= products ======================= */
 
 
-/* Reviews, shown on the row itself: it is the field people are filtering on, and a
-   filter whose result you cannot see is hard to trust. Zero is called out rather than
-   printed as "0 reviews" among the rest — it is the actionable state. */
-function reviewChip(p){
-  if (p.review_count == null) return '';
-  if (p.review_count === 0)
-    return '· <b style="color:var(--accent)">no reviews</b>';
-  const stars = p.review_rating ? ` ★${Number(p.review_rating).toFixed(1)}` : '';
-  return `· ${p.review_count} review${p.review_count===1?'':'s'}${esc(stars)}`;
-}
-
-/* Which platforms this tour is listed on. The Platforms grid was a whole tab of its own;
-   the client asked for it here instead, on the row, next to the quality badge. Falls back
-   to this listing's own platform so a tour that was never grouped still says where it is.
-   Connection and lifecycle badges were removed from the row on the same request. */
-function platformBadges(p){
-  const names = (p.tour_platforms && p.tour_platforms.length)
-    ? p.tour_platforms : (p.platform_name ? [p.platform_name] : []);
-  return names.map(n=>`<span class="badge b-plat">${esc(n)}</span>`).join('');
+/* Where this tour is listed — the Platforms tab, brought onto the row.
+   Every known platform gets a line, not only the ones with a listing: "Not uploaded" is
+   the whole point of the grid, because a gap is the thing worth seeing. */
+function platformGrid(p, platforms){
+  const on = {};
+  (p.tour_listings || []).forEach(l => { on[l.platform] = l; });
+  const known = (platforms || []).length
+    ? platforms
+    : (p.tour_listings || []).map(l => ({code: l.platform, name: l.name}));
+  if (!known.length) return '';
+  return `<div class="pp-h">Listed on</div><div class="pp-grid">${known.map(pl => {
+    const l = on[pl.code];
+    return `<div class="pp-row"><span class="pp-n">${esc(pl.name)}</span>${
+      l ? statusBadge(l.status)
+        : '<span class="badge b-notlisted">Not uploaded</span>'}</div>`;
+  }).join('')}</div>`;
 }
 
 let _t; const debounce = fn => { clearTimeout(_t); _t=setTimeout(fn,260); };
@@ -137,24 +134,33 @@ export async function viewProducts(){
   const L = el('div','plist');
   d.products.forEach(p=>{
     const row = el('div','prow');
-    // No thumbnail, and no photo count: photos are not stored. A photo CHANGED on Viator
-    // still shows up — in Change history, as one line naming the account.
+    // Left: what this listing IS. Right: where it lives. Every fact on the left is a
+    // labelled pair rather than a run of dots, so the column can be read down.
+    const fact = (k, v) => v ? `<div class="pfact"><span class="pf-k">${esc(k)}</span>
+      <span class="pf-v">${v}</span></div>` : '';
+    const rr = p.review_count == null ? '' : (p.review_count === 0
+      ? '<b style="color:var(--accent)">None yet</b>'
+      : `${p.review_count}${p.review_rating
+          ? ` <span class="hint">★ ${Number(p.review_rating).toFixed(1)}</span>` : ''}`);
     row.innerHTML = `
-      <div style="min-width:0">
+      <div class="pmain">
         <div class="ptitle">${esc(p.title||'(untitled)')}</div>
         <div class="pmeta">
           <span class="mono">${esc(p.product_code)}</span>
           ${p.location?'· '+esc(p.location):''}
           ${!S.acct?'· '+esc(p.account_name||p.viator_account_id):''}
-          ${reviewChip(p)}
-          ${p.change_count?`· <b style="color:var(--accent)">${p.change_count} change${p.change_count===1?'':'s'}</b>`:''}
+        </div>
+        <div class="pfacts">
+          ${fact('Status', p.missing_since
+            ? '<span class="badge b-rejected">Removed from Viator</span>'
+            : statusBadge(p.status))}
+          ${fact('Quality', qualBadge(p.quality_level))}
+          ${fact('Reviews', rr)}
+          ${fact('Changes', p.change_count
+            ? `<b style="color:var(--accent)">${p.change_count}</b>` : '0')}
         </div>
       </div>
-      <div class="pbadges">
-        ${p.missing_since?'<span class="badge b-rejected">Removed from Viator</span>':''}
-        ${p.is_draft_stub?'<span class="badge b-stub">Draft — not fetched</span>':''}
-        ${qualBadge(p.quality_level)}${platformBadges(p)}
-      </div>`;
+      <div class="pplat">${platformGrid(p, opts0.platforms)}</div>`;
     if (p.missing_since) row.style.opacity = '.72';
     row.onclick = ()=>openDrawer(p.id);
     L.appendChild(row);

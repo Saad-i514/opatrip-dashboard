@@ -29,7 +29,6 @@
     <button class="navbtn" data-t="accounts" aria-selected="false"><span class="ico">⌂</span>Accounts<span class="cnt" id="cntAccounts">–</span></button>
     <div class="navgrp">Traceability</div>
     <button class="navbtn" data-t="syncs" aria-selected="false"><span class="ico">⎘</span>Sync runs</button>
-    <button class="navbtn" data-t="activity" aria-selected="false"><span class="ico">≡</span>Activity</button>
     <div class="navgrp">Insights</div>
     <button class="navbtn" data-t="categories" aria-selected="false"><span class="ico">◱</span>Breakdown</button>
     <div class="navgrp hidden" data-admin-only>Manage</div>
@@ -54,11 +53,9 @@
   </div>
   <div class="grow"></div>
   <select id="acct" title="Show data for" style="max-width:280px"></select>
-  <input type="text" id="limit" placeholder="limit" title="Optional: capture only the first N products. Leave blank for all." style="width:64px">
   <button class="btn" id="btnFetch" disabled>Fetch</button>
   <button class="btn ghost" id="btnStop">Stop</button>
   <button class="btn primary" id="btnAdd">+ Add Account</button>
-  <span class="pill" id="statusPill"><span class="dot2"></span><span id="statusTxt">idle</span></span>
 </div>
 
 <main>
@@ -74,7 +71,6 @@
   <section id="v-categories" class="hidden"></section>
   <section id="v-syncs" class="hidden"></section>
   <section id="v-admin" class="hidden"></section>
-  <section id="v-activity" class="hidden"></section>
 </main>
 </div>
 </div>
