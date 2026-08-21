@@ -77,7 +77,10 @@ export function go(tab){
   S.tab = tab;
   document.querySelectorAll('#tabs .navbtn').forEach(x=>
     x.setAttribute('aria-selected', x.dataset.t===tab));
-  Object.keys(VIEWS).forEach(t=>$('#v-'+t).classList.toggle('hidden', t!==S.tab));
+  // guarded: a stale link to a tab that has since been removed would otherwise
+  // throw on a null element and leave the dashboard blank
+  Object.keys(VIEWS).forEach(t=>{ const n = $('#v-'+t);
+    if (n) n.classList.toggle('hidden', t!==S.tab); });
   const [t1,t2] = TITLES[tab] || ['Dashboard',''];
   $('#pageTitle').textContent = t1;
   const acc = S.accounts.find(a=>a.viator_account_id===S.acct);

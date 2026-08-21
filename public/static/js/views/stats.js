@@ -47,7 +47,7 @@ export async function viewStats(){
        ${o.coverage.length} platforms.</p>
     <div class="acts">
       <button class="solid" data-go="products">View products</button>
-      <button class="ghost2" data-go="audit">Change history</button>
+      <button class="ghost2" data-go="accounts">View accounts</button>
     </div>
     <svg class="art" width="230" height="150" viewBox="0 0 230 150" fill="none">
       <rect x="10" y="40" width="26" height="80" rx="5" fill="#fff"/>
@@ -83,7 +83,7 @@ export async function viewStats(){
   // Every card that carries a filter opens Products already narrowed to it.
   const drill = el2 => {
     const f = JSON.parse(el2.dataset.filter);
-    Object.assign(S.pf, {q:'', status:'', lifecycle:'', platform:'', connection:'',
+    Object.assign(S.pf, {q:'', status:'', lifecycle:'', platform:'',
                          reviews:'', missing:'', changed:''}, f);
     go('products');
   };

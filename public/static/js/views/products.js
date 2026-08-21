@@ -43,8 +43,7 @@ export async function viewProducts(){
   // every filter travels as a query param, so a filtered view is a shareable URL and the
   // server does the narrowing — filtering 1,100 rows in the browser would mean shipping
   // all of them first
-  for (const k of ['q','lifecycle','platform','connection','reviews','missing','month',
-                   'changed'])
+  for (const k of ['q','lifecycle','platform','reviews','missing','month','changed'])
     if (S.pf[k]) ps.set(k, S.pf[k]);
   if (S.pf.status) ps.set('status', S.pf.status);
   const [d, opts0] = await Promise.all([
@@ -78,9 +77,6 @@ export async function viewProducts(){
       ${opts(LIFECYCLE, S.pf.lifecycle)}</select>
     <select id="previews" title="Review count"><option value="">Any reviews</option>
       ${opts(REVIEWS, S.pf.reviews)}</select>
-    <select id="pconn" title="Book on Connection"><option value="">Any connection</option>
-      ${opts([['Connected','Connected'],['Partially connected','Partially connected'],
-              ['Not connected','Not connected']], S.pf.connection)}</select>
     <select id="pchanged" title="Whether anything has changed since the first capture">
       <option value="">Changed or not</option>
       ${opts(CHANGED, S.pf.changed)}</select>
@@ -93,10 +89,9 @@ export async function viewProducts(){
   f.querySelector('#pmonth').onchange  = e=>set('month', e.target.value);
   f.querySelector('#plife').onchange   = e=>set('lifecycle', e.target.value);
   f.querySelector('#previews').onchange= e=>set('reviews', e.target.value);
-  f.querySelector('#pconn').onchange   = e=>set('connection', e.target.value);
   f.querySelector('#pchanged').onchange= e=>set('changed', e.target.value);
   f.querySelector('#pclear').onclick = ()=>{
-    Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',connection:'',
+    Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',
                          reviews:'',missing:'',month:'',changed:''});
     viewProducts();
   };
@@ -107,7 +102,7 @@ export async function viewProducts(){
     S.pf.platform && `on ${S.pf.platform}`,
     S.pf.lifecycle && (LIFECYCLE.find(x=>x[0]===S.pf.lifecycle)||[,S.pf.lifecycle])[1],
     S.pf.reviews && (REVIEWS.find(x=>x[0]===S.pf.reviews)||[,S.pf.reviews])[1],
-    S.pf.connection, S.pf.missing && 'no longer listed on the platform',
+    S.pf.missing && 'no longer listed on the platform',
     S.pf.month && `first captured in ${monthName(S.pf.month)}`,
     S.pf.changed && (CHANGED.find(x=>x[0]===S.pf.changed)||[,S.pf.changed])[1],
   ].filter(Boolean);
@@ -150,13 +145,14 @@ export async function viewProducts(){
     // one row three columns and the next four, so the labels marched across the page
     // instead of lining up. A blank says something too — for a draft it says the field
     // was never fetched, which is not the same as zero.
-    const NOTCAP = '<span class="hint">Not captured</span>';
+    // A count with nothing behind it shows 0, on request. Strictly a draft's review count
+    // is unknown rather than zero — drafts are never deep-fetched — but 0 is what the
+    // client wants to read, and Reviews and Changes are counts either way.
     const fact = (k, v) => `<div class="pfact"><span class="pf-k">${esc(k)}</span>
-      <span class="pf-v">${v || NOTCAP}</span></div>`;
-    const rr = p.review_count == null ? NOTCAP : (p.review_count === 0
-      ? '<b style="color:var(--accent)">None yet</b>'
-      : `${p.review_count}${p.review_rating
-          ? ` <span class="hint">★ ${Number(p.review_rating).toFixed(1)}</span>` : ''}`);
+      <span class="pf-v">${v || '0'}</span></div>`;
+    const rr = p.review_count ? `${p.review_count}${p.review_rating
+          ? ` <span class="hint">★ ${Number(p.review_rating).toFixed(1)}</span>` : ''}`
+      : '0';
     row.innerHTML = `
       <div class="pmain">
         <div class="ptitle">${esc(p.title||'(untitled)')}</div>
@@ -169,7 +165,8 @@ export async function viewProducts(){
           ${fact('Status', p.missing_since
             ? '<span class="badge b-rejected">Removed from Viator</span>'
             : statusBadge(p.status))}
-          ${fact('Quality', qualBadge(p.quality_level))}
+          ${fact('Quality', qualBadge(p.quality_level)
+            || '<span class="hint">Not rated</span>')}
           ${fact('Reviews', rr)}
           ${fact('Changes', p.change_count
             ? `<b style="color:var(--accent)">${p.change_count}</b>` : '<span>0</span>')}
