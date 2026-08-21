@@ -221,10 +221,10 @@ function fieldHistory(g, i){
       <div class="fh-top">
         <h2>Edit history</h2>
         <span class="fh-nav">
-          <button class="fh-arrow" id="fhPrev" title="Newer change"
-            ${i === 0 ? 'disabled' : ''}>&lsaquo;</button>
-          <button class="fh-arrow" id="fhNext" title="Older change"
-            ${i >= g.list.length - 1 ? 'disabled' : ''}>&rsaquo;</button>
+          <button class="fh-arrow" id="fhBack" title="The change before this one"
+            ${i >= g.list.length - 1 ? 'disabled' : ''}>&lsaquo;</button>
+          <button class="fh-arrow" id="fhFwd" title="The change after this one"
+            ${i === 0 ? 'disabled' : ''}>&rsaquo;</button>
         </span>
       </div>
       <div class="fh-who">
@@ -247,8 +247,9 @@ function fieldHistory(g, i){
          ${esc(name)}’s sync — Viator does not say which of its own users made the
          change.</div>`}
       <div class="fh-foot">
-        <span class="hint">${i + 1} of ${g.list.length}${
-          i === g.list.length - 1 ? ' · the first one recorded' : ''}</span>
+        <span class="hint">${i === 0 ? 'Latest change' : `${i + 1} of ${g.list.length}`}${
+          i === g.list.length - 1 && g.list.length > 1 ? ' · the first one recorded'
+          : (i === 0 && g.list.length > 1 ? ` · ${g.list.length - 1} earlier` : '')}</span>
         <button class="btn ghost" id="fhClose">Close</button>
       </div>
     </div>`;
@@ -257,14 +258,16 @@ function fieldHistory(g, i){
   const close = () => { host.innerHTML = ''; };
   wrap.querySelector('.scrim').onclick = close;
   $('#fhClose').onclick = close;
-  const prev = $('#fhPrev'), next = $('#fhNext');
-  if (!prev.disabled) prev.onclick = () => fieldHistory(g, i - 1);
-  if (!next.disabled) next.onclick = () => fieldHistory(g, i + 1);
-  // arrow keys, because a card with ‹ › on it invites them
+  // The list runs newest first, so index 0 is the latest change and a HIGHER index is
+  // further back in time. Left therefore steps to the PREVIOUS change and right returns
+  // towards the latest — the way a person reads a timeline, and the way the arrows point.
+  const back = $('#fhBack'), fwd = $('#fhFwd');
+  if (!back.disabled) back.onclick = () => fieldHistory(g, i + 1);
+  if (!fwd.disabled)  fwd.onclick  = () => fieldHistory(g, i - 1);
   wrap.tabIndex = -1; wrap.focus();
   wrap.onkeydown = e => {
-    if (e.key === 'ArrowLeft'  && i > 0) fieldHistory(g, i - 1);
-    if (e.key === 'ArrowRight' && i < g.list.length - 1) fieldHistory(g, i + 1);
+    if (e.key === 'ArrowLeft'  && i < g.list.length - 1) fieldHistory(g, i + 1);
+    if (e.key === 'ArrowRight' && i > 0) fieldHistory(g, i - 1);
   };
 }
 
