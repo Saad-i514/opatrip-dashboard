@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { $, api, el, esc, q } from '../core.js';
+import { $, cachedApi, el, esc, q } from '../core.js';
 import { monthName, qualBadge, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { openDrawer, when } from './drawer.js';
@@ -20,9 +20,11 @@ import { openDrawer, when } from './drawer.js';
 function platformGrid(p, platforms){
   const by = {};
   (p.tour_listings || []).forEach(l => { (by[l.platform] = by[l.platform] || []).push(l); });
+  // names come from the platform list, which the filter bar already loaded — the
+  // listings themselves carry only codes now
   const known = (platforms || []).length
     ? platforms
-    : Object.values(by).map(ls => ({code: ls[0].platform, name: ls[0].name}));
+    : Object.keys(by).map(code => ({code, name: code}));
   if (!known.length) return '';
   return `<div class="pp-h">Listed on</div><div class="pp-grid">${known.map(pl => {
     const ls = by[pl.code] || [];
@@ -46,9 +48,13 @@ export async function viewProducts(){
   for (const k of ['q','lifecycle','platform','reviews','missing','month','changed'])
     if (S.pf[k]) ps.set(k, S.pf[k]);
   if (S.pf.status) ps.set('status', S.pf.status);
+  // Served from the cache when we have it, so coming back to this tab is instant;
+  // a refresh goes out behind it and repaints only if something actually changed.
+  const key = '/api/products?'+ps;
   const [d, opts0] = await Promise.all([
-    api('/api/products?'+ps),
-    api('/api/filters'+q()),      // months come from the data, so no empty option exists
+    cachedApi(key, () => { if (S.tab === 'products' && key === '/api/products?'+ps)
+                             viewProducts(); }),
+    cachedApi('/api/filters'+q()),   // months come from the data, so no empty option exists
   ]);
   v.dataset.painted='1';
   v.innerHTML='';

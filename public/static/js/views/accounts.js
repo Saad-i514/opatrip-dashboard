@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { $, api, el, esc } from '../core.js';
+import { $, cachedApi, el, esc } from '../core.js';
 import { daysSince, list, rows, sub } from '../format.js';
 import { loadAccounts, skeleton } from '../ui.js';
 import { go } from '../app.js';
@@ -10,7 +10,7 @@ import { go } from '../app.js';
 export async function viewAccounts(){
   const v = $('#v-accounts');
   skeleton(v, 'rows', 'accounts');
-  const d = await api('/api/accounts');
+  const d = await cachedApi('/api/accounts');
   const list = d.accounts;
   v.innerHTML = '';
   const synced = list.filter(a=>a.synced);

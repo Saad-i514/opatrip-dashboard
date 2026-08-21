@@ -1,4 +1,4 @@
-import { $, api, el, esc, q } from '../core.js';
+import { $, cachedApi, el, esc, q } from '../core.js';
 import { connBadge, qualBadge, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { bars } from './stats.js';
@@ -8,7 +8,7 @@ import { trunc, when } from './drawer.js';
 export async function viewCategories(){
   const v = $('#v-categories');
   skeleton(v, 'rows', 'the category breakdown');
-  const s = await api('/api/stats'+q());
+  const s = await cachedApi('/api/stats'+q());
   v.innerHTML='';
   const g = el('div','grid2');
   g.appendChild(bars('Locations', s.by_location));
@@ -37,7 +37,7 @@ export async function viewCategories(){
 export async function viewSyncs(){
   const v = $('#v-syncs');
   skeleton(v, 'rows', 'sync runs');
-  const d = await api('/api/syncs'+q());
+  const d = await cachedApi('/api/syncs'+q());
   v.innerHTML='';
   const c = el('div','card');
   // The success rate used to be a card on the dashboard. It measures the TOOL, not the

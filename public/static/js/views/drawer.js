@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { $, api, el, esc, session } from '../core.js';
+import { $, cachedApi, el, esc, session } from '../core.js';
 import { getPath, historyFor, label, personName, qualBadge, setEditContext,
          statusBadge, valueBox, whenLong } from '../format.js';
 import { skLines } from '../ui.js';
@@ -16,7 +16,7 @@ export async function openDrawer(pid){
     `<div class="card pad">${skLines(8)}</div>` +
     '</div></div>';
   host.querySelector('.scrim').onclick = closeDrawer;
-  const d = await api('/api/product/'+pid);
+  const d = await cachedApi('/api/product/'+pid);
   const p = d.product, cur = d.current;
   host.innerHTML='';
   const scrim = el('div','scrim'); scrim.onclick = closeDrawer; host.appendChild(scrim);

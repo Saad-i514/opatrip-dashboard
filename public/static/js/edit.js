@@ -11,7 +11,7 @@
      editSection() – every editable field in one block, what the portal's Edit opens
 */
 import { S } from './state.js';
-import { $, api, el, esc, post, session } from './core.js';
+import { $, api, el, esc, invalidate, post, session } from './core.js';
 import { toast } from './toast.js';
 
 export const EMAIL_OK = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
@@ -199,6 +199,7 @@ export async function editSection(pid, title, items, onSaved){
                        {field: it.path, value: v, editor_email: who, note}); }
       catch (ex){ failed.push(`${it.label}: ${ex.message}`); }
     }
+    invalidate();          // the block just changed; nothing may serve the old copy
     close();
     if (failed.length) toast(`${changed.length - failed.length} of ${changed.length} saved`,
                              {kind: 'err', detail: failed[0]});
@@ -253,6 +254,7 @@ export async function editValue(pid, {path, label: lbl, value}, onSaved){
       await post(`/api/product/${pid}/edit`, {
         field: path, value: v, editor_email: who,
         note: $('#fNote').value.trim() || null});
+      invalidate();          // the change must show at once, not in 45 seconds
       close();
       toast(`${lbl} updated`, {kind: 'ok', detail: `recorded against ${who}`});
       if (onSaved) onSaved();

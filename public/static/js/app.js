@@ -1,5 +1,6 @@
 import { S } from './state.js';
-import { $, api, esc, post, session, setSignedOutHandler } from './core.js';
+import { $, api, esc, invalidate, post, prefetch, q, session,
+         setSignedOutHandler } from './core.js';
 import { label } from './format.js';
 import { loadAccounts, renderFilterBar } from './ui.js';
 import { renderSyncProgress } from './progress.js';
@@ -43,6 +44,7 @@ export async function poll(){
     } else b.className='banner hidden';
     renderSyncProgress(st);
     if (st.status==='done' && poll._last==='running'){
+      invalidate();        // a capture just wrote; everything on screen is now old
       refresh(); loadAccounts();
     }
     poll._last = st.status;
@@ -94,6 +96,9 @@ $('#tabs').onclick = e=>{
   go(b.dataset.t);
 };
 $('#acct').onchange = e=>{ S.acct=e.target.value; localStorage.setItem('acct',S.acct);
+  // every cache key carries the account in its query string, so a switch invalidates
+  // all of them at once rather than leaving another account's rows on screen
+  invalidate();
   loadAccounts().then(()=>go(S.tab)); };
 /* Read-only deployment: these three would start or stop a capture, which happens on a
    staff laptop, not here. They explain that instead of failing. */
@@ -122,6 +127,10 @@ async function boot(){
   api('/api/people').then(p => { session.people = p.names || {}; }).catch(() => {});
   await loadAccounts();
   go('stats');
+  // Products is the heaviest page and the one people open next. Fetching it now, while
+  // they are reading the dashboard, means the tab is already populated when they click.
+  prefetch('/api/products' + (S.acct ? '?account=' + encodeURIComponent(S.acct) : '?'));
+  prefetch('/api/filters' + q());
   poll();
 }
 window.addEventListener('signed-in', boot);

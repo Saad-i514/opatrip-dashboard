@@ -123,5 +123,59 @@ export const del = p => api(p,{method:'DELETE'});
 
 
 
+/* ---------- client-side cache ----------------------------------------------------------
+   The dashboard re-fetched everything on every tab switch, so going back to Products cost
+   the full trip to Supabase again — seconds, for data that had not changed.
+
+   Stale-while-revalidate: a cached answer is served IMMEDIATELY, and if it is older than
+   TTL a refresh goes out behind it; when that lands, `onFresh` lets the view repaint. So
+   the second visit is instant and still ends up current.
+
+   Held in memory only. localStorage was the obvious alternative and is the wrong tool
+   here: the products payload is hundreds of kilobytes, serialising it costs more than the
+   request saves on a fast connection, and it would outlive a sign-out.
+
+   Correctness rules, because a stale audit figure is worse than a slow one:
+     * anything that WRITES clears the cache (see invalidate() calls in edit.js, app.js);
+     * switching account clears it, since every key is account-scoped by query string;
+     * a failed request is never cached. */
+const CACHE = new Map();
+export const CACHE_TTL = 45000;
+
+/* Drop cached answers. No argument clears everything; a string clears every key
+   containing it, so invalidate('/api/products') also drops every filtered variant. */
+export function invalidate(part){
+  if (!part){ CACHE.clear(); return; }
+  for (const k of [...CACHE.keys()]) if (k.includes(part)) CACHE.delete(k);
+}
+
+export async function cachedApi(path, onFresh){
+  const now = Date.now();
+  let e = CACHE.get(path);
+  if (e && e.data !== undefined){
+    if (now - e.at > CACHE_TTL && !e.inflight){
+      // refresh behind the answer we just gave; a failure leaves the cached copy alone
+      e.inflight = apiRaw(path).then(d => {
+        e.at = Date.now(); e.inflight = null;
+        const changed = JSON.stringify(d) !== JSON.stringify(e.data);
+        e.data = d;
+        if (changed && onFresh) onFresh(d);
+      }).catch(() => { e.inflight = null; });
+    }
+    return e.data;
+  }
+  if (!e){ e = {at: 0, data: undefined, inflight: null}; CACHE.set(path, e); }
+  if (!e.inflight){
+    e.inflight = api(path).then(d => {
+      e.data = d; e.at = Date.now(); e.inflight = null; return d;
+    }).catch(err => { CACHE.delete(path); throw err; });
+  }
+  return e.inflight;
+}
+
+/* Fetch something now so it is already there when it is asked for. Silent: a prefetch
+   that fails must never show an error for a page nobody has opened. */
+export function prefetch(path){ cachedApi(path).catch(() => {}); }
+
 export const q = k => S.acct ? `?account=${encodeURIComponent(S.acct)}${k?'&'+k:''}` : (k?'?'+k:'');
 

@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { $, api, el, esc, q } from '../core.js';
+import { $, api, cachedApi, el, esc, q } from '../core.js';
 import { monthName, sentence } from '../format.js';
 import { STATUS_COLOR, areaChart, donut, kpiCard, sparkline } from '../charts.js';
 import { skeleton } from '../ui.js';
@@ -144,9 +144,10 @@ export async function viewStats(){
   // to Supabase before even asking for the second — and the database is ~200-350 ms away.
   // Neither depends on the other. `pgP` is caught where it is used, so a failing Progress
   // card still cannot take the rest of the dashboard down.
-  const pgP = api('/api/progress'+q('months='+(S.pgMonths||6)));
+  const pgP = cachedApi('/api/progress'+q('months='+(S.pgMonths||6)));
   pgP.catch(()=>{});                    // no unhandled rejection while overview is awaited
-  const o = await api('/api/overview'+q());
+  const o = await cachedApi('/api/overview'+q(),
+    () => { if (S.tab === 'stats') viewStats(); });
   v.innerHTML='';
 
   // hero

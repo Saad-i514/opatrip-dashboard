@@ -805,10 +805,16 @@ def products(account: str | None = None, q: str | None = None,
              platform: str | None = None, lifecycle: str | None = None,
              reviews: str | None = None, missing: str | None = None,
              month: str | None = None, changed: str | None = None):
-    sql = """SELECT p.*, a.viator_account_id, a.name AS account_name,
-               pl.code AS platform_code, pl.name AS platform_name,
-               (SELECT COUNT(*) FROM product_images i WHERE i.product_id=p.id) AS image_count,
-               (SELECT COUNT(*) FROM changes c WHERE c.product_id=p.id) AS change_count
+    # Only what the list actually draws. `p.*` shipped every column of every row: at 3,295
+    # products that was 3 MB, of which thumbnail_url (279 kB, and photos are not stored any
+    # more) and the two *_seen_at stamps (174 kB) were never rendered. The product page
+    # fetches the whole row separately, so nothing is lost by not sending it 3,295 times.
+    sql = """SELECT p.id, p.product_code, p.title, p.status, p.status_canonical,
+                    p.quality_level, p.location, p.missing_since, p.is_draft_stub,
+                    p.review_count, p.review_rating, p.tour_id,
+                    a.viator_account_id, a.name AS account_name,
+                    pl.code AS platform_code, pl.name AS platform_name,
+                    (SELECT COUNT(*) FROM changes c WHERE c.product_id=p.id) AS change_count
              FROM products p
              JOIN accounts a ON a.id=p.account_id
              LEFT JOIN platforms pl ON pl.id=p.platform_id
@@ -875,21 +881,21 @@ def products(account: str | None = None, q: str | None = None,
         # accounts would learn other accounts' product codes through this side door.
         by_tour = {}
         lw, largs = account_where()
-        for r in con.execute(f"""SELECT p.tour_id AS t, pl.code AS code, pl.name AS nm,
-                                        p.product_code AS pc, p.status_canonical AS st,
-                                        a.viator_account_id AS acct
+        for r in con.execute(f"""SELECT p.tour_id AS t, pl.code AS code,
+                                        p.product_code AS pc, p.status_canonical AS st
                                  FROM products p JOIN platforms pl ON pl.id=p.platform_id
                                  JOIN accounts a ON a.id=p.account_id
                                  {lw} {'AND' if lw else 'WHERE'} p.tour_id IS NOT NULL""",
                              largs):
             by_tour.setdefault(r["t"], []).append(
-                {"platform": r["code"], "name": r["nm"], "code": r["pc"],
-                 "status": r["st"] or "PENDING", "account": r["acct"]})
+                {"platform": r["code"], "code": r["pc"], "status": r["st"] or "PENDING"})
         for r in rows:
-            listed = by_tour.get(r.get("tour_id")) or []
-            r["tour_listings"] = sorted(listed, key=lambda x: x["name"])
-            # kept for anything still reading the old shape
-            r["tour_platforms"] = sorted({x["name"] for x in listed})
+            # The platform NAME is not sent: the browser already holds the platform list
+            # from /api/filters and looks the name up there. Repeating it on every listing
+            # of every product cost ~180 kB for words the client already had. `account`
+            # went the same way when the "+N" marker was removed.
+            r["tour_listings"] = sorted(by_tour.get(r.get("tour_id")) or [],
+                                        key=lambda x: x["platform"])
         # manual overrides win for display, and carry who made them
         db.apply_edits(con, rows)
     return {"products": rows}
