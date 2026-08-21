@@ -32,14 +32,35 @@ export function bars(title, obj, badge){
    The continents are rough lat/lon boxes, not real coastline data. A world map file would
    be tens of kilobytes shipped for decoration; at this size the shapes only have to read
    as "the world", and the arcs between cities are the part that carries the meaning. */
-const LAND = [
-  [ 60, 83, -58, -22], [ 50, 72,-168, -62], [ 30, 50,-126, -70], [ 14, 30,-112, -86],
-  [  7, 15, -85, -77], [-20, 12, -80, -35], [-56,-20, -76, -53], [ 36, 60, -10,  30],
-  [ 54, 70,   8,  60], [ 14, 36, -17,  34], [-35, 15,   8,  42], [ 40, 74,  58, 140],
-  [ 20, 45,  44,  76], [  8, 35,  68,  90], [ 20, 45, 100, 135], [-10, 22,  95, 125],
-  [-39,-11, 113, 154], [-90,-64,-180, 180],
-];
-const isLand = (lat, lon) => LAND.some(([a,b,c,d]) => lat>=a && lat<=b && lon>=c && lon<=d);
+/* Land, as longitude spans per latitude band rather than boxes. Boxes gave rectangles
+   that read as noise; bands let a coast taper, so North America narrows into Mexico and
+   Africa narrows towards the Cape. Still an approximation — real coastline data would be
+   tens of kilobytes shipped for scenery — but it reads as the world at this size. */
+const BANDS = {
+   '80':[[-70,-20]],                    '75':[[-120,-20],[60,180]],
+   '70':[[-160,-20],[10,180]],          '65':[[-165,-45],[-25,-14],[5,180]],
+   '60':[[-165,-55],[-10,180]],         '55':[[-140,-55],[-8,180]],
+   '50':[[-130,-55],[-10,180]],         '45':[[-125,-60],[-5,60],[70,150]],
+   '40':[[-125,-70],[-10,50],[55,145]], '35':[[-120,-75],[-9,45],[50,140]],
+   '30':[[-118,-80],[-17,35],[45,130]], '25':[[-112,-82],[-16,35],[50,125]],
+   '20':[[-107,-86],[-17,38],[42,110]], '15':[[-95,-83],[-17,40],[42,100]],
+   '10':[[-85,-77],[-15,45],[45,80],[95,125]],
+    '5':[[-80,-72],[-10,48],[95,120]],   '0':[[-80,-45],[8,45],[98,120]],
+   '-5':[[-80,-35],[10,42],[100,135]], '-10':[[-78,-35],[12,40],[105,140]],
+  '-15':[[-75,-35],[12,40],[120,145]], '-20':[[-72,-40],[12,38],[113,152]],
+  '-25':[[-72,-45],[14,35],[113,153]], '-30':[[-73,-50],[16,32],[114,152]],
+  '-35':[[-73,-55],[18,28],[115,150]], '-40':[[-73,-62]],
+  '-45':[[-75,-65]], '-50':[[-75,-67]], '-55':[[-72,-67]],
+  '-65':[[-180,180]], '-70':[[-180,180]], '-75':[[-180,180]], '-80':[[-180,180]],
+};
+const BAND_LATS = Object.keys(BANDS).map(Number).sort((a,b)=>a-b);
+const isLand = (lat, lon) => {
+  // snap to the nearest band we have, so a dot between bands still belongs somewhere
+  let best = BAND_LATS[0];
+  for (const b of BAND_LATS) if (Math.abs(b-lat) < Math.abs(best-lat)) best = b;
+  if (Math.abs(best - lat) > 5) return false;
+  return (BANDS[best]||[]).some(([a,b]) => lon >= a && lon <= b);
+};
 
 /* Where the arcs land: real places this client sells in, so the picture is about the
    catalogue rather than generic decoration. */
@@ -50,7 +71,7 @@ const CITIES = [
 ];
 
 function heroGlobe(){
-  const R = 148, cx = 200, cy = 170, lon0 = -20;   // Atlantic-centred, as in the design
+  const R = 150, cx = 210, cy = 170, lon0 = -20;   // Atlantic-centred, as in the design
   const rad = d => d * Math.PI / 180;
   const project = (lat, lon) => {
     const la = rad(lat), lo = rad(lon - lon0);
