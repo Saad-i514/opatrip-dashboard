@@ -4,8 +4,10 @@ aside{background:var(--surface);border-right:1px solid var(--line);position:stic
   height:100vh;display:flex;flex-direction:column;gap:4px;padding:20px 14px}
 .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 20px}
 .brand .mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
-  background:linear-gradient(135deg,#FB923C,#EA580C);color:#fff;font-weight:700;
-  font-size:17px;box-shadow:0 4px 12px rgba(234,88,12,.28)}
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;
+  font-weight:700;font-size:17px;box-shadow:0 4px 12px rgba(173,104,226,.30);
+  overflow:hidden}
+.brand .mark svg{width:22px;height:22px;display:block}
 .brand b{display:block;font-size:15px;letter-spacing:-.02em}
 .brand span{display:block;font-size:11.5px;color:var(--ink-3)}
 .navgrp{font-size:10.5px;font-weight:700;letter-spacing:.09em;color:var(--ink-3);
@@ -14,7 +16,7 @@ aside{background:var(--surface);border-right:1px solid var(--line);position:stic
   border-radius:9px;padding:9px 10px;cursor:pointer;color:var(--ink-2);font-weight:500;
   font-size:14px;text-align:left;transition:.12s}
 .navbtn:hover{background:var(--surface-2);color:var(--ink)}
-.navbtn[aria-selected=true]{background:var(--accent-soft);color:#9A3412;font-weight:600}
+.navbtn[aria-selected=true]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 .navbtn .ico{width:18px;height:18px;flex:none;opacity:.85}
 .navbtn .cnt{margin-left:auto;background:var(--surface-2);border-radius:99px;
   padding:1px 8px;font-size:11.5px;font-weight:600;color:var(--ink-3)}
@@ -23,7 +25,7 @@ aside{background:var(--surface);border-right:1px solid var(--line);position:stic
   background:var(--surface-2);border-radius:11px}
 .whoami .av{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;
   display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
-.topbar{position:sticky;top:0;z-index:25;background:rgba(250,248,245,.92);
+.topbar{position:sticky;top:0;z-index:25;background:rgba(247,246,251,.92);
   backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
   padding:14px 28px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .topbar h1{font-size:20px;letter-spacing:-.02em}
@@ -34,8 +36,8 @@ main{padding:24px 28px 90px;max-width:1500px}
 
 /* ---------- hero ---------- */
 .hero{border-radius:18px;padding:32px 34px;margin-bottom:22px;color:#fff;position:relative;
-  overflow:hidden;background:linear-gradient(135deg,#F97316 0%,#EA580C 55%,#C2410C 100%);
-  box-shadow:0 10px 30px rgba(234,88,12,.22)}
+  overflow:hidden;background:linear-gradient(135deg,#AD68E2 0%,#8B4FD0 55%,#6D28D9 100%);
+  box-shadow:0 10px 30px rgba(124,58,237,.24)}
 .hero h2{font-size:29px;line-height:1.15;letter-spacing:-.03em;max-width:15ch}
 .hero p{margin:12px 0 0;max-width:62ch;opacity:.93;font-size:14.5px}
 .hero .tag{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.18);
@@ -44,7 +46,7 @@ main{padding:24px 28px 90px;max-width:1500px}
 .hero .acts{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .hero .acts button{border:0;border-radius:10px;padding:10px 17px;font-weight:600;
   cursor:pointer;font-size:14px}
-.hero .acts .solid{background:#fff;color:#C2410C}
+.hero .acts .solid{background:#fff;color:var(--accent-ink)}
 .hero .acts .ghost2{background:rgba(255,255,255,.16);color:#fff;
   border:1px solid rgba(255,255,255,.3)}
 .hero .art{position:absolute;right:-10px;bottom:-30px;opacity:.22;pointer-events:none}

@@ -64,7 +64,7 @@ export async function viewStats(){
   // Added this month, Changes this week, Pending, Removed and "No longer listed" were all
   // removed on request — the row is the headline, not an inventory of every figure.
   const K = o.kpis;
-  K.products.spark = sparkline((o.series.added||[]).map(x=>x.n), '#F97316');
+  K.products.spark = sparkline((o.series.added||[]).map(x=>x.n), '#7C3AED');
   const st = o.dist.status || {};
   const box = (n, sb) => ({value: st[n] || 0, delta: null, sub: sb,
                            filter: {lifecycle: n}});
@@ -187,7 +187,7 @@ export async function viewStats(){
   c2.appendChild(el('div','card-h','<h3>Changes detected</h3>'+
     '<span class="sub">last 14 days with activity</span>'));
   const b2 = el('div','pad');
-  b2.innerHTML = areaChart(o.series.changes||[], '#F97316');
+  b2.innerHTML = areaChart(o.series.changes||[], '#7C3AED');
   c2.appendChild(b2); r1.appendChild(c2);
   v.appendChild(r1);
 

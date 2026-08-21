@@ -102,7 +102,7 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 .b-noconn{background:var(--surface-2);color:var(--ink-3)}
 .b-good{background:var(--green-bg);color:var(--green)}
 .b-bad{background:var(--red-bg);color:var(--red)}
-.b-stub{background:var(--accent-soft);color:#9A3412;border-color:var(--accent-line)}
+.b-stub{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent-line)}
 /* which platform a listing is on — replaced the Platforms tab on the product row */
 .b-plat{background:var(--surface-2);color:var(--ink-2);border-color:var(--line)}
 
@@ -114,7 +114,7 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 .prow{display:grid;grid-template-columns:1fr 250px;gap:20px;align-items:start;
   padding:15px 17px;background:var(--surface);border:1px solid var(--line);
   border-radius:var(--r);cursor:pointer;transition:.13s;box-shadow:var(--shadow)}
-.prow:hover{border-color:var(--accent-line);box-shadow:0 3px 14px rgba(249,115,22,.1)}
+.prow:hover{border-color:var(--accent-line);box-shadow:0 3px 14px rgba(124,58,237,.10)}
 .pmain{min-width:0}
 .ptitle{font-weight:600;font-size:15px;line-height:1.35;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
@@ -271,7 +271,7 @@ body.locked{overflow:hidden}
 
 /* ---------- admin panel ---------- */
 .av-sm{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:none;
-  background:var(--accent-soft);color:#9A3412;font-weight:700;font-size:12.5px}
+  background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:12.5px}
 .picklabel{display:block;font-size:13.5px;font-weight:600;margin-bottom:8px}
 .picks{display:grid;gap:9px}
 .pick{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;cursor:pointer;
@@ -303,7 +303,7 @@ body.locked{overflow:hidden}
   border-bottom:1px solid var(--line)}
 .eh:last-child{border-bottom:0}
 .eh-av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
-  background:var(--accent-soft);color:#9A3412;font-weight:700;font-size:14px}
+  background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:14px}
 .eh-top{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .eh-top b{font-size:14.5px}
 .eh-when{color:var(--ink-3);font-size:13px}
@@ -419,7 +419,7 @@ tbody tr:hover{background:var(--surface-2)}
 .dropzone{border:2px dashed var(--line-2);border-radius:11px;padding:26px 18px;
   text-align:center;color:var(--ink-3);cursor:pointer;transition:.15s;font-size:13.5px}
 .dropzone:hover,.dropzone.over{border-color:var(--accent);background:var(--accent-soft);
-  color:#9A3412}
+  color:var(--accent-ink)}
 
 /* ---------- form grid inside the edit-all modal ---------- */
 .formgrid{display:grid;gap:14px}
@@ -455,9 +455,9 @@ tbody tr:hover{background:var(--surface-2)}
    top, the badge, then the message. It sits on .modal's own surface. */
 .an-modal{padding-top:26px;overflow:hidden}
 .an-modal::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;
-  background:linear-gradient(90deg,#FB923C,#EA580C)}
+  background:linear-gradient(90deg,var(--brand),var(--accent))}
 .an-badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);
-  color:#9A3412;border:1px solid var(--accent-line);border-radius:99px;padding:5px 12px;
+  color:var(--accent-ink);border:1px solid var(--accent-line);border-radius:99px;padding:5px 12px;
   font-size:11.5px;font-weight:700;letter-spacing:.02em}
 .an-body{color:var(--ink-2);font-size:14.5px;line-height:1.7;margin:0 0 13px}
 .an-body a{color:var(--accent);font-weight:600}

@@ -31,7 +31,7 @@ export function renderSyncProgress(st){
       <b style="color:#7C2D12;font-size:15px">${title}</b>
       ${st.sync_id?`<span class="badge b-stub">run #${st.sync_id}</span>`:''}
       <div class="grow" style="flex:1"></div>
-      <b style="color:#C2410C;font-size:19px;font-variant-numeric:tabular-nums">${pct}%</b>
+      <b style="color:var(--accent-ink);font-size:19px;font-variant-numeric:tabular-nums">${pct}%</b>
     </div>
     <div class="pbar"><i style="width:${pct}%"></i></div>
     <div class="pstats">

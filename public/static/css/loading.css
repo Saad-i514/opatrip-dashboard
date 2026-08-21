@@ -3,13 +3,13 @@
    Every one of these states names WHAT is loading and from WHERE, rather than showing an
    anonymous spinner that leaves you wondering whether the app has hung. */
 #loadbar{position:fixed;top:0;left:0;height:3px;width:0;z-index:99;
-  background:linear-gradient(90deg,#FB923C,#EA580C);transition:width .25s ease,opacity .4s;
-  box-shadow:0 0 10px rgba(234,88,12,.6)}
+  background:linear-gradient(90deg,var(--brand),var(--accent));transition:width .25s ease,opacity .4s;
+  box-shadow:0 0 10px rgba(124,58,237,.55)}
 .loadchip{position:fixed;right:18px;bottom:18px;z-index:98;display:flex;align-items:center;
   gap:10px;background:var(--ink);color:#fff;border-radius:11px;padding:10px 15px;
   font-size:13px;box-shadow:0 8px 26px rgba(28,25,23,.3);max-width:340px}
 .loadchip .sp{width:15px;height:15px;border-radius:50%;flex:none;
-  border:2px solid rgba(255,255,255,.28);border-top-color:#FB923C;
+  border:2px solid rgba(255,255,255,.28);border-top-color:var(--brand);
   animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loadchip .src{opacity:.6;font-size:11.5px}
@@ -28,11 +28,11 @@
   animation:spin .7s linear infinite}
 
 /* ---------- sync progress ---------- */
-.syncbox{background:linear-gradient(135deg,#FFF7ED,#FFEDD5);border:1px solid var(--accent-line);
+.syncbox{background:linear-gradient(135deg,#F6F1FE,#EDE6FC);border:1px solid var(--accent-line);
   border-radius:14px;padding:16px 18px;margin-bottom:18px}
-.pbar{height:9px;background:rgba(234,88,12,.16);border-radius:99px;overflow:hidden;
+.pbar{height:9px;background:rgba(124,58,237,.14);border-radius:99px;overflow:hidden;
   margin:11px 0 8px}
-.pbar i{display:block;height:100%;background:linear-gradient(90deg,#FB923C,#EA580C);
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));
   border-radius:99px;transition:width .5s ease}
 .pstats{display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:#7C2D12}
 .pstats b{font-variant-numeric:tabular-nums}

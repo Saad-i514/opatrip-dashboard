@@ -4,7 +4,7 @@ import { label, rows, sentence, sub } from './format.js';
 /* ======================= charts (hand-rolled SVG) =======================
    No chart library: this app runs locally and must work with no network, and the shapes
    needed here are simple. Every chart is driven by real rows from /api/overview.        */
-export const PALETTE = ['#F97316','#2563EB','#15803D','#B45309','#7C3AED','#DB2777','#0891B2','#65A30D'];
+export const PALETTE = ['#7C3AED','#2563EB','#15803D','#B45309','#7C3AED','#DB2777','#0891B2','#65A30D'];
 
 export function sparkline(vals, color){
   const w = 220, h = 36, n = vals.length;

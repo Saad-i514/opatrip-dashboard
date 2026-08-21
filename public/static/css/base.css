@@ -1,7 +1,12 @@
 :root{
-  --bg:#FAF8F5; --surface:#fff; --surface-2:#F6F2EC; --line:#EBE5DC; --line-2:#DED6C9;
-  --ink:#1C1917; --ink-2:#57534E; --ink-3:#8A817A;
-  --accent:#F97316; --accent-soft:#FFF1E6; --accent-line:#FDBA74;
+  /* Violet, from the client's design. --brand is the logo colour they specified,
+     #AD68E2, and is used for the mark and nothing else: at 3.2:1 on white it is too
+     light to carry text or a button label. --accent is a deeper violet from the same
+     family that clears WCAG AA, so links, buttons and badges stay readable. */
+  --brand:#AD68E2; --brand-2:#8B4FD0;
+  --bg:#F7F6FB; --surface:#fff; --surface-2:#F3F1F9; --line:#E9E6F2; --line-2:#D9D4E8;
+  --ink:#1A1626; --ink-2:#544D66; --ink-3:#857D99;
+  --accent:#7C3AED; --accent-soft:#F3EDFD; --accent-line:#C9A9F2; --accent-ink:#5B21B6;
   --green:#15803D; --green-bg:#E9F6EC; --amber:#B45309; --amber-bg:#FEF3C7;
   --red:#B91C1C; --red-bg:#FEE7E7; --blue:#1D4ED8; --blue-bg:#E8EEFE;
   --r:12px; --shadow:0 1px 2px rgba(28,25,23,.04),0 2px 6px rgba(28,25,23,.05);
