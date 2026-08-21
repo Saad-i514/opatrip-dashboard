@@ -50,13 +50,13 @@ export async function viewStats(){
       <button class="ghost2" data-go="accounts">View accounts</button>
     </div>
     <svg class="art" width="230" height="150" viewBox="0 0 230 150" fill="none">
-      <rect x="10" y="40" width="26" height="80" rx="5" fill="#fff"/>
-      <rect x="48" y="18" width="26" height="102" rx="5" fill="#fff"/>
-      <rect x="86" y="60" width="26" height="60" rx="5" fill="#fff"/>
-      <rect x="124" y="32" width="26" height="88" rx="5" fill="#fff"/>
-      <polyline points="14,96 60,52 100,74 140,30 200,16" stroke="#fff" stroke-width="5"
+      <rect x="10" y="40" width="26" height="80" rx="5" fill="#AD68E2"/>
+      <rect x="48" y="18" width="26" height="102" rx="5" fill="#AD68E2"/>
+      <rect x="86" y="60" width="26" height="60" rx="5" fill="#AD68E2"/>
+      <rect x="124" y="32" width="26" height="88" rx="5" fill="#AD68E2"/>
+      <polyline points="14,96 60,52 100,74 140,30 200,16" stroke="#7C3AED" stroke-width="5"
         fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="200" cy="16" r="9" fill="#fff"/></svg>`;
+      <circle cx="200" cy="16" r="9" fill="#AD68E2"/></svg>`;
   hero.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   v.appendChild(hero);
 

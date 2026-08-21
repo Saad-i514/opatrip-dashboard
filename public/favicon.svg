@@ -1,14 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <!-- Same mark as the sidebar: the brand violet the client specified (#AD68E2) and the
-       11/38 corner radius, scaled to 48. -->
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#AD68E2"/>
-      <stop offset="1" stop-color="#8B4FD0"/>
-    </linearGradient>
-  </defs>
-  <rect width="48" height="48" rx="14" fill="url(#g)"/>
-  <path d="M24 11.5c-4.7 0-8.5 3.8-8.5 8.5 0 6.2 8.5 16.5 8.5 16.5s8.5-10.3 8.5-16.5
-           c0-4.7-3.8-8.5-8.5-8.5z" fill="#fff"/>
-  <circle cx="24" cy="20" r="3.5" fill="#AD68E2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- The Opatrip mark: a ring that is a circle on three corners and square on the
+       bottom-left, with a dot at its centre. Brand violet #AD68E2, as specified. -->
+  <path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"
+        stroke="#AD68E2" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="24" cy="24" r="5.2" fill="#AD68E2"/>
 </svg>

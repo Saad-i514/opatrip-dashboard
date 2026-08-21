@@ -3,11 +3,10 @@
 aside{background:var(--surface);border-right:1px solid var(--line);position:sticky;top:0;
   height:100vh;display:flex;flex-direction:column;gap:4px;padding:20px 14px}
 .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 20px}
-.brand .mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
-  background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;
-  font-weight:700;font-size:17px;box-shadow:0 4px 12px rgba(173,104,226,.30);
-  overflow:hidden}
-.brand .mark svg{width:22px;height:22px;display:block}
+/* The mark is the logo itself, not a letter on a tile — it stands on the sidebar's own
+   white, exactly as in the client's design, so no background and no shadow. */
+.brand .mark{width:36px;height:36px;display:grid;place-items:center;flex:none}
+.brand .mark svg{width:36px;height:36px;display:block}
 .brand b{display:block;font-size:15px;letter-spacing:-.02em}
 .brand span{display:block;font-size:11.5px;color:var(--ink-3)}
 .navgrp{font-size:10.5px;font-weight:700;letter-spacing:.09em;color:var(--ink-3);
@@ -35,19 +34,22 @@ main{padding:24px 28px 90px;max-width:1500px}
 @media (max-width:900px){ .app{grid-template-columns:1fr} aside{display:none} }
 
 /* ---------- hero ---------- */
-.hero{border-radius:18px;padding:32px 34px;margin-bottom:22px;color:#fff;position:relative;
-  overflow:hidden;background:linear-gradient(135deg,#AD68E2 0%,#8B4FD0 55%,#6D28D9 100%);
-  box-shadow:0 10px 30px rgba(124,58,237,.24)}
+/* Pale lavender with dark type, as in the client's design — not white on saturated
+   violet. Everything inside it had been drawn white for the old dark hero, so the
+   secondary button and the artwork are re-coloured below or they vanish. */
+.hero{border-radius:18px;padding:32px 34px;margin-bottom:22px;position:relative;
+  overflow:hidden;background:linear-gradient(135deg,#F3EBFD 0%,#EDE6FB 55%,#E9E4FA 100%);
+  color:var(--ink);border:1px solid var(--line)}
 .hero h2{font-size:29px;line-height:1.15;letter-spacing:-.03em;max-width:15ch}
-.hero p{margin:12px 0 0;max-width:62ch;opacity:.93;font-size:14.5px}
-.hero .tag{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.18);
-  border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:5px 13px;
-  font-size:12.5px;font-weight:600;margin-bottom:15px}
+.hero p{margin:12px 0 0;max-width:62ch;color:var(--ink-2);font-size:14.5px}
+.hero .tag{display:inline-flex;align-items:center;gap:7px;background:#fff;
+  border:1px solid var(--accent-line);color:var(--accent-ink);border-radius:99px;
+  padding:5px 13px;font-size:12.5px;font-weight:600;margin-bottom:15px}
 .hero .acts{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .hero .acts button{border:0;border-radius:10px;padding:10px 17px;font-weight:600;
   cursor:pointer;font-size:14px}
-.hero .acts .solid{background:#fff;color:var(--accent-ink)}
-.hero .acts .ghost2{background:rgba(255,255,255,.16);color:#fff;
-  border:1px solid rgba(255,255,255,.3)}
-.hero .art{position:absolute;right:-10px;bottom:-30px;opacity:.22;pointer-events:none}
+.hero .acts .solid{background:var(--accent);color:#fff}
+.hero .acts .ghost2{background:#fff;color:var(--accent-ink);
+  border:1px solid var(--accent-line)}
+.hero .art{position:absolute;right:-10px;bottom:-30px;opacity:.30;pointer-events:none}
 
