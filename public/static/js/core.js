@@ -140,6 +140,42 @@ export const setSignedOutHandler = fn => { onSignedOut = fn; };
    because a single request has no progress to report — the loop means "working". */
 export const spinMark = '<span class="spinmark" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z" stroke-width="7" stroke-linejoin="round"/><circle cx="24" cy="24" r="5.2"/></svg><svg viewBox="0 0 48 48" fill="none"><path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z" stroke-width="7" stroke-linejoin="round"/><circle cx="24" cy="24" r="5.2"/></svg></span>';
 
+/* The full mark — rings, orbits, trace, waves — for anywhere with room for it. The same
+   composition as the boot splash, but looping rather than tracking progress: a view has no
+   stages to report, only "still working".
+
+   Each call gets its own mask ids. Duplicated ids all resolve to the first <mask> in the
+   document, so two of these on screen would share one wave and fill in lockstep. */
+let markSeq = 0;
+export function traceMark(px){
+  const n = ++markSeq;
+  const logo = (cls, mask) =>
+    `<g class="${cls}"${mask ? ` mask="url(#${mask})"` : ''}>` +
+    `<path class="lg-ring" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/>` +
+    `<circle class="lg-dot" cx="24" cy="24" r="5.2"/></g>`;
+  return `<div class="tmark" style="--sz:${px || 150}px">
+    <svg class="bootrings" viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="trk" cx="100" cy="100" r="88"/>
+      <circle class="arc" cx="100" cy="100" r="96"/>
+      <g class="sat s1"><circle cx="100" cy="12" r="3.2"/></g>
+      <g class="sat s2"><circle cx="100" cy="12" r="2.4"/></g>
+      <g class="sat s3"><circle cx="100" cy="4" r="1.8"/></g>
+    </svg>
+    <svg class="bootlogo" viewBox="0 0 48 48" aria-hidden="true">
+      <defs>
+        <mask id="mkB${n}" maskUnits="userSpaceOnUse" x="-8" y="-8" width="64" height="64">
+          <g class="wavebody back"><path class="waveb" fill="#fff" d="M0 9 q9 -1.8 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 V80 H-4 Z"/></g></mask>
+        <mask id="mk${n}" maskUnits="userSpaceOnUse" x="-8" y="-8" width="64" height="64">
+          <g class="wavebody"><path class="wave" fill="#fff" d="M0 8 q6 -2.6 12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 V80 H-4 Z"/></g></mask>
+      </defs>
+      ${logo('ghost')}
+      <g class="trace"><path class="lg-ring" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/></g>
+      ${logo('liquid back', 'mkB' + n)}
+      ${logo('liquid', 'mk' + n)}
+    </svg>
+  </div>`;
+}
+
 /* ---------- boot splash ----------------------------------------------------------------
    Drives the logo fill in #boot (markup lives in the HTML so it paints before the modules
    that would otherwise have to inject it).

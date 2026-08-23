@@ -228,6 +228,35 @@
   align-items:center;justify-content:center;gap:20px;
   animation:vloadin .4s ease-out both}
 @keyframes vloadin{from{opacity:0}}
-.vload-mark .spinmark{width:76px;height:76px}
+.vload-mark{margin-bottom:2px}
 .vload-t{font-size:14.5px;color:var(--ink-3);letter-spacing:.01em}
 @media (prefers-reduced-motion:reduce){.vload{animation:none}}
+
+/* ---------- the full mark, looping ----------
+   Same composition as the boot splash — rings, orbits, trace, waves — wherever there is
+   room for it. The splash tracks real boot stages; this loops, because a view has no
+   stages to report, only "still working". The class names are shared with #boot on
+   purpose: one set of rules draws the mark, and only the motion differs. */
+.tmark{position:relative;width:var(--sz,150px);height:var(--sz,150px);
+  display:grid;place-items:center;
+  /* the measured length of that exact ring path (getTotalLength on the real node). Baked
+     rather than measured per instance: the path never changes, and a view loader is
+     created and thrown away constantly. */
+  --len:114.1}
+.tmark .bootrings{position:absolute;inset:0;width:100%;height:100%}
+.tmark .bootlogo{width:47%;height:47%}
+/* the fill rises, holds, fades, and resets while invisible — a hard snap back reads as a
+   stutter. Opacity works here because the wave body lives INSIDE the mask, so fading it
+   fades the liquid it reveals. */
+.tmark .wavebody{transition:none;
+  animation:tmarkfill 3.1s cubic-bezier(.42,.05,.35,1) infinite}
+.tmark .wavebody.back{animation-delay:.2s}
+@keyframes tmarkfill{
+  0%  {transform:translateY(58px);opacity:1}
+  55% {transform:translateY(0);opacity:1}
+  74% {transform:translateY(0);opacity:0}
+  75% {transform:translateY(58px);opacity:0}
+  100%{transform:translateY(58px);opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .tmark .wavebody{animation:none;transform:translateY(20px)}
+  .tmark .arc,.tmark .sat{animation:none}}

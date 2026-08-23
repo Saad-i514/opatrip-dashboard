@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { spinMark, cachedApi, $, api, esc, post } from './core.js';
+import { spinMark, traceMark, cachedApi, $, api, esc, post } from './core.js';
 import { list, rows } from './format.js';
 import { go } from './app.js';
 
@@ -17,7 +17,7 @@ export const skLines = n => Array.from({length:n},
    same treatment — there is nothing left to vary. */
 export function skeleton(host, kind, what){
   host.innerHTML = `<div class="vload">
-      <div class="vload-mark">${spinMark}</div>
+      <div class="vload-mark">${traceMark(158)}</div>
       <div class="vload-t">Loading ${esc(what)}…</div>
     </div>`;
 }
