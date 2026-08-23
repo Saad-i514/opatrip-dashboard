@@ -74,9 +74,13 @@ export const TITLES = {stats:['Dashboard','Everything at a glance'],
   syncs:['Sync runs','Every capture run'],
   admin:['Admin','Who can sign in, and what they can see']};
 export function refresh(){
+  // Returns the view's promise so a caller can wait for the DATA, not just for the view
+  // to be told to render. boot() needs that: without it the splash finished the moment
+  // the tab was switched, and the dashboard then showed a second loading animation of its
+  // own for the several seconds the figures actually took.
   // Promise.resolve: not every view is async (Activity renders synchronously), and
   // calling .catch on its undefined return threw.
-  Promise.resolve((VIEWS[S.tab]||viewStats)()).catch(e=>{
+  return Promise.resolve((VIEWS[S.tab]||viewStats)()).catch(e=>{
     const v=$('#v-'+S.tab);
     if(v) v.innerHTML=`<div class="card empty">${esc(e.message)}</div>`; });
 }
@@ -94,7 +98,7 @@ export function go(tab){
   $('#pageCrumb').textContent = (acc ? acc.name || acc.viator_account_id : 'All accounts')
     + (t2 ? ' · ' + t2 : '');
   renderFilterBar();
-  refresh();
+  return refresh();
 }
 $('#tabs').onclick = e=>{
   const b = e.target.closest('button[data-t]'); if(!b) return;
@@ -141,8 +145,10 @@ async function boot(){
     n.classList.toggle('hidden', !admin));
   api('/api/people').then(p => { session.people = p.names || {}; }).catch(() => {});
   await loadAccounts();
-  bootProgress(.86, 'Drawing the dashboard');
-  go('stats');
+  // Await the view, not just the switch: one animation that runs until the dashboard is
+  // actually on screen, instead of the splash finishing and a second loader taking over.
+  bootProgress(.86, 'Loading your dashboard');
+  await go('stats');
   bootDone();
   // Products is the heaviest page and the one people open next. Fetching it now, while
   // they are reading the dashboard, means the tab is already populated when they click.

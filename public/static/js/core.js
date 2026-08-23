@@ -153,7 +153,14 @@ export function traceMark(px){
     `<g class="${cls}"${mask ? ` mask="url(#${mask})"` : ''}>` +
     `<path class="lg-ring" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/>` +
     `<circle class="lg-dot" cx="24" cy="24" r="5.2"/></g>`;
-  return `<div class="tmark" style="--sz:${px || 150}px">
+  // Size and positioning inline, not left to the stylesheet. The ring layer is
+  // `position:absolute;inset:0`, so if this box is ever unpositioned or unsized — a
+  // stylesheet that has not landed yet, a cached older one — the ring resolves against
+  // some far larger ancestor and renders as a circle the width of the page. Seen once,
+  // for real. Inline styles cannot arrive late.
+  const sz = px || 150;
+  return `<div class="tmark" style="--sz:${sz}px;width:${sz}px;height:${sz}px;
+      position:relative;display:grid;place-items:center">
     <svg class="bootrings" viewBox="0 0 200 200" aria-hidden="true">
       <circle class="trk" cx="100" cy="100" r="88"/>
       <circle class="arc" cx="100" cy="100" r="96"/>

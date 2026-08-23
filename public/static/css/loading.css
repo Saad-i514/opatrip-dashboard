@@ -150,7 +150,8 @@
 #boot.full .bootrings .arc{animation-play-state:paused}
 
 /* --- the mark --- */
-.bootlogo{width:118px;height:118px;overflow:visible}
+#boot .bootlogo{width:118px;height:118px}
+.bootlogo{overflow:visible}
 .bootlogo .lg-ring{fill:none;stroke-width:7;stroke-linejoin:round;stroke-linecap:round}
 .bootlogo .ghost .lg-ring{stroke:var(--brand);opacity:.14}
 .bootlogo .ghost .lg-dot{fill:var(--brand);opacity:.14}
