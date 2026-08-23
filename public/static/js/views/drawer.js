@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { $, cachedApi, el, esc, session } from '../core.js';
+import { spinMark, $, cachedApi, el, esc, session } from '../core.js';
 import { getPath, historyFor, label, personName, qualBadge, setEditContext,
          statusBadge, valueBox, whenLong } from '../format.js';
 import { skLines } from '../ui.js';
@@ -11,7 +11,7 @@ import { secs } from '../progress.js';
 export async function openDrawer(pid){
   const host = $('#drawerHost');
   host.innerHTML = '<div class="scrim"></div><div class="drawer"><div class="dbody">'+
-    `<div class="loading-note"><div class="sp"></div>Loading this product`+
+    `<div class="loading-note">${spinMark}Loading this product`+
     `${S.source ? ' from ' + esc(S.source) : ''}…</div>` +
     `<div class="card pad">${skLines(8)}</div>` +
     '</div></div>';

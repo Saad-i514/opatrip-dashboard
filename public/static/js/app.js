@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { $, api, bootDone, bootProgress, esc, hydrate, invalidate, noteStamp, post,
+import { $, api, bootDone, bootProgress, bootStart, esc, hydrate, invalidate, noteStamp, post,
          prefetch, q, session, setSignedOutHandler } from './core.js';
 import { label } from './format.js';
 import { loadAccounts, renderFilterBar } from './ui.js';
@@ -122,6 +122,9 @@ installReadOnly();
    successful sign-in, so this runs once as a guest (and stops) and once as a user. */
 let started = false;
 async function boot(){
+  // Brings the splash back after a sign-in: showLogin() finished it, and the work that
+  // follows — hydrate, accounts, first render — is the longest wait in the app.
+  bootStart('Checking your session');
   bootProgress(.18, 'Checking your session');
   if (!await ensureSignedIn()) return;      // login screen is up; it will call us back
   bootProgress(.36, 'Signed in');

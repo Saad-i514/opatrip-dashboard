@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { cachedApi, $, api, esc, post } from './core.js';
+import { spinMark, cachedApi, $, api, esc, post } from './core.js';
 import { list, rows } from './format.js';
 import { go } from './app.js';
 
@@ -9,7 +9,7 @@ import { go } from './app.js';
 export const skLines = n => Array.from({length:n},
   ()=>`<span class="sk sk-line" style="width:${55+Math.random()*40}%"></span>`).join('');
 export function skeleton(host, kind, what){
-  const note = `<div class="loading-note"><div class="sp"></div>
+  const note = `<div class="loading-note">${spinMark}
     Loading ${esc(what)}${S.source ? ' from ' + esc(S.source) : ''}…</div>`;
   let body = '';
   if (kind === 'kpis'){

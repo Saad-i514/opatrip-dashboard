@@ -8,10 +8,12 @@
 .loadchip{position:fixed;right:18px;bottom:18px;z-index:98;display:flex;align-items:center;
   gap:10px;background:var(--ink);color:#fff;border-radius:11px;padding:10px 15px;
   font-size:13px;box-shadow:0 8px 26px rgba(28,25,23,.3);max-width:340px}
-.loadchip .sp{width:15px;height:15px;border-radius:50%;flex:none;
-  border:2px solid rgba(255,255,255,.28);border-top-color:var(--brand);
-  animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+.loadchip .spinmark{width:19px;height:19px;flex:none}
+/* on the dark chip the brand violet all but vanishes, so this instance goes white */
+.loadchip .spinmark svg:first-child *{stroke:rgba(255,255,255,.30);fill:none}
+.loadchip .spinmark svg:first-child circle{fill:rgba(255,255,255,.30);stroke:none}
+.loadchip .spinmark svg:last-child *{stroke:#fff;fill:none}
+.loadchip .spinmark svg:last-child circle{fill:#fff;stroke:none}
 .loadchip .src{opacity:.6;font-size:11.5px}
 @keyframes shimmer{100%{background-position:200% 0}}
 .sk{background:linear-gradient(90deg,var(--surface-2) 25%,#EFE9E1 50%,var(--surface-2) 75%);
@@ -23,9 +25,34 @@
   padding:18px 20px;box-shadow:var(--shadow)}
 .loading-note{display:flex;align-items:center;gap:9px;color:var(--ink-3);font-size:13px;
   padding:10px 0}
-.loading-note .sp{width:13px;height:13px;border-radius:50%;flex:none;
-  border:2px solid var(--line-2);border-top-color:var(--accent);
-  animation:spin .7s linear infinite}
+.loading-note .spinmark{width:16px;height:16px;flex:none}
+
+/* ---------- the loading mark ----------
+   The same fill as the boot splash, small, wherever the app waits. Waiting then looks like
+   one thing throughout instead of a logo in one place and an anonymous spinner elsewhere.
+
+   CSS clip-path rather than the splash's SVG wave mask: several of these can be on screen
+   at once, and duplicated mask ids all resolve to the first <mask> in the document. At
+   16-19px the wave detail would be invisible anyway.
+
+   It loops instead of tracking a percentage — one request has no progress to report, and a
+   bar that crawls to 90% and waits is a lie. The loop just means "working". */
+.spinmark{position:relative;display:inline-block;vertical-align:middle}
+.spinmark svg{position:absolute;inset:0;width:100%;height:100%}
+.spinmark svg:first-child *{stroke:var(--brand);opacity:.22}
+.spinmark svg:first-child circle{fill:var(--brand);stroke:none;opacity:.22}
+.spinmark svg:last-child *{stroke:var(--accent)}
+.spinmark svg:last-child circle{fill:var(--accent);stroke:none}
+.spinmark svg:last-child{animation:spinfill 1.5s cubic-bezier(.45,.05,.35,1) infinite}
+/* fills, holds a beat, then fades out and refills from empty while invisible — a hard
+   snap back to zero reads as a stutter */
+@keyframes spinfill{
+  0%  {clip-path:inset(100% 0 0 0);opacity:1}
+  60% {clip-path:inset(0 0 0 0);opacity:1}
+  82% {clip-path:inset(0 0 0 0);opacity:0}
+  100%{clip-path:inset(100% 0 0 0);opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .spinmark svg:last-child{animation:none;clip-path:none;opacity:.85}}
 
 /* ---------- sync progress ---------- */
 .syncbox{background:linear-gradient(135deg,#F6F1FE,#EDE6FC);border:1px solid var(--accent-line);

@@ -50,7 +50,7 @@ export function paintLoading(){
   const items = visible;
   const slow = items.some(i => Date.now() - i.t0 > 2500);
   chip.classList.remove('hidden');
-  chip.innerHTML = `<div class="sp"></div><div>
+  chip.innerHTML = `${spinMark}<div>
       <div>Loading ${esc([...new Set(items.map(i=>i.what))].join(', '))}…</div>
       <div class="src">${items[0].where ? 'from ' + esc(items[0].where) : ''}${
         slow ? (items[0].where ? ' · ' : '') + 'this can take a few seconds' : ''}</div>
@@ -131,6 +131,16 @@ async function renew(){
 let onSignedOut = () => {};
 export const setSignedOutHandler = fn => { onSignedOut = fn; };
 
+/* The loading mark used everywhere the app waits — the chip, the skeletons, the product
+   drawer. The same fill as the boot splash so waiting looks like one thing throughout,
+   rather than a logo in one place and an anonymous spinner in the others.
+
+   CSS clip-path, not the splash's SVG wave mask: several of these can be on screen at once
+   and duplicated mask ids all resolve to the first <mask> in the document. At this size the
+   wave detail would be invisible anyway. It loops rather than tracking a percentage,
+   because a single request has no progress to report — the loop means "working". */
+export const spinMark = '<span class="spinmark" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z" stroke-width="7" stroke-linejoin="round"/><circle cx="24" cy="24" r="5.2"/></svg><svg viewBox="0 0 48 48" fill="none"><path d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z" stroke-width="7" stroke-linejoin="round"/><circle cx="24" cy="24" r="5.2"/></svg></span>';
+
 /* ---------- boot splash ----------------------------------------------------------------
    Drives the logo fill in #boot (markup lives in the HTML so it paints before the modules
    that would otherwise have to inject it).
@@ -198,10 +208,33 @@ export function bootDone(){
   bootProgress(1, 'Ready');
   bootOver = true;
   b.classList.add('full');
-  setTimeout(() => {
-    b.classList.add('gone');
-    setTimeout(() => b.remove(), 800);    // after the fade, so it cannot swallow clicks
-  }, 760);
+  // Hidden, NOT removed. Signing in runs boot() a second time — hydrate, accounts, first
+  // render, the longest wait in the app — and once this element was gone that whole stretch
+  // showed nothing at all. `gone` already makes it inert (visibility + pointer-events).
+  setTimeout(() => b.classList.add('gone'), 760);
+}
+
+/* Show the splash for a fresh boot. First load arrives with it already up, so this is a
+   no-op there; after a sign-in it brings it back and replays from empty. */
+export function bootStart(stage){
+  const b = document.getElementById('boot');
+  if (!b) return;
+  bootOver = false;
+  bootLevel = 0;
+  b.classList.remove('gone', 'full');
+  b.style.setProperty('--wavey', '58px');
+  b.style.setProperty('--p', '0');
+  const el = document.getElementById('bootStage');
+  if (el){ el.classList.remove('swap'); el.textContent = stage || 'Starting up'; }
+  // Restart the draw-on. A CSS animation does not replay just because its element became
+  // visible again: it has to be cleared and re-applied with a reflow in between, or the
+  // mark simply reappears already drawn.
+  const t = b.querySelector('.trace .lg-ring');
+  if (t){
+    t.style.animation = 'none';
+    void t.getBoundingClientRect();
+    t.style.animation = '';
+  }
 }
 
 /* A splash that outlives a failure is worse than no splash: the dashboard would be there,
