@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { $, api, esc, post } from './core.js';
+import { cachedApi, $, api, esc, post } from './core.js';
 import { list, rows } from './format.js';
 import { go } from './app.js';
 
@@ -37,7 +37,7 @@ export function skeleton(host, kind, what){
 
 /* ======================= accounts & sessions ======================= */
 export async function loadAccounts(){
-  const d = await api('/api/accounts'); S.accounts = d.accounts;
+  const d = await cachedApi('/api/accounts'); S.accounts = d.accounts;
   $('#acct').innerHTML = '<option value="">All accounts</option>' + d.accounts.map(a =>
     `<option value="${esc(a.viator_account_id)}">${esc(a.name||a.viator_account_id)}`+
     ` · ${a.product_count} products</option>`).join('');

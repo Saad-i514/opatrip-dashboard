@@ -4,7 +4,7 @@
    email and a password to our server, which forwards them, and keeps the token it gets
    back. No password is ever stored, and the token lives in localStorage so a page reload
    doesn't sign you out. */
-import { $, api, apiRaw, el, esc, post, session, setToken } from './core.js';
+import { $, api, apiRaw, el, esc, forgetMyCache, post, session, setToken } from './core.js';
 
 /* Painted over the whole app. Not a modal: there is nothing behind it to look at, and a
    dismissible dialog in front of an empty dashboard reads like a bug. */
@@ -52,7 +52,7 @@ export function showLogin(message){
       const r = await apiRaw('/api/auth/login', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({email, password})});
-      setToken(r.access_token);
+      setToken(r.access_token, r.refresh_token);
       session.user = r.user;
       host.innerHTML = '';
       document.body.classList.remove('locked');
@@ -70,7 +70,10 @@ export function showLogin(message){
 
 export async function signOut(){
   try { await post('/api/auth/logout', {}); } catch(e){}
-  setToken(''); session.user = null;
+  // Drop this person's cached rows from disk before the identity goes — forgetMyCache
+  // keys off session.user, and the reload below would otherwise leave them readable.
+  try { await forgetMyCache(); } catch(e){}
+  setToken('', ''); session.user = null;
   location.reload();          // simplest possible reset — no view can keep stale data
 }
 
@@ -86,7 +89,7 @@ export async function ensureSignedIn(){
     try{
       session.user = (await apiRaw('/api/auth/me')).user;
       return true;
-    }catch(e){ setToken(''); }
+    }catch(e){ setToken('', ''); }
   }
   showLogin();
   return false;

@@ -133,6 +133,28 @@ def sign_in(email, password):
             "expires_at": out.get("expires_at"), "user": user}
 
 
+def refresh(refresh_token):
+    """Trade a refresh token for a fresh access token.
+
+    Supabase access tokens expire after an hour, and the client used to throw the refresh
+    token away — so anyone still on the dashboard sixty minutes later was bounced to the
+    login screen mid-task. The refresh token lasts far longer and is what that hour is
+    designed around. Raising the JWT expiry instead would have been the wrong fix: a
+    long-lived access token cannot be withdrawn, which would quietly defeat forget()
+    below and leave a demoted admin holding admin rights until it aged out.
+    """
+    if not enabled():
+        raise AuthError("sign-in is not configured on this server")
+    out = _call("/auth/v1/token?grant_type=refresh_token", _pub(), method="POST",
+                body={"refresh_token": refresh_token or ""})
+    if not out.get("access_token"):
+        raise AuthError("that session could not be renewed")
+    return {"access_token": out.get("access_token"),
+            "refresh_token": out.get("refresh_token"),
+            "expires_at": out.get("expires_at"),
+            "user": shape(out.get("user") or {})}
+
+
 def user_from_token(token):
     """Who is this token? Cached briefly; None if the token is missing or rejected."""
     if not token or not enabled():

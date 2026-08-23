@@ -127,7 +127,7 @@ class TaskIn(BaseModel):
 CURRENT_USER = contextvars.ContextVar("current_user", default=None)
 
 # Everything a browser needs before anyone has signed in.
-OPEN_PATHS = {"/api/auth/login", "/api/auth/config"}
+OPEN_PATHS = {"/api/auth/login", "/api/auth/config", "/api/auth/refresh"}
 
 # With no Supabase keys the app runs open, exactly as it did before auth existed, so a
 # developer on a local SQLite copy still gets a working dashboard.
@@ -306,6 +306,10 @@ class LoginIn(BaseModel):
     password: str
 
 
+class RefreshIn(BaseModel):
+    refresh_token: str
+
+
 class UserIn(BaseModel):
     email: str | None = None
     password: str | None = None
@@ -327,6 +331,19 @@ def auth_login(i: LoginIn):
     except auth.AuthError as e:
         # Deliberately vague: saying "no such user" tells an attacker which emails exist.
         raise HTTPException(401, str(e) or "That email and password don't match.")
+
+
+@app.post("/api/auth/refresh")
+def auth_refresh(i: RefreshIn):
+    """Renew an expired session without asking for the password again.
+
+    Open like /login is: the refresh token IS the credential here, and the access token
+    it replaces has already expired, so gate() could never accept the call.
+    """
+    try:
+        return auth.refresh(i.refresh_token)
+    except auth.AuthError as e:
+        raise HTTPException(401, str(e) or "Please sign in again.")
 
 
 @app.get("/api/auth/me")

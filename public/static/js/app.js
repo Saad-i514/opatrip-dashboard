@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { $, api, esc, invalidate, post, prefetch, q, session,
+import { $, api, esc, hydrate, invalidate, noteStamp, post, prefetch, q, session,
          setSignedOutHandler } from './core.js';
 import { label } from './format.js';
 import { loadAccounts, renderFilterBar } from './ui.js';
@@ -43,7 +43,12 @@ export async function poll(){
       b.className='banner'; b.textContent = 'Stopped: '+st.message;
     } else b.className='banner hidden';
     renderSyncProgress(st);
-    if (st.status==='done' && poll._last==='running'){
+    // No stamp is sent here — this app's /api/status does no database work and must not
+    // start, since a serverless process cannot be relied on to keep the memoised value
+    // between invocations. noteStamp('') is a no-op, so the cache falls back to its timer
+    // and this line starts working the day the endpoint does report one.
+    if (noteStamp(st.stamp)){ refresh(); loadAccounts(); }
+    else if (st.status==='done' && poll._last==='running'){
       invalidate();        // a capture just wrote; everything on screen is now old
       refresh(); loadAccounts();
     }
@@ -121,6 +126,9 @@ async function boot(){
   if (started) return;
   started = true;
   renderWhoAmI();
+  // Paint from IndexedDB before anything asks the network. Every restored answer is
+  // marked stale, so each view still revalidates behind what it just drew.
+  await hydrate();
   const admin = (session.user || {}).role === 'admin';
   document.querySelectorAll('[data-admin-only]').forEach(n =>
     n.classList.toggle('hidden', !admin));

@@ -11,7 +11,7 @@
      editSection() – every editable field in one block, what the portal's Edit opens
 */
 import { S } from './state.js';
-import { $, api, el, esc, invalidate, post, session } from './core.js';
+import { $, api, cachedApi, el, esc, invalidate, post, session } from './core.js';
 import { toast } from './toast.js';
 
 export const EMAIL_OK = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
@@ -20,7 +20,7 @@ export const EMAIL_OK = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
    a one-line change in db.EDITABLE_FIELDS — this file needs no edit at all. */
 let FIELDS = null;
 export async function editableFields(){
-  if (!FIELDS) FIELDS = (await api('/api/editable')).fields;
+  if (!FIELDS) FIELDS = (await cachedApi('/api/editable')).fields;
   return FIELDS;
 }
 
