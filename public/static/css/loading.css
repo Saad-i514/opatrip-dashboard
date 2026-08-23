@@ -216,3 +216,18 @@
   .bootlogo .trace .lg-ring{animation:none;stroke-dashoffset:0}
   .wavebody,.bootrings .prog,#boot,#boot.gone .bootwrap{transition:none}
 }
+
+/* ---------- a view while it loads ----------
+   Replaced the grey placeholder blocks. They were meant to hold the page's shape, but a
+   screen of empty rectangles reads as the page half-failing to render, and the shape they
+   held was a guess at content nobody had seen yet. The mark filling says the same thing —
+   "this is coming" — in the app's own language.
+
+   min-height keeps the footer from jumping up and back down as the real content lands. */
+.vload{min-height:min(56vh,440px);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;
+  animation:vloadin .4s ease-out both}
+@keyframes vloadin{from{opacity:0}}
+.vload-mark .spinmark{width:76px;height:76px}
+.vload-t{font-size:14.5px;color:var(--ink-3);letter-spacing:.01em}
+@media (prefers-reduced-motion:reduce){.vload{animation:none}}

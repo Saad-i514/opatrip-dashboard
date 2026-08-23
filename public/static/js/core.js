@@ -52,8 +52,7 @@ export function paintLoading(){
   chip.classList.remove('hidden');
   chip.innerHTML = `${spinMark}<div>
       <div>Loading ${esc([...new Set(items.map(i=>i.what))].join(', '))}…</div>
-      <div class="src">${items[0].where ? 'from ' + esc(items[0].where) : ''}${
-        slow ? (items[0].where ? ' · ' : '') + 'this can take a few seconds' : ''}</div>
+      <div class="src">${slow ? 'this can take a few seconds' : ''}</div>
       </div>`;
 }
 setInterval(()=>{ if (LOADING.size) paintLoading(); }, 400);
