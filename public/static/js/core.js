@@ -131,6 +131,85 @@ async function renew(){
 let onSignedOut = () => {};
 export const setSignedOutHandler = fn => { onSignedOut = fn; };
 
+/* ---------- boot splash ----------------------------------------------------------------
+   Drives the logo fill in #boot (markup lives in the HTML so it paints before the modules
+   that would otherwise have to inject it).
+
+   The level tracks REAL stages — session check, cache hydrate, accounts, first view — so a
+   slow account load holds the fill where it is instead of animating past it and then
+   sitting at 100% waiting. It only ever moves forward: stages can complete out of order
+   (hydrate resolves from disk in milliseconds, accounts may not), and a bar that slid
+   backwards would read as something going wrong. */
+let bootLevel = 0, bootOver = false;
+
+/* Wrapped whole. This runs at module load, and core.js is what every other module
+   imports — a throw in here would stop the entire dashboard loading for the sake of a
+   decoration. The splash degrades to a plain fill instead. */
+(function bootSetup(){
+ try {
+  const b = document.getElementById('boot');
+  if (!b) return;
+  // Measure the ring so the draw-on has no gap and no stall at the join. A guessed
+  // stroke-dasharray is visibly wrong at one end or the other.
+  const path = document.getElementById('bootTrace');
+  if (path && path.getTotalLength){
+    try { b.style.setProperty('--len', path.getTotalLength().toFixed(1)); } catch {}
+  }
+  // Letters get their own elements so they can arrive in sequence. Done here rather than
+  // in the HTML so the markup stays readable as words.
+  const w = b.querySelector('.bootword');
+  if (w){
+    const html = [...w.childNodes].map(n => {
+      const bold = n.nodeName === 'B';
+      return [...(n.textContent || '')].map((ch, i) =>
+        `<span style="animation-delay:${(i * 34)}ms"${bold ? ' class="hi"' : ''}>${ch}</span>`
+      ).join('');
+    }).join('<span style="width:.5em"></span>');
+    w.innerHTML = html;
+    w.querySelectorAll('.hi').forEach(n => n.style.color = 'var(--brand)');
+  }
+ } catch {}
+})();
+
+/* The level. Only ever moves forward: stages finish out of order — hydrate resolves from
+   disk in milliseconds, accounts may not — and a level that dropped would read as a fault.
+   58 is the wave body at rest (fully below the mark); 0 puts the crest above it. */
+export function bootProgress(p, stage){
+  if (bootOver) return;
+  const b = document.getElementById('boot');
+  if (!b) return;
+  bootLevel = Math.max(bootLevel, Math.min(1, p));
+  b.style.setProperty('--wavey', (58 - bootLevel * 58).toFixed(1) + 'px');
+  b.style.setProperty('--p', bootLevel.toFixed(3));      // the readout ring
+  const el = document.getElementById('bootStage');
+  if (el && stage && el.textContent !== stage){
+    // fade out, swap, fade in — a hard text swap mid-animation reads as a glitch
+    el.classList.add('swap');
+    setTimeout(() => { el.textContent = stage; el.classList.remove('swap'); }, 200);
+  }
+}
+
+/* Fill the rest of the way, let the waves land, the ring close and the gloss cross, then
+   uncover the page. Snapping from 60% straight to gone looks like a glitch. */
+export function bootDone(){
+  if (bootOver) return;
+  const b = document.getElementById('boot');
+  if (!b){ bootOver = true; return; }
+  bootProgress(1, 'Ready');
+  bootOver = true;
+  b.classList.add('full');
+  setTimeout(() => {
+    b.classList.add('gone');
+    setTimeout(() => b.remove(), 800);    // after the fade, so it cannot swallow clicks
+  }, 760);
+}
+
+/* A splash that outlives a failure is worse than no splash: the dashboard would be there,
+   working, behind an opaque cover. Anything unhandled during boot still uncovers it. */
+setTimeout(() => { if (!bootOver) bootDone(); }, 15000);
+window.addEventListener('error', () => bootDone());
+window.addEventListener('unhandledrejection', () => bootDone());
+
 export const apiRaw = async (p,o,retried) => {
   const opt = {...(o||{})};
   if (session.token)

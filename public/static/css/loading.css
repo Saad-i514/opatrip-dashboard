@@ -73,3 +73,119 @@
 .toast.t-err{border-left-color:var(--red)}    .toast.t-err .tico{background:var(--red)}
 .toast.t-warn{border-left-color:var(--amber)} .toast.t-warn .tico{background:var(--amber)}
 .toast.t-info{border-left-color:var(--blue)}  .toast.t-info .tico{background:var(--blue)}
+
+/* ---------- boot splash ----------
+   The dashboard is an ES module graph behind a sign-in check, a cache hydrate and an
+   account load, so there is a real gap between the HTML painting and the first view
+   appearing. It used to show an empty shell.
+
+   Layers, outside in:
+     SWEEP     an arc on the outer orbit — "still working", stops when the fill completes
+     MARKERS   three dots making the rounds at speeds that never resynchronise
+     READOUT   a ring showing exact progress, so the motion is also information
+     TRACE     the mark draws itself, stroke by stroke
+     CAPTURE   two waves fill it, the level driven by real boot stages
+     GLOSS     a highlight crosses the finished mark once, then it lifts
+
+   The level comes from bootProgress() in core.js — actual stages, not a timer — so a slow
+   account load holds it rather than lying. The waves keep moving regardless, which is what
+   says "still working" without faking progress.
+
+   Lives in the HTML rather than being injected by script: a module-injected splash could
+   only appear after the very modules it exists to cover had already loaded. */
+#boot{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
+  background:var(--bg);transition:opacity .55s ease,visibility .55s}
+#boot.gone{opacity:0;visibility:hidden;pointer-events:none}
+.bootwrap{display:flex;flex-direction:column;align-items:center;gap:30px}
+.bootmark{position:relative;width:212px;height:212px;display:grid;place-items:center}
+
+/* --- the orbits --- */
+.bootrings{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.bootrings circle{fill:none;stroke-linecap:round}
+.bootrings .trk{stroke:var(--line);stroke-width:1.5}
+/* 2πr for r=88. Held as a variable so the dash maths cannot drift from the geometry. */
+.bootrings .prog{--c:552.9;stroke:var(--accent);stroke-width:3;
+  stroke-dasharray:var(--c);
+  stroke-dashoffset:calc(var(--c) - var(--c) * var(--p,0));
+  transform:rotate(-90deg);transform-origin:100px 100px;   /* start at twelve o'clock */
+  transition:stroke-dashoffset .7s cubic-bezier(.32,.72,.35,1)}
+.bootrings .arc{stroke:var(--brand);stroke-width:2;stroke-dasharray:40 563;
+  transform-origin:100px 100px;
+  animation:bootsweep 1.9s cubic-bezier(.6,.05,.35,.95) infinite}
+@keyframes bootsweep{to{transform:rotate(360deg)}}
+.bootrings .sat circle{fill:var(--brand);stroke:none}
+.bootrings .sat{transform-origin:100px 100px}
+.s1{animation:bootsweep 3.4s linear infinite}
+.s2{animation:bootsweep 5.1s linear infinite reverse;opacity:.65}
+.s3{animation:bootsweep 7.3s linear infinite;opacity:.45}
+#boot.full .bootrings .arc,#boot.full .bootrings .sat,#boot.full .bootrings .trk{
+  opacity:0;transition:opacity .5s}
+#boot.full .bootrings .arc{animation-play-state:paused}
+
+/* --- the mark --- */
+.bootlogo{width:118px;height:118px;overflow:visible}
+.bootlogo .lg-ring{fill:none;stroke-width:7;stroke-linejoin:round;stroke-linecap:round}
+.bootlogo .ghost .lg-ring{stroke:var(--brand);opacity:.14}
+.bootlogo .ghost .lg-dot{fill:var(--brand);opacity:.14}
+
+/* TRACE: the outline draws itself once, then hands over to the liquid.
+   --len is the real path length, measured in core.js — a guessed dasharray leaves a gap
+   or a stall at the join. */
+.bootlogo .trace .lg-ring{stroke:var(--brand);
+  stroke-dasharray:var(--len,120);stroke-dashoffset:var(--len,120);
+  animation:boottrace 1.05s cubic-bezier(.55,.1,.25,1) .12s forwards}
+@keyframes boottrace{to{stroke-dashoffset:0}}
+
+/* CAPTURE. Two waves, because one reads as a shape sliding up rather than a surface: the
+   back swell is longer, slower and dimmer, so the crests never march in step.
+   The liquid is --accent, NOT --brand like the traced outline. Both layers in one colour
+   made an empty mark look almost identical to a full one — the only difference was the two
+   happening to overlap. Filling now visibly deepens the mark, which is the point. */
+.bootlogo .liquid .lg-ring{stroke:var(--accent)}
+.bootlogo .liquid .lg-dot{fill:var(--accent)}
+.bootlogo .liquid.back{opacity:.42}
+.bootlogo .liquid.back .lg-ring{stroke:var(--brand)}
+.bootlogo .liquid.back .lg-dot{fill:var(--brand)}
+.wavebody{transform:translateY(var(--wavey,58px));
+  transition:transform .7s cubic-bezier(.32,.72,.35,1)}
+.wavebody.back{transform:translateY(calc(var(--wavey,58px) + 1.5px))}
+/* each crest travels exactly one of its own periods, so both loops are seamless */
+.wave{animation:bootwave 2.1s linear infinite}
+.waveb{animation:bootwaveb 3.3s linear infinite}
+@keyframes bootwave{to{transform:translateX(-24px)}}
+@keyframes bootwaveb{to{transform:translateX(-36px)}}
+
+/* GLOSS: one highlight crosses the finished mark. Only on completion — a shine that ran
+   the whole time would compete with the fill it is meant to celebrate. */
+.bootlogo .gloss{opacity:0}
+.bootlogo .gloss .lg-ring{stroke:#fff}
+.bootlogo .gloss .lg-dot{fill:#fff}
+#boot.full .bootlogo .gloss{animation:bootgloss .85s ease-out .1s}
+@keyframes bootgloss{
+  0%{opacity:0;clip-path:polygon(-40% 0,-15% 0,-35% 100%,-60% 100%)}
+  35%{opacity:.85}
+  100%{opacity:0;clip-path:polygon(115% 0,140% 0,120% 100%,95% 100%)}}
+
+.bootword{font-size:14px;letter-spacing:.36em;text-transform:uppercase;font-weight:700;
+  color:var(--ink-3);padding-left:.36em;display:flex;gap:.36em}
+.bootword b{color:var(--brand)}
+.bootword span{animation:bootletter .5s ease-out backwards}
+.bootstage{font-size:13px;color:var(--ink-3);min-height:1.3em;letter-spacing:.01em;
+  transition:opacity .28s ease}
+.bootstage.swap{opacity:0}
+@keyframes bootletter{from{opacity:0;transform:translateY(5px)}}
+
+/* the finish: a ring pushes outward and the splash lifts */
+#boot.full .bootmark::after{content:"";position:absolute;inset:26px;border-radius:50%;
+  border:2px solid var(--accent);animation:bootpop .7s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes bootpop{from{transform:scale(.7);opacity:.8}to{transform:scale(1.45);opacity:0}}
+#boot.gone .bootwrap{transform:translateY(-10px) scale(.97);
+  transition:transform .55s cubic-bezier(.4,0,.2,1)}
+
+@media (prefers-reduced-motion:reduce){
+  .bootrings .arc,.bootrings .sat,.wave,.waveb,.bootword span,
+  #boot.full .bootmark::after,#boot.full .bootlogo .gloss{animation:none}
+  .bootrings .arc{opacity:.5}
+  .bootlogo .trace .lg-ring{animation:none;stroke-dashoffset:0}
+  .wavebody,.bootrings .prog,#boot,#boot.gone .bootwrap{transition:none}
+}

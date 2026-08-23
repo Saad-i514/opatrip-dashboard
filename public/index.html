@@ -16,6 +16,58 @@
 <link rel="stylesheet" href="/static/css/loading.css">
 </head>
 <body>
+<!-- Boot splash: trace, then capture, while an arc sweeps and the ring counts up.
+     Deliberately inline in the HTML — it exists to cover the time the ES modules take to
+     load, so it must be painted before any of them run. core.js drives it. -->
+<div id="boot" role="status" aria-live="polite" aria-label="Loading Opatrip Trace">
+  <div class="bootwrap">
+    <div class="bootmark">
+      <svg class="bootrings" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="trk" cx="100" cy="100" r="88"/>
+        <!-- exact progress, so the ring is a readout and not just decoration -->
+        <circle class="prog" cx="100" cy="100" r="88"/>
+        <!-- still-working sweep, on its own orbit outside the readout -->
+        <circle class="arc" cx="100" cy="100" r="96"/>
+        <!-- three markers making the rounds, at speeds that never resynchronise -->
+        <g class="sat s1"><circle cx="100" cy="12" r="3.2"/></g>
+        <g class="sat s2"><circle cx="100" cy="12" r="2.4"/></g>
+        <g class="sat s3"><circle cx="100" cy="4" r="1.8"/></g>
+      </svg>
+      <svg class="bootlogo" viewBox="0 0 48 48" aria-hidden="true">
+        <defs>
+          <mask id="bootWaveB" maskUnits="userSpaceOnUse" x="-8" y="-8" width="64" height="64">
+            <g class="wavebody back"><path class="waveb" fill="#fff" d="M0 9 q9 -1.8 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 V80 H-4 Z"/></g>
+          </mask>
+          <mask id="bootWave" maskUnits="userSpaceOnUse" x="-8" y="-8" width="64" height="64">
+            <g class="wavebody"><path class="wave" fill="#fff" d="M0 8 q6 -2.6 12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 t12 0 V80 H-4 Z"/></g>
+          </mask>
+        </defs>
+        <g class="ghost">
+          <path class="lg-ring" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/>
+          <circle class="lg-dot" cx="24" cy="24" r="5.2"/>
+        </g>
+        <g class="trace">
+          <path class="lg-ring" id="bootTrace" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/>
+        </g>
+        <g class="liquid back" mask="url(#bootWaveB)">
+          <path class="lg-ring" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/>
+          <circle class="lg-dot" cx="24" cy="24" r="5.2"/>
+        </g>
+        <g class="liquid" mask="url(#bootWave)">
+          <path class="lg-ring" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/>
+          <circle class="lg-dot" cx="24" cy="24" r="5.2"/>
+        </g>
+        <g class="gloss">
+          <path class="lg-ring" d="M7 24 A17 17 0 0 1 24 7 A17 17 0 0 1 41 24 A17 17 0 0 1 24 41 L7 41 Z"/>
+          <circle class="lg-dot" cx="24" cy="24" r="5.2"/>
+        </g>
+      </svg>
+    </div>
+    <div class="bootword"><b>OPATRIP</b> TRACE</div>
+    <div class="bootstage" id="bootStage">Starting up</div>
+  </div>
+</div>
+
 <div class="app">
 <aside>
   <div class="brand">

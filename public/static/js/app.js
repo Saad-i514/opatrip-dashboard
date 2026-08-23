@@ -1,6 +1,6 @@
 import { S } from './state.js';
-import { $, api, esc, hydrate, invalidate, noteStamp, post, prefetch, q, session,
-         setSignedOutHandler } from './core.js';
+import { $, api, bootDone, bootProgress, esc, hydrate, invalidate, noteStamp, post,
+         prefetch, q, session, setSignedOutHandler } from './core.js';
 import { label } from './format.js';
 import { loadAccounts, renderFilterBar } from './ui.js';
 import { renderSyncProgress } from './progress.js';
@@ -122,19 +122,25 @@ installReadOnly();
    successful sign-in, so this runs once as a guest (and stops) and once as a user. */
 let started = false;
 async function boot(){
+  bootProgress(.18, 'Checking your session');
   if (!await ensureSignedIn()) return;      // login screen is up; it will call us back
+  bootProgress(.36, 'Signed in');
   if (started) return;
   started = true;
   renderWhoAmI();
   // Paint from IndexedDB before anything asks the network. Every restored answer is
   // marked stale, so each view still revalidates behind what it just drew.
+  bootProgress(.5, 'Restoring your last view');
   await hydrate();
+  bootProgress(.68, 'Loading accounts');
   const admin = (session.user || {}).role === 'admin';
   document.querySelectorAll('[data-admin-only]').forEach(n =>
     n.classList.toggle('hidden', !admin));
   api('/api/people').then(p => { session.people = p.names || {}; }).catch(() => {});
   await loadAccounts();
+  bootProgress(.86, 'Drawing the dashboard');
   go('stats');
+  bootDone();
   // Products is the heaviest page and the one people open next. Fetching it now, while
   // they are reading the dashboard, means the tab is already populated when they click.
   prefetch('/api/products' + (S.acct ? '?account=' + encodeURIComponent(S.acct) : '?'));
