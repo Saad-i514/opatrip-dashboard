@@ -24,8 +24,10 @@ export async function viewAccounts(){
    ['Total products', totP, 'across every account'],
    ['Live', sum('live_count'), 'selling right now'],
    ['Drafts', sum('draft_count'), 'not submitted yet'],
-   ['Rejected', sum('rejected_count'), 'need fixing'],
-   ['Never captured', never.length, never.length?'need a first run':'all covered']]
+   ['Rejected', sum('rejected_count'), 'need fixing']]
+   // "Never captured" was a tile here too. It said 0 nearly always, and when it did not,
+   // the card lower down already names the accounts — a count with no names is the less
+   // useful of the two. `never` is still computed for that card.
    .forEach(([l,n,s2])=>tiles.appendChild(el('div','tile',
      `<div class="l">${l}</div><div class="n">${n}</div><div class="s">${esc(s2)}</div>`)));
   v.appendChild(tiles);
