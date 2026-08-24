@@ -85,6 +85,77 @@ VOLATILE_PREFIXES = (
 VOLATILE_TOKENS = (
     "sessionId", "lookbackId", "traceId", "requestTimestampUTC", "altSessId",
     "lastUpdatedAt", "statusStartDate",
+
+    # --- values that describe WHEN WE LOOKED, not the product -------------------
+    # Each was checked against the real data before being added here; the row counts
+    # are from account 272089, sync 190, where 117 of 140 "changes" were these.
+    #
+    # = the capture date, exactly. Changes on every sync run on a new day.
+    "productLocalDate",
+    # = the capture date too. Both sides of the special-offer eligibility window.
+    "offerStartDate", "offerEndDate",
+    # = capture date + exactly one year. Viator stamps it when the page renders.
+    # NOTE its sibling `comparisonPrice` is the struck-through "was" price and is REAL —
+    # which is why this is excluded by name and not the whole calculatedComparisonPrices
+    # block. Verified: 44 comparisonPrice paths still diff normally.
+    "expiresAt",
+    # A map KEYED BY DATE (date -> which pricing record applies). Measured across a
+    # 25-day gap, every key moved by exactly 25 days, so a key rename read as four
+    # changes per product. The pricing itself lives in the sibling `pricingRecords`,
+    # which is untouched — 1,623 of those paths still diff normally.
+    "lowestPricedRecordsByDates",
+
+    # --- the destination's TripAdvisor figures, not the product's ---------------
+    # These sit inside a location record: categories ["GEOGRAPHIC"], a lat/long centre,
+    # providerReference "TRIPADVISOR-<id>", and a tripAdvisorUrl pointing at the CITY's
+    # Tourism-g<id>-…-Vacations.html page. reviewCount is how many reviews TripAdvisor
+    # holds for the city; photoUrl is the city's hero image. Proof they are not the
+    # product's: two different tours in Lubango both read 498 and share one photo, while
+    # their own review_count is 0.
+    #
+    # Stored twice per product as well — primaryLocationDetails and the itinerary item's
+    # poiLocation are the same catalogue entry, same tripAdvisorLocationId.
+    #
+    # The PRODUCT's own reviews and photos are elsewhere and still tracked:
+    # review_rating.totalReviewCount (capital R — these lowercase tokens do not match it,
+    # verified) and product.media (9,322 paths, none excluded).
+    "reviewCount", "photoUrl",
+)
+
+# Paths that repeat a fact recorded elsewhere. Not volatile — the underlying change is
+# REAL — but stored several times over, so one edit reads as several changes.
+#
+# Measured across 60 snapshots: a single photo swapped on Viator produced up to EIGHT
+# rows, because the same URL is held four ways and the hero photo is also one of the
+# media images. Excluding the copies leaves the change reported exactly once.
+#
+# What survives is deliberate: `sizes[].url` keeps the photo itself diffable, and
+# `mediaRef` keeps its identity. product.heroPhoto is left alone — which image is the
+# hero is an editorial choice a human makes, so that IS worth reporting.
+REDUNDANT_TOKENS = (
+    # Every image carries TEN generated size variants, and the size list is keyed by its
+    # own url, so swapping one photo renames all ten keys — 10 removed + 10 added across
+    # url, relativePath, width, height and size. Measured on a real product: ONE photo
+    # swap produced 112 change rows. The variants are machine-generated from the same
+    # source image and carry no information the url does not.
+    "media.sizes",
+    # maxSizeUrl and minSizeUrl are the same image at other dimensions.
+    #
+    # previewUrl is deliberately NOT excluded: it is the one canonical URL left per image,
+    # and photo-change detection depends on a url being present. The snapshot holds each
+    # photo's ref and CDN url precisely so a swapped photo is still detected without
+    # storing the bytes — silence all of them and that traceability is gone.
+    "maxSizeUrl", "minSizeUrl",
+    # media.ref duplicates the sibling mediaRef (the dot keeps this off "mediaRef")
+    "media.ref",
+    # heroPhoto embeds a full copy of whichever media image is the hero, so a photo swap
+    # would be reported twice. heroPhoto.mediaRef is NOT excluded — which image is the
+    # hero is an editorial choice a human makes, and that is worth reporting.
+    "heroPhoto.media.",
+    # poiLocation.description is a verbatim copy of poiLocation.searchString.
+    # Scoped to poiLocation on purpose: a bare "description" would also silence
+    # itinerary item descriptions, which are real content a human writes.
+    "poiLocation.description",
 )
 
 # --- who to contact when someone needs a capture run --------------------------

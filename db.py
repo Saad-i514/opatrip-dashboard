@@ -5,12 +5,13 @@ whole normalized dict as JSON; diffing walks flattened dotted paths, so a produc
 exposing more data simply produces more paths and one exposing less produces fewer.
 """
 import json
+import math
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import store
-from config import (DB_PATH, SNAPSHOT_HISTORY, VOLATILE_PREFIXES,
+from config import (DB_PATH, REDUNDANT_TOKENS, SNAPSHOT_HISTORY, VOLATILE_PREFIXES,
                     VOLATILE_TOKENS)
 
 # The SQLite DDL below is still used when running without cloud credentials. The Postgres
@@ -406,7 +407,38 @@ def flatten(obj, prefix=""):
 
 
 def is_volatile(path):
-    return path.startswith(VOLATILE_PREFIXES) or any(t in path for t in VOLATILE_TOKENS)
+    """Paths that must not produce a change row.
+
+    Two different reasons, kept as two lists so the reason stays readable: VOLATILE_*
+    describe WHEN WE LOOKED rather than the product, REDUNDANT_TOKENS repeat a fact that
+    is already recorded elsewhere.
+    """
+    return (path.startswith(VOLATILE_PREFIXES)
+            or any(t in path for t in VOLATILE_TOKENS)
+            or any(t in path for t in REDUNDANT_TOKENS))
+
+
+def same_number(ov, nv):
+    """True when two values are the same number written at different precision.
+
+    The SQLite-era snapshots were stored at 12 significant digits; the values captured now
+    keep full float precision. Comparing the two produced changes like
+    25.0006250156 -> 25.00062501562539, a difference of 2.5e-11 that no human made. 998 of
+    4,730 products still hold a pre-migration snapshot, so each would emit one of these on
+    its next sync.
+
+    ONLY for real numbers, never for numeric-looking strings: '01234' and '1234' are a
+    genuine change to a reference, and float() would call them equal. bool is excluded
+    because it is a subclass of int and True == 1.
+
+    rel_tol 1e-9 is far below any change a person can make — a price moving by a
+    billionth of a percent is not a price change — and far above float round-trip noise.
+    """
+    if isinstance(ov, bool) or isinstance(nv, bool):
+        return False
+    if not isinstance(ov, (int, float)) or not isinstance(nv, (int, float)):
+        return False
+    return math.isclose(ov, nv, rel_tol=1e-9, abs_tol=0.0)
 
 
 def diff(old, new):
@@ -417,7 +449,7 @@ def diff(old, new):
         if is_volatile(path):
             continue
         ov, nv = a.get(path, None), b.get(path, None)
-        if ov != nv:
+        if ov != nv and not same_number(ov, nv):
             changes.append((path, ov, nv))
     return changes
 

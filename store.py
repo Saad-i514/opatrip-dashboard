@@ -63,7 +63,17 @@ class Row(Mapping):
             raise KeyError(k) from None
 
     def __iter__(self):
-        return iter(self._c)
+        # VALUES, matching sqlite3.Row — which is the class this one exists to emulate, and
+        # what anyone writing `a, b = row` or `list(row)` expects. It used to yield the
+        # column NAMES, so `dict(zip(r.keys(), list(r)))` silently produced
+        # {'id': 'id', 'field_path': 'field_path', ...} and `for a, b in rows` unpacked
+        # header strings. That wrote a backup file containing nothing but column names,
+        # and it was only noticed after the rows it was protecting had been deleted.
+        #
+        # dict(row) is unaffected: Python's dict() uses keys() + __getitem__ for anything
+        # exposing .keys(), never __iter__ — checked both ways. Every existing call site
+        # uses r[0], r["col"] or dict(r); none iterate a row for its column names.
+        return iter(self._v)
 
     def __len__(self):
         return len(self._c)
