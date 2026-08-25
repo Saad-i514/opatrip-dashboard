@@ -101,18 +101,26 @@ export function getPath(obj, path){
    possible to ADD, not just correct. */
 export function rows(pairs){
   const ctx = EDITCTX;
-  const editable = !!ctx && pairs.some(p => Array.isArray(p) && p.length > 2 && p[2]);
+  // path is usually one snapshot path, but a row can show TWO fields merged into one
+  // sentence ("4.8 from 230 reviews" is rating AND totalReviewCount) — pass an array
+  // there so Edit history can still jump to it for either one. Multi-path rows are jump
+  // targets only, never editable: ctx.edit() changes a single field, and there is no
+  // single correct value to write back for two.
+  const solo = p => typeof p === 'string' ? p : null;
+  const editable = !!ctx && pairs.some(p => Array.isArray(p) && p.length > 2 && solo(p[2]));
   const wrap = el('div', editable ? 'rows editable' : 'rows');
   let any = false;
   pairs.forEach(entry => {
-    const [k, v, path] = entry;
+    const [k, v, rawPath] = entry;
+    const paths = Array.isArray(rawPath) ? rawPath.filter(Boolean) : (rawPath ? [rawPath] : []);
+    const path = solo(rawPath);          // the one path this row can be EDITED through
     const ed = (ctx && path) ? (ctx.edits || {})[path] : null;
     const blank = v === undefined || v === null || v === ''
                   || (Array.isArray(v) && !v.length);
     if (blank && !ed && !(editable && path)) return;
     any = true;
     const text = typeof k === 'string' ? label(k) : k;
-    if (path && typeof text === 'string') PATH_LABELS.set(path, text);
+    if (typeof text === 'string') paths.forEach(p => PATH_LABELS.set(p, text));
     wrap.appendChild(el('div','k', esc(text)));
     const cell = el('div','v');
     if (ed){
@@ -132,8 +140,9 @@ export function rows(pairs){
     else if (typeof v === 'boolean' || typeof v === 'number') cell.innerHTML = fmtVal(v, k);
     else cell.innerHTML = v;
     // Independent of the edit pencil: the Edit history card jumps here by field path, so
-    // this needs to exist whether or not editing is on for this view.
-    if (path) cell.dataset.jumpPath = path;
+    // this needs to exist whether or not editing is on for this view. Space-separated so
+    // a multi-field row matches on ANY of its paths ([data-jump-path~="…"], not "=").
+    if (paths.length) cell.dataset.jumpPath = paths.join(' ');
     wrap.appendChild(cell);
     if (editable){
       const act = el('div','act');

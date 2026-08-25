@@ -291,6 +291,30 @@ VOLATILE_TOKENS = (
     # "Comparison price" line built without a path), so a change here had no field on
     # the product page to click through to and verify in the first place.
     "calculatedComparisonPrices",
+
+    # performance.allowAdminPerformanceStatusUpdates / performance.productCode: NOT
+    # something a supplier sees or sets on Viator. The first is a literal admin-only
+    # permission flag (its own name says who it is for), never shown to a supplier at
+    # all; the second is a verbatim duplicate of the product's own already-tracked
+    # identity (the product_code column, and the product this whole row already belongs
+    # to). performance.performanceStatus is deliberately NOT included here — it IS a
+    # supplier-visible indicator (the same kind of computed-but-shown signal as
+    # quality_level, already kept), and is already rendered with a working jump target
+    # in secQuality(). Real incident: a newly-appearing product's first capture of this
+    # whole block reported "Allow Admin Performance Status Updates: (none) -> true" and
+    # "Product code: (none) -> 213206P50" as if a human had set them.
+    "performance.allowAdminPerformanceStatusUpdates", "performance.productCode",
+
+    # uniquePackageRefs / optionsAndOrderedSeasons / product.productOptions: Viator's own
+    # internal cross-reference bookkeeping — flat lists whose entries are literally just
+    # id strings (both the list's own identity key AND its value ARE the same raw id,
+    # e.g. "OPT-d3210d46-..."), never a human-readable field. Not shown anywhere on the
+    # dashboard either. 100% redundant with product_options itself, already kept — the
+    # SAME option being removed (Verona, 201139P133) already produces a real, readable
+    # row there; these three just drop the SAME id from three internal index lists,
+    # scoped to "product." so product.productOptions (this list) can never collide with
+    # product_options (the real, kept per-option data — checked, 0 collisions).
+    "uniquePackageRefs", "optionsAndOrderedSeasons", "product.productOptions",
 )
 
 # Paths that repeat a fact recorded elsewhere. Not volatile — the underlying change is

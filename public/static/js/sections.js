@@ -1,5 +1,5 @@
 import { el, esc, q } from './core.js';
-import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, iconList, label, list, readable, rows, section, sentence } from './format.js';
+import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, iconList, label, list, PATH_LABELS, readable, rows, section, sentence } from './format.js';
 import { when } from './views/drawer.js';
 
 /* ======================= per-product readable sections ======================= */
@@ -101,7 +101,12 @@ export function secOverview(p){
     f.appendChild(section('Primary location', rows([
       ['Place', pl.name, 'product.primaryLocationDetails.name'],
       ['Full name', pl.searchString || pl.description, 'product.primaryLocationDetails.searchString'],
-      ['Details', placeExtras(pl) || null],
+      // placeExtras() folds several fields (locationAddress.*, tripAdvisorLocationId,
+      // providerReference — the real identity anchor for this place) into one line of
+      // text, so they need to be reachable from here too, not just their own row.
+      ['Details', placeExtras(pl) || null, pl.name ? ['product.primaryLocationDetails.providerReference',
+        'product.primaryLocationDetails.tripAdvisorLocationId',
+        'product.primaryLocationDetails.locationAddress.city'] : null],
     ])));
   }
   const ta = p.tripAdvisorListing||{};
@@ -176,7 +181,13 @@ export function secTourDetails(p){
       const admTxt = adm==='FREE' ? 'Free' : adm==='YES' ? 'Included'
         : adm==='NO' ? 'Not included' : (adm?sentence(adm):'—');
       const extras = placeExtras(loc);
-      return `<tr>
+      // Lets Edit history jump straight to THIS stop, not just the Stops table in
+      // general — itineraryItemReference is the same id flatten() already keys this
+      // stop's own change rows by, so the two can never point at different things.
+      const jp = s.itineraryItemReference
+        ? `product.itinerary.itineraryItems[${s.itineraryItemReference}]` : null;
+      if (jp) PATH_LABELS.set(jp, `Stop ${i+1} — ${loc.name||loc.searchString||'itinerary'}`);
+      return `<tr${jp ? ` data-jump-path="${esc(jp)}"` : ''}>
         <td class="mono">${i+1}</td>
         <td><div style="font-weight:600">${esc(loc.name||loc.searchString||'—')}</div>
             ${loc.searchString&&loc.name?`<div class="hint">${esc(loc.searchString)}</div>`:''}
@@ -193,10 +204,19 @@ export function secTourDetails(p){
 export function secMeeting(p){
   const dr = p.departureAndReturn||{}, po = p.pickupOption||{};
   // start points AND end points — end points were being dropped entirely
-  const starts = (p.startEndPoints||[]).length ? p.startEndPoints : (dr.startPoints||[]);
-  const ends = dr.endPoints||[];
-  const seen = new Set(starts.map(s=>JSON.stringify(s)));
-  const pts = starts.concat(ends.filter(e=>!seen.has(JSON.stringify(e))));
+  const startArr = (p.startEndPoints||[]).length ? p.startEndPoints : (dr.startPoints||[]);
+  // Which container each point actually came from — needed below to jump to the SAME
+  // path flatten() keys its change rows by, which differs by container even for an
+  // otherwise-identical point. Computed from the untagged objects, before tagging, so
+  // the existing de-dup (a point appearing in both raw lists) still matches as before.
+  const startContainer = (p.startEndPoints||[]).length
+    ? 'product.startEndPoints' : 'product.departureAndReturn.startPoints';
+  const endArr = dr.endPoints||[];
+  const seen = new Set(startArr.map(s=>JSON.stringify(s)));
+  const starts = startArr.map(s=>({...s, _container: startContainer}));
+  const ends = endArr.filter(e=>!seen.has(JSON.stringify(e)))
+    .map(s=>({...s, _container: 'product.departureAndReturn.endPoints'}));
+  const pts = starts.concat(ends);
   if (!pts.length && !po.pickupOptionType && !dr.type) return null;
   const f = document.createDocumentFragment();
   f.appendChild(rows([
@@ -221,7 +241,11 @@ export function secMeeting(p){
       pts.map(s=>{
         const loc = s.location||{};
         const extras = placeExtras(loc);
-        return `<tr><td>${esc(sentence(s.type||'Start'))}</td>
+        const jp = s.startEndPointReference
+          ? `${s._container}[${s.startEndPointReference}]` : null;
+        if (jp) PATH_LABELS.set(jp, loc.name || sentence(s.type||'Start point'));
+        return `<tr${jp ? ` data-jump-path="${esc(jp)}"` : ''}>
+          <td>${esc(sentence(s.type||'Start'))}</td>
           <td><div style="font-weight:600">${esc(loc.name||'—')}</div>
               <div class="hint">${esc(loc.searchString||loc.description||'')}</div>
               ${extras?`<div class="hint" style="margin-top:4px">${extras}</div>`:''}</td>
@@ -471,19 +495,22 @@ export function secPricing(p, cur){
   const minRows = Object.entries(minSrp).filter(([,v])=>v!=null)
     .map(([b,v])=>[sentence(b), money(v,p.currency)]);
   if (minRows.length) f.appendChild(section('Lowest price Viator allows', rows(minRows)));
-  const seasons = Object.values(pr.seasons||{});
-  if (seasons.length){
+  const seasonEntries = Object.entries(pr.seasons||{});
+  if (seasonEntries.length){
     const t = el('div','tblwrap');
     t.innerHTML = `<table><thead><tr><th>Season</th><th>From</th><th>To</th>
       <th>Time zone</th><th>Active</th></tr></thead><tbody>${
-      seasons.slice(0,40).map(s=>`<tr>
+      seasonEntries.slice(0,40).map(([ref,s])=>{
+        const jp = `product.pricing.seasons.${ref}`;
+        PATH_LABELS.set(jp, s.isDefaultSeason ? 'Default season' : 'Seasonal availability');
+        return `<tr data-jump-path="${esc(jp)}">
         <td>${s.isDefaultSeason?'Default':'Seasonal'}</td>
         <td>${esc(fmtDate(s.startDate)||s.startDate||'—')}</td>
         <td>${esc(fmtDate(s.endDate)||s.endDate||'no end date')}</td>
         <td>${esc(s.timeZone||'—')}</td>
         <td>${s.isActive?'<span class="yes">Yes</span>':'<span class="no">No</span>'}</td>
-      </tr>`).join('')}</tbody></table>`;
-    f.appendChild(section(`Seasons (${seasons.length})`, t));
+      </tr>`;}).join('')}</tbody></table>`;
+    f.appendChild(section(`Seasons (${seasonEntries.length})`, t));
   }
   const noPrice = (p.ageBandsWithNoPricing||[]).map(x=>x.name||x).filter(Boolean);
   if (noPrice.length) f.appendChild(section('Age bands with NO pricing set',
@@ -679,7 +706,7 @@ export function secQuality(cur){
   f.appendChild(rows([
     ['Quality', cur.quality_level?(cur.quality_level==='GOOD'?'Good':'Needs work'):null, 'quality_level'],
     ['Rating', rr.totalReviewCount ? `${rr.rating} from ${rr.totalReviewCount} reviews`
-       : 'No reviews yet'],
+       : 'No reviews yet', ['review_rating.rating', 'review_rating.totalReviewCount']],
     ['Performance', perf.performanceStatus?sentence(perf.performanceStatus):null, 'performance.performanceStatus'],
     ['Synced with your system', cur.roster_sync?cur.roster_sync.synced:null],
     ['Needs attention', cur.roster_sync?cur.roster_sync.needs_attention:null],

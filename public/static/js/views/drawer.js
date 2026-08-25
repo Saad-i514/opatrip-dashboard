@@ -68,13 +68,18 @@ export async function openDrawer(pid){
     const tiles = el('div','tiles');
     [['Commission', (()=>{ const c = commissionOf(pp);
         return c!=null ? c+'%' : '—'; })(), (pp.pricing||{}).productProgramMargin
-        && (pp.pricing||{}).productProgramMargin.isOptedIn ? 'incl. boost' : ''],
+        && (pp.pricing||{}).productProgramMargin.isOptedIn ? 'incl. boost' : '', 'commission_percent'],
      ['Duration', totalDuration(it)||'—',''],
      ['Currency', pp.currency||'—',''],
      ['Reviews', rr.totalReviewCount||0, rr.totalReviewCount?`rated ${rr.rating}`:'none yet'],
      ['Changes', d.changes.length, 'since first capture']]
-     .forEach(([l,n,s])=>tiles.appendChild(el('div','tile',
-       `<div class="l">${l}</div><div class="n">${esc(n)}</div><div class="s">${esc(s)}</div>`)));
+     .forEach(([l,n,s,jp])=>{
+       if (jp) PATH_LABELS.set(jp, l);
+       const tile = el('div','tile',
+         `<div class="l">${l}</div><div class="n">${esc(n)}</div><div class="s">${esc(s)}</div>`);
+       if (jp) tile.dataset.jumpPath = jp;
+       tiles.appendChild(tile);
+     });
     body.appendChild(tiles);
   }
 
@@ -118,7 +123,11 @@ export async function openDrawer(pid){
     // CSS.escape guards a path that happens to contain a quote or bracket-like character
     // reaching the attribute selector as anything other than a literal string to match.
     jumpToField = (path) => {
-      const target = panes.querySelector(`[data-jump-path="${CSS.escape(path)}"]`);
+      // The whole body, not just the tab panes — the headline tiles (Commission, …) sit
+      // above the tabs entirely, and a jump target there has no pane to switch to.
+      // ~= matches one whole word in a space-separated list, so this also finds a row
+      // that carries several paths at once (two fields merged into one sentence).
+      const target = body.querySelector(`[data-jump-path~="${CSS.escape(path)}"]`);
       if (!target) return false;
       const i = [...panes.children].findIndex(pane => pane.contains(target));
       if (i >= 0) strip.children[i].click();
