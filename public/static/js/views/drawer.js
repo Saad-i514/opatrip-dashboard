@@ -190,7 +190,7 @@ function renderEntityRow(g, jumpToField){
           ${valueBox(it.old,'old','Value before')}</div>
         <div class="eh-arrow" aria-hidden="true">→</div>
         <div class="eh-side after"><span class="eh-lbl">After</span>
-          ${valueBox(it.now,null,'Value after',wasDeleted(it)?'Deleted':undefined)}</div>
+          ${afterBox(it)}</div>
       </div>
       <div class="eh-foot"><b>${esc(name)}</b>
         <span class="eh-when">${esc(whenLong(it.at))}</span>
@@ -365,7 +365,7 @@ function fieldHistory(g, i){
           ${valueBox(it.old,'old','Value before')}</div>
         <div class="eh-arrow" aria-hidden="true">→</div>
         <div class="eh-side after"><span class="eh-lbl">After</span>
-          ${valueBox(it.now,null,'Value after',wasDeleted(it)?'Deleted':undefined)}</div>
+          ${afterBox(it)}</div>
       </div>
       ${it.note ? `<div class="hint" style="margin-top:12px">Reason: ${esc(it.note)}</div>` : ''}
       ${it.byUs ? '' : `<div class="hint" style="margin-top:12px">Spotted by
@@ -512,6 +512,28 @@ function wasDeleted(it){
   const had = it.old !== null && it.old !== undefined && it.old !== '';
   const gone = it.now === null || it.now === undefined || it.now === '';
   return had && gone;
+}
+/* A scalar list (Viator's own suggested-improvements list, say) is diffed by keying each
+   entry on ITS OWN VALUE — db.py's flatten() does this deliberately, so reordering the
+   list is never mistaken for a change. One consequence: when an entry is added, its
+   "value" is, by construction, identical to the identity already shown in the
+   breadcrumb — "REVIEW_COUNT" appearing as both the field name AND the field's own new
+   value. Detected here (a path ending in an identity bracket with nothing after it) so
+   the box can say "Added" instead of repeating the exact same word twice. */
+function scalarListIdentity(path){
+  const m = String(path||'').match(/\[=([^\]]*?)(?:#\d+)?\]$/);
+  return m ? m[1] : null;
+}
+function wasAdded(it){
+  const id = scalarListIdentity(it.path);
+  return id !== null && String(it.now) === id
+    && (it.old === null || it.old === undefined || it.old === '');
+}
+/* The "After" box for a scalar-list addition: the raw value would just repeat the
+   breadcrumb's own last word, so this reads as an event ("Added") instead of a value. */
+function afterBox(it){
+  if (wasAdded(it)) return '<span class="yes">Added</span>';
+  return valueBox(it.now, null, 'Value after', wasDeleted(it) ? 'Deleted' : undefined);
 }
 export function closeDrawer(){ $('#drawerHost').innerHTML=''; }
 // Escape closes ONE layer: the modal if one is open, otherwise the drawer. Closing both

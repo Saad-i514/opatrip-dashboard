@@ -720,7 +720,11 @@ export function secQuality(cur){
     ['Needs attention', cur.roster_sync?cur.roster_sync.needs_attention:null],
   ]) || el('div','hint','No quality data.'));
   if (imp.length) f.appendChild(section('Viator suggests improving',
-    el('div','',list(imp.map(sentence)))));
+    el('div','',list(imp.map(sentence))),
+    // A REMOVED suggestion has nothing to jump to (it's gone from imp by definition —
+    // the same "field no longer on the page" case as a deleted product_options entry),
+    // but a still-current one can jump here: same identity flatten() keys it by.
+    imp.map(v=>`improvements.improvementItemList[=${v}]`)));
   /* Viator's own quality checks, pass/fail per requirement, with the reasons it gives. */
   const traitCode = Object.keys(cur.product_traits||{})[0];
   const traits = (traitCode && cur.product_traits[traitCode]) || {};
