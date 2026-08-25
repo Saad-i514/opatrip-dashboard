@@ -564,10 +564,18 @@ export function secBooking(p){
     f.appendChild(section('Refund terms', t2));
   }
   const tri = p.travellerRequiredInfo||{};
-  const asked = Object.keys(tri).filter(k=>tri[k]===true).map(k=>label(k));
-  f.appendChild(section('Information collected from travellers',
-    el('div','', asked.length?chips(asked)
-      :'<span class="hint">Nothing beyond the standard details.</span>')));
+  // passportType is a STRING ("REQUIRED_BEFORE_AND_ON_DAY_OF_TRAVEL"), not a boolean, so
+  // the chip list below — which only shows fields that are true — silently never included
+  // it even though it is real, human-set booking config, same as the rest of this object.
+  const askedKeys = Object.keys(tri).filter(k=>k!=='alsoRequiredFields' && k!=='passportType' && tri[k]===true);
+  const asked = askedKeys.map(label);
+  const passportLine = tri.passportType
+    ? `<div class="hint" style="margin-bottom:8px">Passport: ${esc(sentence(tri.passportType))}</div>` : '';
+  const body = el('div','', passportLine + (asked.length?chips(asked)
+    : (tri.passportType ? '' : '<span class="hint">Nothing beyond the standard details.</span>')));
+  f.appendChild(section('Information collected from travellers', body,
+    [...askedKeys, ...(tri.passportType?['passportType']:[])]
+      .map(k=>`product.travellerRequiredInfo.${k}`)));
   const perm = (p.permittedCancellationPolicyTypes||[]).map(x=>x.displayText).filter(Boolean);
   if (perm.length) f.appendChild(section('Policies you could switch to',
     el('div','', chips(perm))));
@@ -714,18 +722,28 @@ export function secQuality(cur){
   if (imp.length) f.appendChild(section('Viator suggests improving',
     el('div','',list(imp.map(sentence)))));
   /* Viator's own quality checks, pass/fail per requirement, with the reasons it gives. */
-  const traits = Object.values(cur.product_traits||{})[0] || {};
-  const tlist = Object.values(traits).filter(t=>t && t.name);
+  const traitCode = Object.keys(cur.product_traits||{})[0];
+  const traits = (traitCode && cur.product_traits[traitCode]) || {};
+  const tlist = Object.entries(traits).filter(([,t])=>t && t.name);
   if (tlist.length){
     const t = el('div','tblwrap');
     t.innerHTML = `<table><thead><tr><th>Requirement</th><th>Met</th>
       <th>Issues</th></tr></thead><tbody>${
-      tlist.map(x=>`<tr><td>${esc(sentence(x.name))}</td>
+      tlist.map(([key,x])=>{
+        // No id-shaped segment sits in this path (a trait code like "PASSPORT_TYPE" and
+        // a product code like "197063P32" are both plain words, not a generated id), so
+        // entityKey() cannot collapse .isSatisfied/.violations to one shared entity key
+        // the way it does for product_options — each keeps its own full path, and both
+        // need to be listed here for either one to find this row.
+        const base = `product_traits.${traitCode}.${key}`;
+        const jps = [`${base}.isSatisfied`, `${base}.violations`];
+        jps.forEach(jp => PATH_LABELS.set(jp, sentence(x.name)));
+        return `<tr data-jump-path="${esc(jps.join(' '))}"><td>${esc(sentence(x.name))}</td>
         <td>${x.isSatisfied?'<span class="yes">Yes</span>':'<span class="no">No</span>'}</td>
         <td>${(x.violations||[]).length
           ? esc((x.violations||[]).map(v=>typeof v==='string'?sentence(v)
               :sentence(v.type||v.name||readable(v))).filter(Boolean).join(', '))
-          : '<span class="hint">—</span>'}</td></tr>`).join('')}</tbody></table>`;
+          : '<span class="hint">—</span>'}</td></tr>`;}).join('')}</tbody></table>`;
     const failed = tlist.filter(x=>!x.isSatisfied).length;
     f.appendChild(section(
       `Viator quality checks (${tlist.length - failed}/${tlist.length} met)`, t));

@@ -315,6 +315,17 @@ VOLATILE_TOKENS = (
     # scoped to "product." so product.productOptions (this list) can never collide with
     # product_options (the real, kept per-option data — checked, 0 collisions).
     "uniquePackageRefs", "optionsAndOrderedSeasons", "product.productOptions",
+
+    # travellerRequiredInfo.alsoRequiredFields: a computed list of exactly which of this
+    # SAME object's own boolean fields (fullNames, passportDetails, …) are true right now
+    # — verified on real data, every one of its entries matches a true boolean elsewhere
+    # in the same object (3 of 3 products checked, 0 mismatches). The real, human-set
+    # facts are those booleans themselves (kept, and genuinely important — this is
+    # Viator's real "traveller information required at booking" setting, confirmed shown
+    # on the dashboard as "Information collected from travellers"). This list just
+    # doubled every one of them: a product requiring full names AND passport details
+    # produced 4 rows for what was really 2 real settings changing.
+    "travellerRequiredInfo.alsoRequiredFields",
 )
 
 # Paths that repeat a fact recorded elsewhere. Not volatile — the underlying change is
@@ -395,6 +406,15 @@ VOLATILE_SCOPED = (
     # editorial field (which photo is the hero — a human's choice) and is not touched,
     # since its own path never starts with "product.media[".
     ("product.media[", ".mediaRef"),
+    # product_traits.<code>.<TRAIT>.name: proven 100% redundant across every real trait
+    # entry checked (5,591 of 5,591) — always equals the trait's own dict key
+    # (e.g. "PASSPORT_TYPE"), which is already in the path. The real, kept, meaningful
+    # fields on the SAME entry are .isSatisfied and .violations — Viator's own
+    # requirement checklist, already shown on the dashboard as "Viator quality checks".
+    # Scoped to product_traits. so it cannot reach any other field named "name" — checked,
+    # the only path shape containing ".name" anywhere under product_traits is exactly
+    # this one (5,591 of 5,591), never inside a violation entry.
+    ("product_traits.", ".name"),
 )
 
 # --- who to contact when someone needs a capture run --------------------------

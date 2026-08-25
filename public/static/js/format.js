@@ -262,11 +262,20 @@ export function readable(x){
   const main = keys.find(k => NAMEY.test(k));
   return main ? said(main) : keys.map(said).join(' · ');
 }
+// A raw database constant (ALL_CAPS_WITH_UNDERSCORES) reads as backend jargon, not what
+// anyone would recognise — the product page itself always sentence-cases these
+// (passportType, an option's status, …), so a change record should read the same way,
+// not the "beautiful text on the page, raw text in the history" split this was doing.
+// Letters only, no digits or dashes, so it can never touch an id, a grade code like
+// "TG3", or a TripAdvisor reference — verified against every real value stored in the
+// changes table: catches exactly the genuine enum values and nothing else.
+const ENUM_SHAPE = /^[A-Z]+(_[A-Z]+)*$/;
 export function fullText(v){
   let s = (v === null || v === undefined) ? '' : String(v);
   // pretty-print JSON: a one-line blob is exactly the thing that most needs unpacking
   try { const p = JSON.parse(s);
         if (p && typeof p === 'object') s = JSON.stringify(p, null, 2); } catch(e){}
+  if (s.length >= 4 && ENUM_SHAPE.test(s)) s = sentence(s);
   return s;
 }
 export function valueBox(v, tone, label, emptyText){
@@ -361,7 +370,11 @@ export function section(title, node, jumpPath){
   // Lets Edit history jump straight to a GROUP of fields the portal (and this dashboard)
   // shows as one unit — an option, an itinerary stop — even when the group has no single
   // row of its own to land on, e.g. a title baked into this heading rather than a row.
-  if (jumpPath){ s.dataset.jumpPath = jumpPath; PATH_LABELS.set(jumpPath, title); }
+  // jumpPath may be one path or an array — a flat settings bag with no shared entity id
+  // (travellerRequiredInfo: fullNames, passportDetails, … each their own top-level field)
+  // still needs every one of them to land on this same section.
+  const jps = Array.isArray(jumpPath) ? jumpPath.filter(Boolean) : (jumpPath ? [jumpPath] : []);
+  if (jps.length){ s.dataset.jumpPath = jps.join(' '); jps.forEach(p => PATH_LABELS.set(p, title)); }
   const h = el('div','vsec-top');
   h.appendChild(el('h4','vsec-h', esc(title || '')));
   s.appendChild(h);
