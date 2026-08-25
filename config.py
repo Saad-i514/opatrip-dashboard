@@ -120,6 +120,177 @@ VOLATILE_TOKENS = (
     # review_rating.totalReviewCount (capital R — these lowercase tokens do not match it,
     # verified) and product.media (9,322 paths, none excluded).
     "reviewCount", "photoUrl",
+
+    # poiLocation's TripAdvisor ranking of the DESTINATION, e.g. "#14 of 86 things to do
+    # in Hai Phong" -> "#14 of 87 ..." — recalculated citywide, nothing to do with this
+    # product. Scoped to poiLocation.ranking specifically, the same way as
+    # poiLocation.description above, so it cannot reach any other "ranking" field.
+    # Checked: every "ranking" path in real data lives under poiLocation.
+    "poiLocation.ranking",
+
+    # travelerPickup.locationAreas[].locationsInArea[] — the pickup-point catalogue
+    # (hotels, landmarks) TripAdvisor supplies for the area, confirmed by
+    # providerReference "TRIPADVISOR-<id>" on every entry. Measured on a real sync
+    # (account 264421, Vietnam): a hotel renamed on TripAdvisor — "Holiday Suites
+    # Hotel & Spa" -> "Holiday Suites Hotel" — and re-geocoded by a few metres produced
+    # rows for description, searchString, centre.lat and centre.long, none of them a
+    # Viator edit. No supplier picks these hotels one by one; Viator surfaces whichever
+    # of them TripAdvisor lists nearby. The pickup AREA itself — centreLocation,
+    # pickupAreaCategory, the top-level travelerPickup settings a supplier does
+    # configure — does not contain this token and stays diffable.
+    "locationsInArea",
+    # A full sweep after the fix above found "locationsInArea" is case-sensitive, so it
+    # never matched its own sibling `expiredLocationsInArea` — same object shape, same
+    # providerReference "TRIPADVISOR-<id>", same catalogue, just for a point that has
+    # since expired. Listed explicitly rather than relying on case tricks. Also
+    # `travelerPickup.pickupPorts[]`, the identical catalogue for a cruise/port pickup —
+    # found by the same sweep, never before excluded, currently 0 change rows (this one
+    # is closing a coverage gap in an already-approved rule, not new evidence).
+    "expiredLocationsInArea", "pickupPorts",
+
+    # --- the rest of poiLocation / primaryLocationDetails: third-party catalogue ------
+    # metadata about a place ALREADY CHOSEN, not the choice itself. The client's own
+    # standard for this list: keep anything that reflects WHICH location an employee
+    # attached to the product (that is real Viator data — an actual product decision);
+    # exclude only what a third party (TripAdvisor here) supplies about that place once
+    # picked, since nobody at the company ever touches it.
+    #
+    # KEPT diffable, deliberately: `reference`/`providerReference`/`tripAdvisorLocationId`
+    # (the identity — if an employee points a listing at a DIFFERENT place, this is what
+    # changes), `name` and `searchString` (the human-legible "which place", and the exact
+    # two fields the dashboard itself reads), `locationAddress` (city/country — still
+    # "which place", just coarser).
+    #
+    # EXCLUDED here: `centre` (lat/long — proven to drift by a few metres for the SAME
+    # place, see locationsInArea above), `categories`/`isBanned` (TripAdvisor's own
+    # classification and moderation flags), `tripAdvisorCountryCode`/`tripAdvisorUrl`
+    # (administrative TripAdvisor identifiers), `website` (the PLACE's own site, e.g. a
+    # hotel's homepage — nothing about the tour), `rating` (TripAdvisor's star rating of
+    # the place, same class as the reviewCount/ranking above), `address` (verified NOT a
+    # duplicate of anything else — 1/312 and 0/37 coincidental matches against `name` in
+    # the Google-sourced containers below — but it is still TripAdvisor/Google's own
+    # formatted text about the place, not something typed here).
+    "poiLocation.centre", "poiLocation.categories", "poiLocation.isBanned",
+    "poiLocation.tripAdvisorCountryCode", "poiLocation.tripAdvisorUrl",
+    "poiLocation.website", "poiLocation.rating", "poiLocation.address",
+    "primaryLocationDetails.centre", "primaryLocationDetails.categories",
+    "primaryLocationDetails.isBanned", "primaryLocationDetails.tripAdvisorCountryCode",
+    "primaryLocationDetails.tripAdvisorUrl", "primaryLocationDetails.website",
+    "primaryLocationDetails.rating", "primaryLocationDetails.address",
+    # primaryLocationDetails can carry the same "#N of M things to do" ranking as
+    # poiLocation — rare (1 of 212 real instances checked) but the identical concept,
+    # so the identical treatment.
+    "primaryLocationDetails.ranking",
+
+    # poiLocation.canBeMatchedToViatorLocation / .matchedViatorLocation: proven to be a
+    # COMPUTED backend flag, not anything an employee sets. Real example: the itinerary
+    # stop "Bai Dinh Pagoda" (a specific, real attraction) shows
+    # canBeMatchedToViatorLocation=False, matchedViatorLocation="Northern Vietnam" — that
+    # is Viator's own matching system failing to link this exact place to one of its
+    # internal location records and falling back to the region. Nobody at the company
+    # can set or edit this; it is the system reporting on itself.
+    "poiLocation.canBeMatchedToViatorLocation", "poiLocation.matchedViatorLocation",
+
+    # --- the pickup/start/end POINTS: same principle, different provider ----------
+    # product.startEndPoints[].location, departureAndReturn.startPoints[].location,
+    # departureAndReturn.endPoints[].location, and travelerPickup.locationAreas[].
+    # centreLocation.location are catalogue entries too — but sourced from GOOGLE PLACES
+    # (providerReference "GOOGLE-ChIJ...", confirmed on real data), not TripAdvisor. Same
+    # conclusion either way: once an employee has picked WHICH point a tour starts, ends,
+    # or is centred on, the formatted address, geocoding and place classification for
+    # that exact point are Google's own catalogue content, refined on Google's own
+    # schedule, not a product edit. `.location.` scopes each token to these four
+    # containers only — verified against 204,337 real paths, zero collateral, including
+    # that poiLocation's and primaryLocationDetails's OWN same-named fields (which have
+    # no ".location." infix in their path) are unaffected by these shared tokens.
+    ".location.address", ".location.categories", ".location.centre", ".location.isBanned",
+
+    # product.availableTaListings[]: NOT this product's data at all. It is the SUPPLIER
+    # ACCOUNT's whole roster of other connectable TripAdvisor business listings, offered
+    # on every product regardless of that product's own location — proven on real data:
+    # account 18's Venice walking tour (201139P96) listed "Matera", "Monte Isola" and
+    # "Florence" as available candidates, and a sync run captured a NEW entry,
+    # "Opatrip.com Amalfi Coast" (Amalfi, hundreds of km from Venice), as a "change" to
+    # that one product. The product's real connection decision is a SEPARATE field,
+    # product.tripAdvisorListing (singular — "Opatrip.com Venice", correct, unchanged
+    # across both syncs) — kept, untouched by this token. The dashboard itself only ever
+    # shows availableTaListings as a bare count ("Other listings available: N"), never
+    # its individual entries, confirming nothing here is product-editorial data.
+    "availableTaListings",
+
+    # .searchString / .locationAddress.line2: the SAME class of problem as .centre above
+    # (same identity, provider text drifts on its own) but proven on street-address TEXT
+    # instead of GPS coordinates. Real incident (account 10, "Private Historic Parks &
+    # Heritage Walk in Tirana", 197372P6): the SAME Google place — same `reference`, same
+    # `providerReference`, neither changed — had its street name relabeled by Google from
+    # "Rruga Herman Gmeiner" to "Rruga Herman Gmainer", and because that one physical
+    # pickup point is embedded in THREE places in the product (startEndPoints,
+    # departureAndReturn.endPoints, and the itinerary's poiLocation), one relabeling
+    # produced 6 change rows across none of which a Viator employee touched anything.
+    # `.name` is NOT included here — it stayed identical through the exact same incident
+    # (still "Tirana Lake Park" before and after), because it is the short stable label,
+    # while `.searchString` embeds the full geocoded address (down to a Google Plus Code
+    # in one real example, "8R6G+P4W" — unambiguously machine-generated, never typed by a
+    # supplier). Checked against the whole corpus: every one of 5,370 real .searchString
+    # paths lives on a location-shaped object (centreLocation, locationsInArea,
+    # expiredLocationsInArea, poiLocation, primaryLocationDetails, or one of the four
+    # Google-sourced .location. containers) — never anything unrelated — and all 897 real
+    # .locationAddress.line2 paths sit on the same three containers that carry it
+    # (poiLocation, primaryLocationDetails, .location.). Only `.line2` (street) is
+    # excluded, not the rest of locationAddress — .city/.country/.postcode have not been
+    # measured to drift, so per rule zero they stay kept rather than assumed guilty.
+    ".searchString", ".locationAddress.line2",
+
+    # .isError / .isLocked / .media.shape / .media.type: technical metadata Viator's
+    # system computes about a photo file, not anything a human enters — proven, on real
+    # data, 100% identical between product.heroPhoto and the SAME photo's own entry in
+    # product.media[] (30 of 30 checked), confirming they are a duplicate of a fact
+    # already recorded, not independent signal. Real incident: TWO products (account 18's
+    # "Private Amalfi Walking Tour: Architectural Heritage", 384/"Private Syracuse & Noto
+    # Heritage Tour from Catania") each had 3 photos genuinely removed, and each removal
+    # produced 7 field-level rows (isError, isLocked, media.previewUrl, media.shape,
+    # media.type, mediaRef, sortOrder) instead of 1. previewUrl and sortOrder stay kept —
+    # previewUrl is the one canonical URL a photo change is traced through, and sortOrder
+    # is a real editorial choice (which order photos display in). Scoped to "media." only
+    # (a dot, not bare "shape"/"type") so this cannot reach an unrelated field that
+    # happens to share that short a name elsewhere in the product.
+    ".isError", ".isLocked", ".media.shape", ".media.type",
+
+    # pricingRecords / rawPricingRecords / datesAndLowestPrices / allStartTimes /
+    # bookingCutoffsByTime / duplicateOptions / duplicateCompletedOptions: Viator's own
+    # BACKEND-COMPUTED EXPANSION of the real, human-set pricing/schedule rules — not
+    # independently authored. Proven, not assumed: pricingRecords/rawPricingRecords/
+    # datesAndLowestPrices' retailPrice/lowestPrice for a package matched EXACTLY the same
+    # package's own real, kept `pricingPackages....price.retailPrice` (559 both places);
+    # bookingCutoffsByTime's per-start-time "cutoffHours: 24" matched the real, kept root
+    # field `bookingConfirmationSettings.bookingCutoffInHours: 24` exactly; and
+    # duplicateOptions/duplicateCompletedOptions are a computed map of every option's own
+    # title, already fully covered by the real, kept `product_options.OPT-<id>.title`.
+    # Even the schedule shape (which days, which date range) survives losing these: it is
+    # baked into pricingPackages' own reference string itself (e.g.
+    # "PPP-AIS-2099-12-31_MTWHFSU_TG1_2026-06-29_1000_D"), which stays kept.
+    # Real incident (account 18, "Private Customizable Cultural Walking Tour in Verona",
+    # 201139P133): removing 2 of 3 tour-duration options was ALREADY fully recorded via
+    # product_options' own .title/.status/.tourGradeCode (kept, 3 rows) — but the SAME
+    # single event, walking through these seven computed containers, produced 234 MORE
+    # rows repeating it. Checked against the whole corpus for collateral: zero of these
+    # tokens touch pricingPackages, product_options, or bookingConfirmationSettings' own
+    # root fields (bookingCutoffType/bookingCutoffInHours/confirmationType) — all stay
+    # kept and fully diffable.
+    "pricingRecords", "rawPricingRecords", "datesAndLowestPrices", "allStartTimes",
+    "bookingCutoffsByTime", "duplicateOptions", "duplicateCompletedOptions",
+
+    # specialOfferInfo.calculatedComparisonPrices: the SAME computed-expansion class as
+    # the pricing calendar above, proven the same way — its .comparisonPrice (559)
+    # matched EXACTLY the already-kept, individually-tracked
+    # specialOfferInfo.comparisonPriceForSpecial (559); its .expiresAt is the same
+    # capture-relative field already excluded elsewhere; and its .ageBand is a two-item
+    # array where Viator's own data literally starts with the string "AGE_BAND" as a
+    # type tag before the real value — never something a human enters. It is also never
+    # rendered per-item anywhere in the dashboard (sections.js shows only a summary
+    # "Comparison price" line built without a path), so a change here had no field on
+    # the product page to click through to and verify in the first place.
+    "calculatedComparisonPrices",
 )
 
 # Paths that repeat a fact recorded elsewhere. Not volatile — the underlying change is
@@ -156,6 +327,50 @@ REDUNDANT_TOKENS = (
     # Scoped to poiLocation on purpose: a bare "description" would also silence
     # itinerary item descriptions, which are real content a human writes.
     "poiLocation.description",
+    # primaryLocationDetails.description is the same duplicate, one level up — verified
+    # 100% identical to primaryLocationDetails.searchString across every real object
+    # checked (821 of 821), not an estimate. searchString is kept diffable, matching
+    # poiLocation above, and matching what the dashboard itself already reads
+    # (primaryLocationDetails.name and .searchString — never .description).
+    "primaryLocationDetails.description",
+    # The same duplicate again, for the four Google-sourced point containers
+    # (startEndPoints[].location, startPoints[].location, endPoints[].location,
+    # centreLocation.location) — verified 100% identical to their own .searchString
+    # across every real instance checked (628 of 628). `.location.` scopes this to
+    # those four only, the same scoping used in VOLATILE_TOKENS above.
+    ".location.description",
+)
+
+# (prefix, suffix) pairs for a field that is only noise INSIDE one specific dict-keyed
+# container but is real data anywhere else, so a plain substring token would either miss
+# it or catch too much. The container's dict key (a generated id, different on every
+# option) sits between the prefix and the suffix, so no single literal substring can span
+# both ends — is_volatile() checks path.startswith(prefix) and suf in path instead.
+VOLATILE_SCOPED = (
+    # product_options.OPT-<uuid>.connectionDetails.*: proven, on real data, to be ENTIRELY
+    # Viator's own API/pricing-sync plumbing for that option — thirdPartyMappings (its own
+    # connected-system ids), and nine isXxxSapiV2/isOptionSyncEnabled/isAutoSyncStartTime
+    # booleans, all about the state of a sync TOGGLE, not anything an employee authors.
+    # Checked against the whole corpus: 5,366 of 5,369 real "connectionDetails" paths in
+    # the database are inside product_options; the other 3 are a DIFFERENT, unrelated
+    # field (product.connectionDetails.supplierProductCode/.syncDetails.*, kept, untouched
+    # by this scoping since its own path never starts with "product_options."). A single
+    # option going away produced 20 change rows for this alone (account 18, "Private
+    # Customizable Cultural Walking Tour in Verona", 201139P133) even though the same
+    # option's real fields (.title, .status, .tourGradeCode) already say it was removed.
+    ("product_options.", ".connectionDetails."),
+    # product_options.OPT-<uuid>.reference: proven 100% redundant across every real option
+    # checked (307 of 307) — it always equals the dict key already present earlier in the
+    # same path. Scoped to product_options only: poiLocation.reference and
+    # primaryLocationDetails.reference are a real identity anchor there and stay kept.
+    ("product_options.", ".reference"),
+    # product.media[<id>].mediaRef: proven 100% redundant across every real photo checked
+    # (1,344 of 1,344) — flatten() derives the [<id>] bracket key FROM this exact field
+    # (list_identity()), so it always equals what is already in the path. Scoped to
+    # product.media[ specifically: product.heroPhoto.mediaRef is a DIFFERENT, real,
+    # editorial field (which photo is the hero — a human's choice) and is not touched,
+    # since its own path never starts with "product.media[".
+    ("product.media[", ".mediaRef"),
 )
 
 # --- who to contact when someone needs a capture run --------------------------

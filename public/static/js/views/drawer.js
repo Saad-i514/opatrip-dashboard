@@ -1,14 +1,16 @@
 import { S } from '../state.js';
 import { spinMark, $, cachedApi, el, esc, session } from '../core.js';
-import { getPath, historyFor, label, personName, qualBadge, setEditContext,
+import { getPath, historyFor, label, PATH_LABELS, personName, qualBadge, setEditContext,
          statusBadge, valueBox, whenLong } from '../format.js';
 import { skLines } from '../ui.js';
 import { buildSections, commissionOf, totalDuration, tree } from '../sections.js';
 import { editSection, editValue } from '../edit.js';
 import { secs } from '../progress.js';
+import { toast } from '../toast.js';
 
 /* ======================= drawer ======================= */
 export async function openDrawer(pid){
+  PATH_LABELS.clear();   // this product's page is about to (re)write its own labels
   const host = $('#drawerHost');
   host.innerHTML = '<div class="scrim"></div><div class="drawer"><div class="dbody">'+
     `<div class="loading-note">${spinMark}Loading this product`+
@@ -41,6 +43,11 @@ export async function openDrawer(pid){
     </div>`;
   dr.appendChild(head);
   const body = el('div','dbody');
+  // Set once the tabs below exist. Edit history calls this to jump straight to a
+  // changed field instead of leaving someone to hunt for it tab by tab — but only when
+  // the field is still ON the product; something Viator removed has nowhere to jump to,
+  // which the caller in editHistoryCard checks for and explains instead.
+  let jumpToField = null;
 
   if (p.missing_since){
     body.appendChild(el('div','banner',
@@ -108,6 +115,20 @@ export async function openDrawer(pid){
     });
     b.appendChild(strip); b.appendChild(panes);
     c.appendChild(b); body.appendChild(c);
+    // CSS.escape guards a path that happens to contain a quote or bracket-like character
+    // reaching the attribute selector as anything other than a literal string to match.
+    jumpToField = (path) => {
+      const target = panes.querySelector(`[data-jump-path="${CSS.escape(path)}"]`);
+      if (!target) return false;
+      const i = [...panes.children].findIndex(pane => pane.contains(target));
+      if (i >= 0) strip.children[i].click();
+      requestAnimationFrame(() => {
+        target.scrollIntoView({behavior: 'smooth', block: 'center'});
+        target.classList.remove('jump-flash'); void target.offsetWidth;  // restart the animation on a repeat click
+        target.classList.add('jump-flash');
+      });
+      return true;
+    };
     setEditContext(null);   // never let another view inherit this product's context
   } else if (cur){
     const c = el('div','card');
@@ -120,7 +141,7 @@ export async function openDrawer(pid){
      Viator's own changes and this dashboard's corrections used to sit in two separate
      tables (and one of them on a different tab entirely), which meant nobody could see
      the order things happened in. */
-  body.appendChild(editHistoryCard(d));
+  body.appendChild(editHistoryCard(d, jumpToField));
 
   /* The "Earlier captures" snapshot browser lived here. It listed run ids and raw
      JSON dumps — a debugging tool on a page people open to read a product. What
@@ -141,67 +162,162 @@ export async function openDrawer(pid){
    one at a time, with arrows — the shape of a spreadsheet's edit history.
 
    Every entry is still kept. Nothing is dropped, only folded. */
-function editHistoryCard(d){
+/* One entity's box: an option, a photo bucket, or a single standalone field. Used both
+   at the top of the feed and nested inside an expanded section — the SAME box either
+   way, so a thing looks and behaves identically whether or not it happened to share its
+   section with something else this time. */
+function renderEntityRow(g, jumpToField){
+  const it = g.list[0];                       // the latest change to this thing
+  const name = personName(it.who, session.people);
+  const row = el('div','eh');
+  row.setAttribute('role','button'); row.tabIndex = 0;
+  row.innerHTML = `
+    <div class="eh-av" title="${esc(it.who)}">${esc((name[0]||'?').toUpperCase())}</div>
+    <div style="min-width:0">
+      <div class="eh-what">${esc(g.label)}${g.multi
+        ? ` <span class="eh-sub">› ${esc(fieldLabel(it.suffix || it.path))}</span>` : ''}</div>
+      <div class="eh-rep">
+        <div class="eh-side"><span class="eh-lbl">Before</span>
+          ${valueBox(it.old,'old','Value before')}</div>
+        <div class="eh-arrow" aria-hidden="true">→</div>
+        <div class="eh-side after"><span class="eh-lbl">After</span>
+          ${valueBox(it.now,null,'Value after',wasDeleted(it)?'Deleted':undefined)}</div>
+      </div>
+      <div class="eh-foot"><b>${esc(name)}</b>
+        <span class="eh-when">${esc(whenLong(it.at))}</span>
+        ${it.byUs ? '<span class="badge b-stub">edited here</span>'
+                  : '<span class="badge b-draft">changed on Viator</span>'}
+        ${g.list.length > 1
+          ? `<span class="eh-more">${g.list.length} change${g.list.length===1?'':'s'}${
+              g.multi ? ` across ${g.paths.size} fields` : ''} · click to see them</span>`
+          : ''}
+        ${g.jumpable && jumpToField ? '<button class="jumpbtn" type="button">Go to field</button>' : ''}
+      </div>
+    </div>`;
+  const open = () => fieldHistory(g, 0);
+  row.onclick = open;
+  row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
+  const jumpBtn = row.querySelector('.jumpbtn');
+  if (jumpBtn){
+    jumpBtn.onclick = e => {
+      e.stopPropagation();     // don't also open the field-history modal underneath it
+      if (!jumpToField(g.jumpPath))
+        toast('Not on the product page', {kind: 'info',
+          detail: 'Either Viator removed it since this change, or it is not shown as '
+            + 'its own field — open the box above to see its history instead.'});
+    };
+  }
+  return row;
+}
+function editHistoryCard(d, jumpToField){
   const items = historyFor(d);
   const c = el('div','card');
   const b = el('div','pad');
 
-  // group by what changed. Photos arrive as dozens of rows per edit (one per field per
-  // photo), so they fold into a single "Photos" group rather than dozens of boxes.
+  // Group by ENTITY, not by exact field: an option, an itinerary stop, a photo is one
+  // card on Viator's own screens and on this dashboard's product page, never field by
+  // field, so a change to three of an option's fields at once is one box here too, not
+  // three. Photos are a special case of the same idea — every photo folds into one
+  // "Photos" bucket, since the gallery itself was removed from the product page (see the
+  // note above `openDrawer`), so there is no per-photo section to jump to anyway.
   const groups = new Map();
   items.forEach(it => {
     const photo = /^product\.(media|heroPhoto)/.test(it.path || '');
-    const key = photo ? 'Photos' : it.path;
-    const label = photo ? 'Photos' : fieldLabel(it.path);
-    if (!groups.has(key)) groups.set(key, {label, list: []});
-    groups.get(key).list.push(it);
+    const ent = entityKey(it.path);
+    it.suffix = ent.suffix;                 // which field within the box, for the modal
+    const key = photo ? 'Photos' : ent.key;
+    const label = photo ? 'Photos' : fieldLabel(ent.key);
+    if (!groups.has(key))
+      groups.set(key, {label, list: [], jumpPath: photo ? null : ent.key, paths: new Set()});
+    const g = groups.get(key);
+    g.list.push(it);
+    g.paths.add(it.path);
   });
-  // newest first, by each field's most recent change
-  const ordered = [...groups.values()].sort((a, b2) =>
+  for (const g of groups.values()){
+    g.multi = g.paths.size > 1;      // more than one distinct field folded into this box
+    g.jumpable = !!g.jumpPath;
+    // Chronological order first and always — that IS the traceability: if the SAME field
+    // changed twice, "step back" has to land on ITS earlier value, not some other field's.
+    // Only when two changes landed at the exact same instant (an option's title, status
+    // and grade code all written by one sync at once) does it fall back to a tie-break,
+    // and even then only to choose what the COLLAPSED row leads with — a name says more
+    // than a status flag when both happened together.
+    if (g.multi) g.list.sort((a,b)=>
+      String(b.at||'').localeCompare(String(a.at||''))
+      || (/\.(title|name)$/.test(a.path)?0:1) - (/\.(title|name)$/.test(b.path)?0:1));
+  }
+  // newest first, by each thing's most recent change
+  const entityGroups = [...groups.values()].sort((a, b2) =>
     String(b2.list[0].at || '').localeCompare(String(a.list[0].at || '')));
 
   c.appendChild(el('div','card-h', '<h3>Edit history</h3>'
-    + `<span class="sub">${ordered.length} field${ordered.length===1?'':'s'} changed · `
+    + `<span class="sub">${entityGroups.length} thing${entityGroups.length===1?'':'s'} changed · `
     + `${items.length} change${items.length===1?'':'s'} in total</span>`));
 
-  if (!ordered.length){
+  if (!entityGroups.length){
     b.appendChild(el('div','empty','<div class="big">Nothing has changed yet</div>'
       + 'The first capture is the starting point. From the next check onwards, anything '
       + 'Viator changes — and anything anyone corrects here — is listed on this page.'));
     c.appendChild(b); return c;
   }
-  b.appendChild(el('div','hint','One box per field, showing its most recent change. '
-    + 'Click a box to step back through that field’s earlier changes.'));
+  b.appendChild(el('div','hint','One box per thing that changed — an option, a photo, a '
+    + 'single field on its own. Click a box to step back through its earlier changes.'));
 
+  // Bucket entities by the same section the product page itself groups them under
+  // (Schedules & prices, Special offers, …), so a day with five options edited reads as
+  // one "Schedules & prices" box, not five separate ones — expand it to see which. A
+  // path with no section (the product's own title, say) has nothing to bucket it WITH,
+  // so it stays its own box exactly as before; so does the Photos bucket, which is
+  // already the same idea at product-wide scope.
   const feed = el('div','ehist');
-  ordered.forEach(g => {
-    const it = g.list[0];                       // the latest change to this field
-    const name = personName(it.who, session.people);
-    const row = el('div','eh');
-    row.setAttribute('role','button'); row.tabIndex = 0;
+  const bySection = new Map();
+  const standalone = [];
+  entityGroups.forEach(g => {
+    const sec = g.jumpPath ? pathSection(g.jumpPath) : null;
+    if (sec){ if (!bySection.has(sec)) bySection.set(sec, []); bySection.get(sec).push(g); }
+    else standalone.push(g);
+  });
+  const sections = [...bySection.entries()].map(([name, list]) => ({
+    name, list,
+    at: list.reduce((m,g)=>String(g.list[0].at||'') > m ? String(g.list[0].at||'') : m, ''),
+  }));
+  // Sections interleave with standalone boxes by their own most recent change, same as
+  // every box always has — grouping by section does not mean "always last."
+  const top = [...sections.map(s=>({kind:'section', s})), ...standalone.map(g=>({kind:'entity', g}))]
+    .sort((a,b) => {
+      const at = x => x.kind==='section' ? x.s.at : String(x.g.list[0].at||'');
+      return at(b).localeCompare(at(a));
+    });
+
+  top.forEach(item => {
+    if (item.kind === 'entity'){ feed.appendChild(renderEntityRow(item.g, jumpToField)); return; }
+    const { s } = item;
+    const things = s.list.length;
+    const changes = s.list.reduce((n,g)=>n+g.list.length, 0);
+    const row = el('div','eh eh-section');
+    row.setAttribute('role','button'); row.tabIndex = 0; row.setAttribute('aria-expanded','false');
     row.innerHTML = `
-      <div class="eh-av" title="${esc(it.who)}">${esc((name[0]||'?').toUpperCase())}</div>
+      <div class="eh-av eh-av-sec">${esc(s.name[0]||'?')}</div>
       <div style="min-width:0">
-        <div class="eh-what">${esc(g.label)}</div>
-        <div class="eh-rep">
-          <div class="eh-side"><span class="eh-lbl">Before</span>
-            ${valueBox(it.old,'old','Value before')}</div>
-          <div class="eh-arrow" aria-hidden="true">→</div>
-          <div class="eh-side after"><span class="eh-lbl">After</span>
-            ${valueBox(it.now,null,'Value after')}</div>
+        <div class="eh-what">${esc(s.name)}</div>
+        <div class="hint" style="margin:2px 0 6px">
+          ${s.list.map(g=>esc(g.label.split(' › ').pop())).join(', ')}</div>
+        <div class="eh-foot">
+          <span class="eh-more">${changes} change${changes===1?'':'s'} across ${things} thing${things===1?'':'s'}</span>
+          <button class="jumpbtn" type="button">Expand</button>
         </div>
-        <div class="eh-foot"><b>${esc(name)}</b>
-          <span class="eh-when">${esc(whenLong(it.at))}</span>
-          ${it.byUs ? '<span class="badge b-stub">edited here</span>'
-                    : '<span class="badge b-draft">changed on Viator</span>'}
-          ${g.list.length > 1
-            ? `<span class="eh-more">${g.list.length} changes · click to see them</span>`
-            : ''}</div>
       </div>`;
-    const open = () => fieldHistory(g, 0);
-    row.onclick = open;
-    row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
+    const inner = el('div','eh-nested hidden');
+    s.list.forEach(g => inner.appendChild(renderEntityRow(g, jumpToField)));
+    const toggle = () => {
+      const open = inner.classList.toggle('hidden');
+      row.setAttribute('aria-expanded', String(!open));
+      row.querySelector('.jumpbtn').textContent = open ? 'Expand' : 'Collapse';
+    };
+    row.onclick = toggle;
+    row.onkeydown = e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } };
     feed.appendChild(row);
+    feed.appendChild(inner);
   });
   b.appendChild(feed);
   c.appendChild(b);
@@ -234,13 +350,13 @@ function fieldHistory(g, i){
         ${it.byUs ? '<span class="badge b-stub">edited here</span>'
                   : '<span class="badge b-draft">changed on Viator</span>'}
       </div>
-      <div class="fh-field">${esc(g.label)}</div>
+      <div class="fh-field">${esc(g.label)}${g.multi ? ' › ' + esc(fieldLabel(it.suffix || it.path)) : ''}</div>
       <div class="eh-rep">
         <div class="eh-side"><span class="eh-lbl">Before</span>
           ${valueBox(it.old,'old','Value before')}</div>
         <div class="eh-arrow" aria-hidden="true">→</div>
         <div class="eh-side after"><span class="eh-lbl">After</span>
-          ${valueBox(it.now,null,'Value after')}</div>
+          ${valueBox(it.now,null,'Value after',wasDeleted(it)?'Deleted':undefined)}</div>
       </div>
       ${it.note ? `<div class="hint" style="margin-top:12px">Reason: ${esc(it.note)}</div>` : ''}
       ${it.byUs ? '' : `<div class="hint" style="margin-top:12px">Spotted by
@@ -313,7 +429,7 @@ export const when = t => String(t||'').replace('T',' ').replace('+00:00','').sli
 /* Section names match the portal's tabs, so a field path resolves to the place someone
    would go looking for it in Viator itself. */
 export const PATH_SEC = {pricing:'Schedules & prices', ageBands:'Schedules & prices',
-  productOptions:'Schedules & prices', currency:'Schedules & prices',
+  product_options:'Schedules & prices', currency:'Schedules & prices',
   bookingSettings:'Booking details', bookingConfirmationSettings:'Booking details',
   cancellationPolicy:'Booking details', travellerRequiredInfo:'Booking details',
   voucher:'Tickets', connectionDetails:'Product connection',
@@ -322,14 +438,71 @@ export const PATH_SEC = {pricing:'Schedules & prices', ageBands:'Schedules & pri
   itinerary:'Product content', inclusions:'Product content',
   exclusions:'Product content', taxonomy:'Product content',
   additionalInfo:'Product content'};
+// A path segment that is a raw system id carries no meaning to someone reading this on
+// the dashboard — it means nothing on Viator's own screens either. It is dropped from the
+// breadcrumb entirely rather than shown dash-by-dash as loose words. Two different id
+// shapes, both real: a generated UUID (OPT-<uuid>, LOC-POINT-<uuid>, IMG-<uuid>), and
+// Viator's OWN compound reference — a short type prefix followed by a long schedule
+// descriptor that is not a UUID at all (PPP-AIS-2099-12-31_MTWHFSU_TG3_2026-06-29_1000_D
+// for a pricing package, SEA-AIS-INF_2026-06-29_TG1_D for a season) — just as unreadable.
+// REF_SEGMENT requires BOTH a real prefix and a long tail so it cannot catch a short,
+// genuinely readable code like "TG3" or a two-letter locale.
+const ID_SEGMENT = /^([A-Za-z][A-Za-z-]*-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REF_SEGMENT = /^[A-Z]{2,6}-[A-Za-z0-9_-]{6,}$/;
+const isIdSegment = p => ID_SEGMENT.test(p) || REF_SEGMENT.test(p);
+function pathSection(path){
+  const first = String(path||'').replace(/^product\./,'').split(/[.\[]/)[0];
+  return PATH_SEC[first];
+}
 export function fieldLabel(path){
+  // The product page already wrote a plain-English label for this EXACT path while
+  // rendering (rows()/section() register it as they go — see PATH_LABELS above). Use
+  // that verbatim rather than rebuilding one from the path's own field names: it is what
+  // someone reading this dashboard already recognises, because it is the same text they
+  // would see on the page itself, not a guess at what the path might mean.
+  const known = PATH_LABELS.get(path);
+  if (known != null){
+    const sec = pathSection(path);
+    return sec ? sec+' › '+known : known;
+  }
+  // No page renders this path individually (a field folded into a group, or one this
+  // dashboard does not show at all) — fall back to reading the path itself.
   // "[=VALUE]" is an identity key from a set-like list — show the value, not "=VALUE"
   const parts = String(path||'').replace(/^product\./,'').split(/[.\[]/)
-    .map(s=>s.replace(/\]$/,'').replace(/^=/,'')).filter(Boolean);
+    .map(s=>s.replace(/\]$/,'').replace(/^=/,'')).filter(Boolean)
+    .filter(p=>!isIdSegment(p));
   if (!parts.length) return path;
-  const sec = PATH_SEC[parts[0]];
+  const sec = pathSection(path);
   const rest = parts.map(p=>/^[A-Z0-9_-]{6,}$/.test(p)?p:label(p));
-  return (sec ? sec+' › ' : '') + rest.join(' › ');
+  // The identity key of a set-like list often just restates the field name right before
+  // it (e.g. an "ageBand" field whose own list key is "AGE_BAND") — drop the repeat.
+  const dedup = rest.filter((p,i)=>
+    i===0 || p.toUpperCase().replace(/[^A-Z0-9]/g,'') !==
+             rest[i-1].toUpperCase().replace(/[^A-Z0-9]/g,''));
+  return (sec ? sec+' › ' : '') + dedup.join(' › ');
+}
+/* Splits a path at its OUTERMOST id-shaped segment: everything up to and including that
+   id is the ENTITY (an option, an itinerary stop — one thing Viator shows as a single
+   card, never field by field), everything after is which field of it changed. A path
+   with no id segment (product.title, product.briefDescription — fields Viator shows on
+   their own) is its own entity, unchanged from before this existed. */
+export function entityKey(path){
+  const raw = String(path||'');
+  const chunks = raw.split('.');
+  for (let i = 0; i < chunks.length; i++){
+    const bracket = chunks[i].match(/\[([^\]]*)\]/);
+    const idPart = bracket ? bracket[1].replace(/^=/,'') : chunks[i];
+    if (isIdSegment(idPart))
+      return {key: chunks.slice(0, i+1).join('.'), suffix: chunks.slice(i+1).join('.')};
+  }
+  return {key: raw, suffix: ''};
+}
+/* Before=real, After=blank means Viator removed the field, not that it was never set —
+   valueBox() cannot tell the two apart on its own since both show the same blank value. */
+function wasDeleted(it){
+  const had = it.old !== null && it.old !== undefined && it.old !== '';
+  const gone = it.now === null || it.now === undefined || it.now === '';
+  return had && gone;
 }
 export function closeDrawer(){ $('#drawerHost').innerHTML=''; }
 // Escape closes ONE layer: the modal if one is open, otherwise the drawer. Closing both

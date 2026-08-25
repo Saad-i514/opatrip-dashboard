@@ -464,7 +464,8 @@ export function secPricing(p, cur){
     const name = o.title
       ? `${o.title}${o.tourGradeCode?` (${o.tourGradeCode})`:''}`
       : 'Suggested retail price';
-    f.appendChild(section(`Prices — ${name}`, tbl));
+    f.appendChild(section(`Prices — ${name}`, tbl,
+      `product.pricing.pricingPackages.${ref}`));
   });
   const minSrp = pr.minimumSuggestedRetailPriceByAgeBands||{};
   const minRows = Object.entries(minSrp).filter(([,v])=>v!=null)
@@ -576,7 +577,7 @@ export function secConnection(p, cur){
      Product connection as "Product code / Option / Product option ID" — the labels come
      straight from the portal's own thirdPartyMappings, so they always match. */
   const opts = (cur && cur.product_options) || {};
-  Object.values(opts).forEach(o=>{
+  Object.entries(opts).forEach(([ref,o])=>{
     const ocd = o.connectionDetails||{};
     const maps = ocd.thirdPartyMappings||[];
     const name = `${o.title||'Option'}${o.tourGradeCode?` (${o.tourGradeCode})`:''}`;
@@ -588,12 +589,16 @@ export function secConnection(p, cur){
       ['Price sync', ocd.isProductOptionPriceSyncEnabled],
       ['Auto-sync start times', ocd.isAutoSyncStartTime],
       ['Timed entry', ocd.isProductConnectionTimedEntry],
-      ['Option status', o.status ? sentence(o.status) : null],
-      ['Default option', o.isDefaultOption],
-      ['Pickup included', o.isPickupIncluded],
+      // These three (unlike everything above) are real, employee-driven option state —
+      // the only ones a change actually gets recorded for — so they carry a path.
+      ['Option status', o.status ? sentence(o.status) : null, `product_options.${ref}.status`],
+      ['Default option', o.isDefaultOption, `product_options.${ref}.isDefaultOption`],
+      ['Pickup included', o.isPickupIncluded, `product_options.${ref}.isPickupIncluded`],
     ];
     const r = rows(pairs);
-    if (r) f.appendChild(section(`Option — ${name}`, r));
+    // title/tourGradeCode have no row of their own — they ARE this section's own heading
+    // — so the section itself is the jump target for a change to either of them.
+    if (r) f.appendChild(section(`Option — ${name}`, r, `product_options.${ref}`));
   });
   const ps = p.productPricingSyncToggleSapiV2||{};
   if (Object.keys(ps).length) f.appendChild(section('Automatic pricing sync', rows([

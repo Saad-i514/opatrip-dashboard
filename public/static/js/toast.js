@@ -95,3 +95,51 @@ export function confirmDialog({title, body = '', okLabel = 'Confirm',
     wrap.querySelector('[data-yes]').focus();
   });
 }
+
+/** Promise<{all:true}|{filter:string}|null>. Asks whole-account vs named product(s) before
+   a Fetch starts; null means the user backed out entirely. */
+export function fetchScopeDialog(){
+  return new Promise(resolve => {
+    const h = $('#modalHost'); h.innerHTML = '';
+    const wrap = el('div');
+    const done = v => { h.innerHTML = ''; resolve(v); };
+    const render = mode => {
+      wrap.innerHTML = mode === 'pick' ? `
+        <div class="scrim"></div>
+        <div class="modal card">
+          <h2 style="font-size:18px;margin-bottom:6px">What should Fetch capture?</h2>
+          <p class="hint" style="margin:0 0 20px">Every product in this account, or only
+            one you name?</p>
+          <div style="display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap">
+            <button class="btn ghost" data-cancel>Cancel</button>
+            <button class="btn ghost" data-specific>Specific product(s)</button>
+            <button class="btn primary" data-all>All products</button>
+          </div></div>` : `
+        <div class="scrim"></div>
+        <div class="modal card">
+          <h2 style="font-size:18px;margin-bottom:6px">Which product(s)?</h2>
+          <p class="hint" style="margin:0 0 10px">One per line or comma-separated — a
+            product ID (e.g. 213197P12) or (part of) its name.</p>
+          <textarea id="fetchFilterInput" rows="4" style="width:100%;box-sizing:border-box;
+            resize:vertical" placeholder="213197P12, Sunset Kayak Tour"></textarea>
+          <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:16px">
+            <button class="btn ghost" data-back>Back</button>
+            <button class="btn primary" data-go>Fetch</button>
+          </div></div>`;
+      wrap.querySelector('.scrim').onclick = () => done(null);
+      if (mode === 'pick'){
+        wrap.querySelector('[data-cancel]').onclick = () => done(null);
+        wrap.querySelector('[data-all]').onclick = () => done({all: true});
+        wrap.querySelector('[data-specific]').onclick = () => render('text');
+      } else {
+        wrap.querySelector('[data-back]').onclick = () => render('pick');
+        const input = wrap.querySelector('#fetchFilterInput');
+        const go = () => { const v = input.value.trim(); if (v) done({filter: v}); };
+        wrap.querySelector('[data-go]').onclick = go;
+        input.focus();
+      }
+    };
+    h.appendChild(wrap);
+    render('pick');
+  });
+}

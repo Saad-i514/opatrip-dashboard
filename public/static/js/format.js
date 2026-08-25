@@ -7,6 +7,14 @@ import { go } from './app.js';
    English: CONSTANT_CASE -> "Sentence case", camelCase keys -> spaced labels, booleans
    -> Yes/No, 10:00:00 -> 10:00 AM, minutes -> 2h 30m. Unknown fields still render, just
    with a derived label, so nothing is hidden when the portal adds something new.        */
+/* path -> the exact label the product page rendered for it, filled in by rows() and
+   section() as the page builds. Edit history reads this so a change is described in the
+   SAME words as the field itself — "Eligible for a special offer", not a breadcrumb
+   rebuilt from specialOfferInfo.specialOfferEligibility.isEligibleToRunSpecialOffer — and
+   the two can never drift apart, since one is the literal source of the other. Cleared at
+   the top of each product page load; buildSections() runs before Edit history is drawn,
+   so by the time a path is looked up, whatever page text exists for it is already here. */
+export const PATH_LABELS = new Map();
 export const words = s => String(s)
   .replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ')
   .replace(/\s+/g,' ').trim();
@@ -104,6 +112,7 @@ export function rows(pairs){
     if (blank && !ed && !(editable && path)) return;
     any = true;
     const text = typeof k === 'string' ? label(k) : k;
+    if (path && typeof text === 'string') PATH_LABELS.set(path, text);
     wrap.appendChild(el('div','k', esc(text)));
     const cell = el('div','v');
     if (ed){
@@ -122,6 +131,9 @@ export function rows(pairs){
     } else if (v instanceof Node) cell.appendChild(v);
     else if (typeof v === 'boolean' || typeof v === 'number') cell.innerHTML = fmtVal(v, k);
     else cell.innerHTML = v;
+    // Independent of the edit pencil: the Edit history card jumps here by field path, so
+    // this needs to exist whether or not editing is on for this view.
+    if (path) cell.dataset.jumpPath = path;
     wrap.appendChild(cell);
     if (editable){
       const act = el('div','act');
@@ -248,9 +260,12 @@ export function fullText(v){
         if (p && typeof p === 'object') s = JSON.stringify(p, null, 2); } catch(e){}
   return s;
 }
-export function valueBox(v, tone, label){
+export function valueBox(v, tone, label, emptyText){
   const s = fullText(v);
-  if (!s) return '<span class="hint">(none)</span>';
+  // emptyText lets a caller distinguish "this never had a value" from "Viator removed
+  // it" — the same blank string means two different things depending on what the OTHER
+  // side of the change shows, which only the caller (edit history) knows.
+  if (!s) return `<span class="hint">${esc(emptyText || '(none)')}</span>`;
   const short = s.length > 90 ? s.slice(0, 90) + '…' : s;
   // The full text is carried in a hidden element, not a data- attribute: textContent
   // hands back the exact original with no escaping round trip to get wrong.
@@ -331,9 +346,13 @@ export const sub = t => el('div','subhead', esc(t));
    room for an "Edit" button top-right (drawer.js fills that in for blocks that hold
    editable fields). Every section on every tab goes through here, so they all get the
    same shape rather than each tab inventing its own. */
-export function section(title, node){
+export function section(title, node, jumpPath){
   if (!node) return null;
   const s = el('section','vsec');
+  // Lets Edit history jump straight to a GROUP of fields the portal (and this dashboard)
+  // shows as one unit — an option, an itinerary stop — even when the group has no single
+  // row of its own to land on, e.g. a title baked into this heading rather than a row.
+  if (jumpPath){ s.dataset.jumpPath = jumpPath; PATH_LABELS.set(jumpPath, title); }
   const h = el('div','vsec-top');
   h.appendChild(el('h4','vsec-h', esc(title || '')));
   s.appendChild(h);

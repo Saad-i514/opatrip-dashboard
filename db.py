@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 import store
 from config import (DB_PATH, REDUNDANT_TOKENS, SNAPSHOT_HISTORY, VOLATILE_PREFIXES,
-                    VOLATILE_TOKENS)
+                    VOLATILE_SCOPED, VOLATILE_TOKENS)
 
 # The SQLite DDL below is still used when running without cloud credentials. The Postgres
 # equivalent lives in pgschema.py.
@@ -409,13 +409,19 @@ def flatten(obj, prefix=""):
 def is_volatile(path):
     """Paths that must not produce a change row.
 
-    Two different reasons, kept as two lists so the reason stays readable: VOLATILE_*
-    describe WHEN WE LOOKED rather than the product, REDUNDANT_TOKENS repeat a fact that
-    is already recorded elsewhere.
+    Three different reasons, kept as separate lists so the reason stays readable:
+    VOLATILE_* describe WHEN WE LOOKED rather than the product, REDUNDANT_TOKENS repeat a
+    fact that is already recorded elsewhere, and VOLATILE_SCOPED is for a field name that
+    is only noise INSIDE one specific container but is real, kept data anywhere else — a
+    plain substring token cannot express that when the container is a dict keyed by a
+    generated id (e.g. product_options.OPT-<uuid>.reference), because that id sits between
+    the prefix and the suffix and differs on every product. (prefix, suffix) matches
+    without caring what sits in between.
     """
     return (path.startswith(VOLATILE_PREFIXES)
             or any(t in path for t in VOLATILE_TOKENS)
-            or any(t in path for t in REDUNDANT_TOKENS))
+            or any(t in path for t in REDUNDANT_TOKENS)
+            or any(path.startswith(pre) and suf in path for pre, suf in VOLATILE_SCOPED))
 
 
 def same_number(ov, nv):
@@ -598,6 +604,19 @@ def save_snapshot(con, product_id, sync_id, account_id, operator_email,
                        VALUES (?,?,?,?,?)""",
                     (product_id, sync_id, t, payload, raw_json))
         return 0                       # a baseline is not a change
+
+    # ---- 1b. a draft going live: the only snapshot on file is a STUB (drafts are
+    # deliberately never deep-fetched — see draft_stub()), so this is really the first
+    # real capture too. Diffing a stub against a full product would report EVERY field as
+    # "changed" (nothing to compare it to), which is not an edit anyone made on Viator —
+    # measured on a real run: 8 products going draft->live produced 5,987 of 6,392 change
+    # rows in one sync, all old_value=NULL. Treated as a fresh baseline, same as case 1.
+    if "stub" in prev and "product" not in prev and "product" in normalized:
+        con.execute("""INSERT INTO snapshots (product_id, sync_id, captured_at,
+                                              normalized_json, raw_network_json)
+                       VALUES (?,?,?,?,?)""",
+                    (product_id, sync_id, t, payload, raw_json))
+        return 0
 
     rows = diff(prev, normalized)
 

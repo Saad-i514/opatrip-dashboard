@@ -328,6 +328,7 @@ body.locked{overflow:hidden}
 .eh-av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
   background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:14px}
 .eh-what{font-weight:700;color:var(--ink);font-size:14.5px;margin-bottom:10px}
+.eh-sub{font-weight:600;color:var(--ink-3)}
 .eh-rep{display:grid;grid-template-columns:1fr 26px 1fr;gap:10px;align-items:stretch}
 .eh-side{min-width:0;border:1px solid var(--line);border-radius:9px;padding:9px 11px;
   background:var(--surface-2)}
@@ -342,6 +343,18 @@ body.locked{overflow:hidden}
   font-size:13px;color:var(--ink-2)}
 .eh-when{color:var(--ink-3);font-size:12.5px}
 .eh-more{color:var(--accent);font-weight:600;font-size:12.5px}
+.jumpbtn{margin-left:auto;background:transparent;border:1px solid var(--accent-line);
+  color:var(--accent);border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;
+  cursor:pointer}
+.jumpbtn:hover{background:var(--accent-soft)}
+/* A section box summarises several things at once (five options edited in one run), so
+   it never shows a before/after of its own — only a count and which things are inside —
+   and gets a slightly different tone so it reads as "summary", not "one more field". */
+.eh-section{background:var(--surface-2)}
+.eh-section:hover{background:var(--accent-soft)}
+.eh-av-sec{background:var(--accent);color:#fff}
+.eh-nested{display:grid;gap:10px;margin:-2px 0 0 24px;padding-left:24px;
+  border-left:2px solid var(--accent-line)}
 
 /* the one-at-a-time card, with its arrows */
 .modal.fh{width:min(560px,94vw)}
@@ -531,3 +544,8 @@ tbody tr:hover{background:var(--surface-2)}
    column, which is the only reason to put them in a table. */
 th.num, td.v.num, td.num{text-align:center}
 td.v.num, td.num{font-variant-numeric:tabular-nums}
+
+/* One-shot highlight for "jump to this field" from the Edit history card — fades out on
+   its own so it reads as "here it is", not a permanent marker. */
+@keyframes jumpFlash{from{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent-line)}to{background:transparent;box-shadow:0 0 0 0 transparent}}
+.jump-flash{animation:jumpFlash 1.8s ease-out;border-radius:6px}
