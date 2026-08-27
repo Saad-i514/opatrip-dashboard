@@ -463,6 +463,14 @@ function pathSection(path){
   const first = String(path||'').replace(/^product\./,'').split(/[.\[]/)[0];
   return PATH_SEC[first];
 }
+function idDescriptor(p){
+  const dates = String(p||'').match(/(\d{4}-\d{2}-\d{2})/g) || [];
+  if (dates.length >= 2){
+    const endD = dates[0], startD = dates[1];
+    return endD === '2099-12-31' ? 'Default season' : `${startD} – ${endD}`;
+  }
+  return null;
+}
 export function fieldLabel(path){
   // The product page already wrote a plain-English label for this EXACT path while
   // rendering (rows()/section() register it as they go — see PATH_LABELS above). Use
@@ -477,12 +485,16 @@ export function fieldLabel(path){
   // No page renders this path individually (a field folded into a group, or one this
   // dashboard does not show at all) — fall back to reading the path itself.
   // "[=VALUE]" is an identity key from a set-like list — show the value, not "=VALUE"
-  const parts = String(path||'').replace(/^product\./,'').split(/[.\[]/)
-    .map(s=>s.replace(/\]$/,'').replace(/^=/,'')).filter(Boolean)
-    .filter(p=>!isIdSegment(p));
+  const rawParts = String(path||'').replace(/^product\./,'').split(/[.\[]/)
+    .map(s=>s.replace(/\]$/,'').replace(/^=/,'')).filter(Boolean);
+  const idDesc = rawParts.map(idDescriptor).find(Boolean);
+  const parts = rawParts.filter(p=>!isIdSegment(p));
   if (!parts.length) return path;
   const sec = pathSection(path);
   const rest = parts.map(p=>/^[A-Z0-9_-]{6,}$/.test(p)?p:label(p));
+  if (idDesc && (rawParts.includes('seasons') || rawParts.includes('pricingPackages'))) {
+    rest.push(`(${idDesc})`);
+  }
   // The identity key of a set-like list often just restates the field name right before
   // it (e.g. an "ageBand" field whose own list key is "AGE_BAND") — drop the repeat.
   const dedup = rest.filter((p,i)=>

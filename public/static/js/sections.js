@@ -481,15 +481,30 @@ export function secPricing(p, cur){
   Object.values(pr.rawPricingRecords||{}).forEach(rec=>{
     if (rec && rec.pricingPackageRef) optOfPkg[rec.pricingPackageRef] = rec.productOptionRef;
   });
-  Object.entries(pkgs).forEach(([ref,pkg])=>{
+  const pkgEntries = Object.entries(pkgs);
+  pkgEntries.forEach(([ref,pkg])=>{
     const tbl = priceTierTable(pkg, p.currency);
     if (!tbl) return;
     const o = opts[optOfPkg[ref]] || {};
     const name = o.title
       ? `${o.title}${o.tourGradeCode?` (${o.tourGradeCode})`:''}`
       : 'Suggested retail price';
-    f.appendChild(section(`Prices — ${name}`, tbl,
-      `product.pricing.pricingPackages.${ref}`));
+    // Extract season date span from package ref if present (e.g. PPP-AIS-2027-12-24_..._2027-11-20_...)
+    const dateMatches = ref.match(/(\d{4}-\d{2}-\d{2})/g) || [];
+    let seasonTag = '';
+    if (dateMatches.length >= 2) {
+      const endD = dateMatches[0], startD = dateMatches[1];
+      if (endD === '2099-12-31') {
+        if (pkgEntries.length > 1) seasonTag = 'Default season';
+      } else {
+        seasonTag = `${fmtDate(startD) || startD} – ${fmtDate(endD) || endD}`;
+      }
+    }
+    const labelTitle = `Prices — ${name}${seasonTag ? ` (${seasonTag})` : ''}`;
+    const headerTitle = `Prices — ${name}${seasonTag ? ` · ${seasonTag}` : ''}`;
+    const jp = `product.pricing.pricingPackages.${ref}`;
+    PATH_LABELS.set(jp, labelTitle);
+    f.appendChild(section(headerTitle, tbl, jp));
   });
   const minSrp = pr.minimumSuggestedRetailPriceByAgeBands||{};
   const minRows = Object.entries(minSrp).filter(([,v])=>v!=null)
@@ -497,14 +512,29 @@ export function secPricing(p, cur){
   if (minRows.length) f.appendChild(section('Lowest price Viator allows', rows(minRows)));
   const seasonEntries = Object.entries(pr.seasons||{});
   if (seasonEntries.length){
+    // Map seasonRef -> Option Title (via pr.pricingRecords) if available
+    const optBySeason = {};
+    Object.entries(pr.pricingRecords || {}).forEach(([optRef, sMap]) => {
+      const o = opts[optRef] || {};
+      const optName = o.title ? `${o.title}${o.tourGradeCode ? ` (${o.tourGradeCode})` : ''}` : o.tourGradeCode;
+      if (optName && typeof sMap === 'object') {
+        Object.keys(sMap).forEach(sRef => { optBySeason[sRef] = optName; });
+      }
+    });
+
     const t = el('div','tblwrap');
     t.innerHTML = `<table><thead><tr><th>Season</th><th>From</th><th>To</th>
       <th>Time zone</th><th>Active</th></tr></thead><tbody>${
       seasonEntries.slice(0,40).map(([ref,s])=>{
         const jp = `product.pricing.seasons.${ref}`;
-        PATH_LABELS.set(jp, s.isDefaultSeason ? 'Default season' : 'Seasonal availability');
+        const optName = optBySeason[ref] || '';
+        const dateSpan = (s.startDate || s.endDate)
+          ? `${fmtDate(s.startDate)||s.startDate||'?'} – ${fmtDate(s.endDate)||s.endDate||'?'}` : '';
+        const seasonDesc = s.isDefaultSeason ? 'Default season'
+          : `Season (${[dateSpan, optName].filter(Boolean).join(' · ') || 'Seasonal availability'})`;
+        PATH_LABELS.set(jp, seasonDesc);
         return `<tr data-jump-path="${esc(jp)}">
-        <td>${s.isDefaultSeason?'Default':'Seasonal'}</td>
+        <td>${s.isDefaultSeason?'Default':(optName ? `Seasonal (${esc(optName)})` : 'Seasonal')}</td>
         <td>${esc(fmtDate(s.startDate)||s.startDate||'—')}</td>
         <td>${esc(fmtDate(s.endDate)||s.endDate||'no end date')}</td>
         <td>${esc(s.timeZone||'—')}</td>
