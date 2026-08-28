@@ -1494,14 +1494,7 @@ def spreadsheet_import(i: SpreadsheetImportIn):
         plat_id = db.platform_id(con, "viator") or 1
 
         # Create a sync run record for the import
-        now_ts = db.now()
-        sync_sql = store.insert_id(
-            "syncs",
-            ("account_id", "operator_email", "started_at", "status", "products_seen", "changes_found"),
-            "id"
-        )
-        sync_row = con.execute(sync_sql, (account_pk, operator_email, now_ts, "running", len(rows), 0)).fetchone()
-        sync_id = sync_row[0] if sync_row else None
+        sync_id = db.start_sync(con, account_pk, operator_email)
 
         imported_count = 0
         updated_count = 0
