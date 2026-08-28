@@ -1543,6 +1543,8 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
         if "location" in ov:
             p_obj["location"] = ov["location"]
             con.execute("UPDATE products SET location=? WHERE id=?", (ov["location"], pid))
+        if "external reference" in ov or "external ref" in ov:
+            p_obj["externalReference"] = ov.get("external reference") or ov.get("external ref")
 
         if "group type" in ov:
             p_obj.setdefault("itinerary", {})["privateTour"] = "private" in ov["group type"].lower()
