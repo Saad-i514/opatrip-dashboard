@@ -31,8 +31,10 @@ function platformGrid(p, platforms){
     const ls = by[pl.code] || [];
     // this product's own listing, never a namesake's from another account
     const l = ls.find(x => x.code === p.product_code) || ls[0];
+    const isOwn = l && l.code === p.product_code;
+    const st = isOwn ? (p.status || l.status) : (l ? l.status : null);
     return `<div class="pp-row"><span class="pp-n">${esc(pl.name)}</span>${
-      l ? statusBadge(l.status)
+      st ? statusBadge(st)
         : '<span class="badge b-notlisted">Not uploaded</span>'}</div>`;
   }).join('')}</div>`;
 }

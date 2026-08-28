@@ -40,6 +40,11 @@
      6. `product_traits`: Evaluates standard Viator quality rules.
 8. **Partial Update Resilience**:
    - If a user omits any section or fields in the raw text, the parser only updates the fields provided in the text while **fully preserving all existing unmentioned data** in the product snapshot and database.
+9. **`+ Add Product` Button in Products View**:
+   - Added `+ Add Product` button in the products filter bar with account picker and raw text dialogue.
+10. **Status Badge Synchronization (Left vs Right)**:
+   - Fixed status canonical mapping (`LIVE` -> `LIVE`, `ACTIVE` -> `LIVE`).
+   - Fixed `platformGrid` in `products.js` to ensure the product row's own listing badge on the right under `LISTED ON` always matches the actual product status shown on the left.
 
 ---
 

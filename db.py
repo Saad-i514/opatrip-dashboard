@@ -314,8 +314,19 @@ def canonical_status(con, plat_id, raw):
     PENDING rather than vanishing, so a new platform status is visible immediately."""
     if not raw:
         return None
+    raw_u = str(raw).upper().strip()
+    if raw_u in ("LIVE", "ACTIVE", "PUBLISHED", "ONLINE"):
+        return "LIVE"
+    if raw_u in ("DRAFT", "NEW"):
+        return "DRAFT"
+    if raw_u in ("PENDING", "PENDING_REVIEW", "PENDING_FIRST_ACTIVATION", "UNDER_REVIEW", "IN_REVIEW"):
+        return "PENDING"
+    if raw_u in ("REJECTED", "DECLINED"):
+        return "REJECTED"
+    if raw_u in ("REMOVED", "INACTIVE", "DELETED", "OFFLINE", "ARCHIVED"):
+        return "REMOVED"
     r = con.execute("""SELECT canonical FROM status_map WHERE platform_id=? AND raw=?""",
-                    (plat_id, str(raw).upper())).fetchone()
+                    (plat_id, raw_u)).fetchone()
     return r["canonical"] if r else "PENDING"
 
 
