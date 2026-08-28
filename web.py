@@ -1672,7 +1672,7 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
             pricing_obj["minimumSuggestedRetailPriceByAgeBands"] = {
                 "ADULT": 5, "SENIOR": 5, "YOUTH": 0, "CHILD": 0, "INFANT": 0
             }
-            con.execute("UPDATE products SET commission_percent=? WHERE id=?", (effective_margin, pid))
+            p_obj["commission_percent"] = effective_margin
 
         if price_val:
             net_val = fee_val if fee_val is not None else round(price_val * (1 - (effective_margin or 22.0)/100.0), 2)
