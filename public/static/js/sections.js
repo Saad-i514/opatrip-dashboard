@@ -198,18 +198,30 @@ export function secTourDetails(p){
         <td>${esc(s.description||'')}</td></tr>`;
     }).join('')}</tbody></table>`;
   f.appendChild(section(`Stops (${stops.length})`, t));
+  
+  const admLinks = p.admissionSourceLinks || (p.raw_row_data ? (p.raw_row_data['Admission Source Links']||'').split('\n').filter(Boolean) : []);
+  const hrsLinks = p.hoursSourceLinks || (p.raw_row_data ? (p.raw_row_data['Hours Source Links']||'').split('\n').filter(Boolean) : []);
+  if (admLinks.length) {
+    f.appendChild(section(`Admission source links (${admLinks.length})`,
+      el('div', '', list(admLinks.map(l => `<a href="${esc(l.trim())}" target="_blank" rel="noopener">${esc(l.trim())} ↗</a>`)))));
+  }
+  if (hrsLinks.length) {
+    f.appendChild(section(`Hours source links (${hrsLinks.length})`,
+      el('div', '', list(hrsLinks.map(l => `<a href="${esc(l.trim())}" target="_blank" rel="noopener">${esc(l.trim())} ↗</a>`)))));
+  }
   return f;
 }
 
 /* The portal's "Meeting & pickup". */
 export function secMeeting(p){
   const dr = p.departureAndReturn||{}, po = p.pickupOption||{};
+  const routeMap = p.routeMapLink || dr.routeMapLink || (p.raw_row_data ? p.raw_row_data['Route Map Link'] : null);
+  const meetingPoint = dr.meetingPoint || (p.raw_row_data ? p.raw_row_data['Meeting Point / Pickup Area'] : null);
+  const pickupType = po.pickupType || (p.raw_row_data ? p.raw_row_data['Pickup Type'] : null);
+  const pickupVehicle = po.pickupVehicleDescription || (p.raw_row_data ? p.raw_row_data['Pickup Vehicle Description'] : null);
+
   // start points AND end points — end points were being dropped entirely
   const startArr = (p.startEndPoints||[]).length ? p.startEndPoints : (dr.startPoints||[]);
-  // Which container each point actually came from — needed below to jump to the SAME
-  // path flatten() keys its change rows by, which differs by container even for an
-  // otherwise-identical point. Computed from the untagged objects, before tagging, so
-  // the existing de-dup (a point appearing in both raw lists) still matches as before.
   const startContainer = (p.startEndPoints||[]).length
     ? 'product.startEndPoints' : 'product.departureAndReturn.startPoints';
   const endArr = dr.endPoints||[];
@@ -218,18 +230,18 @@ export function secMeeting(p){
   const ends = endArr.filter(e=>!seen.has(JSON.stringify(e)))
     .map(s=>({...s, _container: 'product.departureAndReturn.endPoints'}));
   const pts = starts.concat(ends);
-  if (!pts.length && !po.pickupOptionType && !dr.type) return null;
+  if (!pts.length && !po.pickupOptionType && !dr.type && !meetingPoint && !routeMap) return null;
   const f = document.createDocumentFragment();
   f.appendChild(rows([
-    // Viator's own flag that it dropped the location off a start/end point. It is the
-    // one field in this capture that is BOTH invisible on the dashboard and actually
-    // varying — true on 29 of 743 products — so it was real signal going unread. Shown
-    // only when set, since "No" on 714 products is noise.
+    ['Meeting point / Area', meetingPoint],
+    ['Meeting arrangement', (dr.meetingMode||po.pickupOptionType||dr.type)
+      ? sentence(dr.meetingMode||po.pickupOptionType||dr.type) : null, 'product.pickupOption.pickupOptionType'],
+    ['Pickup transport type', pickupType],
+    ['Pickup vehicle', pickupVehicle],
+    ['Route map link', routeMap ? `<a href="${esc(routeMap)}" target="_blank" rel="noopener">Open Route on Google Maps ↗</a>` : null],
     ...(p.hasStartEndPointLocationDropped
         ? [['Start/end point location dropped by Viator', 'Yes — re-check the meeting point',
             'product.hasStartEndPointLocationDropped']] : []),
-    ['Meeting arrangement', (po.pickupOptionType||dr.type)
-      ? sentence(po.pickupOptionType||dr.type) : null, 'product.pickupOption.pickupOptionType'],
     ['Ends where it starts', po.endsAtStartPoint!==undefined?po.endsAtStartPoint
       : dr.endsAtStartPoint, 'product.pickupOption.endsAtStartPoint'],
     ['Pickup optional', po.isPickupOfferedAndOptional, 'product.pickupOption.isPickupOfferedAndOptional'],

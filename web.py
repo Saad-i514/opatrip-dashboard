@@ -1537,15 +1537,27 @@ def spreadsheet_import(i: SpreadsheetImportIn):
 
             # Details
             duration = get_col(row, "duration", "total duration")
-            theme_cat = get_col(row, "theme category", "category", "themes")
+            theme_cat = get_col(row, "theme category", "category")
+            themes_raw = get_col(row, "themes", "theme")
             inclusions_raw = get_col(row, "inclusions", "included")
             exclusions_raw = get_col(row, "exclusions", "excluded")
             description = get_col(row, "unique description", "description", "brief description", "summary")
             opt_title = get_col(row, "guide languages", "guide language", "language", "option", "option title", "tour grade")
             attractions_raw = get_col(row, "attractions", "itinerary", "highlights")
 
+            route_map = get_col(row, "route map link", "route_map_link", "route map", "map link")
+            adm_links_raw = get_col(row, "admission source links", "admission source", "admission links")
+            hours_links_raw = get_col(row, "hours source links", "hours source", "hours links")
+            meeting_mode = get_col(row, "meeting/pickup mode", "meeting pickup mode", "meeting mode")
+            meeting_point = get_col(row, "meeting point / pickup area", "meeting point", "pickup area", "meeting_point")
+            pickup_type = get_col(row, "pickup type", "pickup_type", "transport type")
+            pickup_vehicle = get_col(row, "pickup vehicle description", "pickup vehicle", "vehicle description")
+            guide_fee_raw = get_col(row, "guide fee", "guide_fee")
+
             inclusions_list = [x.strip() for x in (inclusions_raw or "").splitlines() if x.strip()]
             exclusions_list = [x.strip() for x in (exclusions_raw or "").splitlines() if x.strip()]
+            adm_links = [x.strip() for x in (adm_links_raw or "").splitlines() if x.strip()]
+            hours_links = [x.strip() for x in (hours_links_raw or "").splitlines() if x.strip()]
 
             # Itinerary stops
             itinerary_items = []
@@ -1597,10 +1609,25 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                     "currency": currency,
                     "duration": duration,
                     "category": theme_cat,
+                    "themes": themes_raw,
                     "description": description,
                     "briefDescription": description[:240] if description else None,
                     "inclusions": inclusions_list,
                     "exclusions": exclusions_list,
+                    "routeMapLink": route_map,
+                    "admissionSourceLinks": adm_links,
+                    "hoursSourceLinks": hours_links,
+                    "guideFee": guide_fee_raw,
+                    "departureAndReturn": {
+                        "type": meeting_mode,
+                        "meetingMode": meeting_mode,
+                        "meetingPoint": meeting_point,
+                        "routeMapLink": route_map,
+                    } if (meeting_mode or meeting_point or route_map) else {},
+                    "pickupOption": {
+                        "pickupType": pickup_type,
+                        "pickupVehicleDescription": pickup_vehicle,
+                    } if (pickup_type or pickup_vehicle) else {},
                     "itinerary": {
                         "itineraryItems": itinerary_items
                     } if itinerary_items else {},
