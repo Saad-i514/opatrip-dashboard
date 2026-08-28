@@ -31,10 +31,16 @@ export async function openDrawer(pid){
   head.innerHTML = `<button class="vback" id="xClose">&lsaquo; Back to product list</button>
     <div class="dhead-top">
       <div style="flex:1;min-width:0">
-        <h2 class="vtitle">${esc(p.title||'(untitled)')}</h2>
-        <div class="vsubline">
+        <div style="display:flex;align-items:center;gap:8px">
+          <h2 class="vtitle" style="margin:0">${esc(p.title||'(untitled)')}</h2>
+          <button class="penbtn" id="btnEditTitle" title="Edit Title" aria-label="Edit Title" style="display:inline-flex;opacity:0.8;font-size:16px;cursor:pointer">&#9998;</button>
+        </div>
+        <div class="vsubline" style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px">
           ${p.is_draft_stub?'<span class="badge b-stub">Draft — recorded only</span>':''}
-          ${statusBadge(p.status)}
+          <span style="display:inline-flex;align-items:center;gap:4px">
+            ${statusBadge(p.status)}
+            <button class="penbtn" id="btnEditStatus" title="Edit Status" aria-label="Edit Status" style="display:inline-flex;opacity:0.8;font-size:13px;cursor:pointer">&#9998;</button>
+          </span>
           <span class="hint">Product code: <span class="mono">${esc(p.product_code)}</span></span>
           <span class="hint">${esc(p.account_name||p.viator_account_id)}${
             p.location?' · '+esc(p.location):''}</span>
@@ -42,11 +48,21 @@ export async function openDrawer(pid){
       </div>
     </div>`;
   dr.appendChild(head);
+
+  const editTitleBtn = head.querySelector('#btnEditTitle');
+  if (editTitleBtn) {
+    editTitleBtn.onclick = () => editValue(p.id, {
+      path: 'product.title', label: 'Product Title', value: (cur && cur.product ? cur.product.title : p.title)
+    }, () => openDrawer(p.id));
+  }
+  const editStatusBtn = head.querySelector('#btnEditStatus');
+  if (editStatusBtn) {
+    editStatusBtn.onclick = () => editValue(p.id, {
+      path: 'product.status', label: 'Status', value: (cur && cur.product ? cur.product.status : p.status)
+    }, () => openDrawer(p.id));
+  }
+
   const body = el('div','dbody');
-  // Set once the tabs below exist. Edit history calls this to jump straight to a
-  // changed field instead of leaving someone to hunt for it tab by tab — but only when
-  // the field is still ON the product; something Viator removed has nowhere to jump to,
-  // which the caller in editHistoryCard checks for and explains instead.
   let jumpToField = null;
 
   if (p.missing_since){
@@ -65,19 +81,32 @@ export async function openDrawer(pid){
   if (cur && cur.product){
     const pp = cur.product, it = pp.itinerary||{};
     const rr = cur.review_rating||{};
+    const durVal = pp.duration || totalDuration(it) || '—';
+    const commVal = (()=>{ const c = commissionOf(pp);
+        return c!=null ? c+'%' : '—'; })();
+    const qualVal = (pp.quality||{}).level || p.quality_level || cur.quality_level || '—';
+    const revCnt = (rr.totalReviewCount!=null ? rr.totalReviewCount : p.review_count) || 0;
+    const revScore = rr.rating || p.review_rating;
+
     const tiles = el('div','tiles');
-    [['Commission', (()=>{ const c = commissionOf(pp);
-        return c!=null ? c+'%' : '—'; })(), (pp.pricing||{}).productProgramMargin
-        && (pp.pricing||{}).productProgramMargin.isOptedIn ? 'incl. boost' : '', 'commission_percent'],
-     ['Duration', totalDuration(it)||'—',''],
-     ['Currency', pp.currency||'—',''],
-     ['Reviews', rr.totalReviewCount||0, rr.totalReviewCount?`rated ${rr.rating}`:'none yet'],
-     ['Changes', d.changes.length, 'since first capture']]
-     .forEach(([l,n,s,jp])=>{
-       if (jp) PATH_LABELS.set(jp, l);
+    [['Commission', commVal, (pp.pricing||{}).productProgramMargin && (pp.pricing||{}).productProgramMargin.isOptedIn ? 'incl. boost' : 'click to edit', 'product.pricing.productProgramMargin.baseMargin', 'Commission'],
+     ['Duration', durVal, 'click to edit', 'product.itinerary.durationInMinutes', 'Duration'],
+     ['Quality', qualVal, 'click to edit', 'product.quality.level', 'Quality Level'],
+     ['Reviews', revCnt, revCnt ? `rated ${revScore}` : 'click to edit', 'review_rating.rating', 'Reviews'],
+     ['Currency', pp.currency||'—', 'click to edit', 'product.currency', 'Currency'],
+     ['Changes', d.changes.length, 'since first capture', '', '']]
+     .forEach(([l,n,s,path,lbl])=>{
+       if (path) PATH_LABELS.set(path, l);
        const tile = el('div','tile',
          `<div class="l">${l}</div><div class="n">${esc(n)}</div><div class="s">${esc(s)}</div>`);
-       if (jp) tile.dataset.jumpPath = jp;
+       if (path){
+         tile.dataset.jumpPath = path;
+         tile.style.cursor = 'pointer';
+         tile.title = `Click to edit ${lbl || l}`;
+         tile.onclick = () => editValue(p.id, {
+           path, label: lbl || l, value: (path === 'product.itinerary.durationInMinutes' ? (pp.duration || pp.itinerary?.durationInMinutes) : getPath(cur, path))
+         }, () => openDrawer(p.id));
+       }
        tiles.appendChild(tile);
      });
     body.appendChild(tiles);

@@ -14,6 +14,11 @@ import store
 from config import (DB_PATH, REDUNDANT_TOKENS, SNAPSHOT_HISTORY, VOLATILE_PREFIXES,
                     VOLATILE_SCOPED, VOLATILE_TOKENS)
 
+EDITABLE = {
+    "status", "title", "quality_level", "review_count", "review_rating",
+    "notes", "owner", "location", "connection_state", "commission_percent"
+}
+
 # The SQLite DDL below is still used when running without cloud credentials. The Postgres
 # equivalent lives in pgschema.py.
 
@@ -1047,6 +1052,31 @@ def set_edit(con, product_id, field, value, editor_email, note=None):
          email, emp, now(), note))
     log_task(con, "QUALITY_FIX", emp, product_id=product_id,
              notes=f"edited {field}")
+
+    # Synchronize core columns on products table if applicable
+    col_map = {
+        "title": "title", "product.title": "title",
+        "status": "status", "product.status": "status",
+        "quality_level": "quality_level", "product.quality.level": "quality_level", "quality.level": "quality_level",
+        "review_count": "review_count", "product.review_count": "review_count",
+        "review_rating": "review_rating", "product.review_rating": "review_rating", "review_rating.rating": "review_rating",
+        "location": "location", "product.location": "location",
+    }
+    if field in col_map:
+        col = col_map[field]
+        if col == "status":
+            canon = status_canonical(value)
+            con.execute("UPDATE products SET status=?, status_canonical=? WHERE id=?", (value, canon, product_id))
+        elif col in ("review_count",):
+            con.execute(f"UPDATE products SET {col}=? WHERE id=?", (int(value) if str(value).isdigit() else None, product_id))
+        elif col in ("review_rating",):
+            try:
+                con.execute(f"UPDATE products SET {col}=? WHERE id=?", (float(value) if value else None, product_id))
+            except Exception:
+                pass
+        else:
+            con.execute(f"UPDATE products SET {col}=? WHERE id=?", (value, product_id))
+
     return {"field": field, "value": value, "editor_email": email}
 
 

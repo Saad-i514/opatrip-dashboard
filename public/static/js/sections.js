@@ -757,12 +757,12 @@ export function secQuality(cur){
   const imp = (cur.improvements||{}).improvementItemList||[];
   const act = p.productActivationWebModel||{};
   f.appendChild(rows([
-    ['Quality', cur.quality_level?(cur.quality_level==='GOOD'?'Good':'Needs work'):null, 'quality_level'],
+    ['Quality', cur.quality_level ? (cur.quality_level==='GOOD'?'Good':'Needs work') : ((p.quality||{}).level ? sentence(p.quality.level) : null), 'quality_level'],
     ['Rating', rr.totalReviewCount ? `${rr.rating} from ${rr.totalReviewCount} reviews`
-       : 'No reviews yet', ['review_rating.rating', 'review_rating.totalReviewCount']],
+       : (p.review_rating ? `${p.review_rating} (${p.review_count||0} reviews)` : null), 'review_rating.rating'],
     ['Performance', perf.performanceStatus?sentence(perf.performanceStatus):null, 'performance.performanceStatus'],
-    ['Synced with your system', cur.roster_sync?cur.roster_sync.synced:null],
-    ['Needs attention', cur.roster_sync?cur.roster_sync.needs_attention:null],
+    ['Synced with your system', cur.roster_sync?cur.roster_sync.synced:null, 'roster_sync.synced'],
+    ['Needs attention', cur.roster_sync?cur.roster_sync.needs_attention:null, 'roster_sync.needs_attention'],
   ]) || el('div','hint','No quality data.'));
   if (imp.length) f.appendChild(section('Viator suggests improving',
     el('div','',list(imp.map(sentence))),
