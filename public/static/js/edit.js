@@ -511,6 +511,243 @@ Review rating: 4.95`;
   txt.focus();
 }
 
+export async function openCreateProductModal(preselectedAccount = null) {
+  const host = $('#dialog-host');
+  if (!host) return;
+  host.innerHTML = '';
+  const wrap = el('div');
+
+  // Fetch accounts list
+  let accts = [];
+  try {
+    const res = await api('/api/accounts');
+    accts = (res && res.accounts) || [];
+  } catch(e) {
+    console.error('Failed to load accounts for create product modal', e);
+  }
+
+  const defaultAcctId = preselectedAccount || S.acct || (accts[0] ? accts[0].id : '');
+
+  const sampleTemplate = `Berlin's Best: Third Reich and Cold War 2-Hour Walking Tour
+────────────────────────────────────────
+OVERVIEW
+Duration: 2h 0m
+Theme: History, Heritage, Culture
+Category: History & Culture
+Languages: French, English
+Max travelers: 15
+Group type: Private
+Skip the line: Yes
+Customizable: Yes
+Customizable parts: Start Time, Duration, Inclusions
+Product type: STANDARD_TOUR
+Itinerary type: STANDARD
+Tour modes: WALKING_TOUR, VEHICLE_TOUR
+Product types: CULTURAL_TOURS, HISTORICAL_TOURS
+Reseller status: NOT_RESELLER
+Guide certified: Yes
+Guide is driver: Yes
+Helpline: +49 30 1234567
+Public page: https://www.viator.com/tours/Berlin/sample
+Location: Berlin, Germany
+
+ATTRACTIONS
+1. Brandenburg Gate — 20 min, admission: Free Entry — Marvel at the iconic 18th-century neoclassical monument and hear stories of the Cold War divide
+2. Reichstag Building — 25 min, admission: Included — Explore the historic parliament building with reserved admission to the iconic glass dome
+3. Soviet War Memorial Tiergarten — 15 min, admission: Free Entry — Walk through the serene memorial garden flanking 1945 artillery monuments
+4. Memorial to the Murdered Jews of Europe — 20 min, admission: Free Entry — Walk through the field of 2,711 concrete stelae with guided historical context
+5. Potsdamer Platz — 15 min, admission: Free Entry — Explore the bustling epicenter of modern Berlin architecture and former No Man's Land
+6. Topography of Terror — 30 min, admission: Included — Guided walkthrough of the indoor and outdoor exhibition along the surviving Berlin Wall segment
+7. Checkpoint Charlie — 15 min, admission: Free Entry — Stop at the famed Cold War crossing point and guardhouse for photos and historical stories
+
+INCLUSIONS
+Professional local guide: Stu Helm
+All admission tickets (including special exhibition entry)
+Food tastings and refreshments
+Private vehicle transport
+
+EXCLUSIONS
+Gratuities (at client's discretion)
+Personal shopping expenses
+
+DESCRIPTION
+Step into the soul of Berlin's history on this private 2.5-hour walking tour through the legendary streets of Berlin. Beginning at iconic Brandenburg Gate, the journey winds through the Reichstag and Memorials.
+
+ADDITIONAL INFO
+Wheelchair accessible
+Near public transportation
+Stroller accessible
+Comfortable walking shoes recommended
+
+FAQS
+What should I wear? — Comfortable walking shoes are recommended.
+Is transport included? — Yes, private Mercedes vehicle is included.
+
+PRICING
+Public price: 829
+Guide fee: 232
+Currency: USD
+Price unit: PER_PERSON
+Dynamic pricing: No
+Base margin: 22
+Boost margin: 2
+Accelerate opted in: Yes
+
+MEETING & PICKUP
+Meeting point: Pariser Platz, 10117 Berlin, Germany
+Meeting address: Pariser Platz, 10117 Berlin, Germany
+Meeting arrangement: MEET_AT_DEPARTURE_POINT
+Pickup transport type: VEHICLE
+Pickup vehicle: Mercedes Executive Van
+Route map: https://maps.google.com/?q=Berlin
+Ends where starts: Yes
+Pickup optional: No
+
+BOOKING
+Confirmation type: INSTANT
+Cut-off hours: 24
+Cancellation policy: STANDARD
+Bad-weather cancellation: Yes
+Email every booking: Yes
+
+TRAVELLER REQUIREMENTS
+Required info: Full names, Passport details, Mobile phone number
+
+TICKETS & VOUCHER
+Ticket format: ELECTRONIC
+Tickets per booking: PER_BOOKING
+Show barcode on ticket: Yes
+Special instructions: Present your mobile voucher to the tour guide at the fountain.
+
+CONNECTIVITY
+Supplier code: PROD-BER-001
+Reservation system: Custom Viator Connect
+
+LINKS
+Admission source links:
+https://www.example.com/admission-tickets
+Hours source links:
+https://www.example.com/hours-and-times
+
+QUALITY & STATUS
+Quality level: GOOD
+Status: LIVE
+Reviews count: 18
+Review rating: 4.95`;
+
+  const acctOptions = accts.map(a => {
+    const isSel = (String(a.id) === String(defaultAcctId) || a.code === defaultAcctId || a.name === defaultAcctId);
+    return `<option value="${esc(a.id)}" ${isSel ? 'selected' : ''}>${esc(a.name || a.code)} (${a.product_count || 0} products)</option>`;
+  }).join('');
+
+  wrap.innerHTML = `<div class="scrim"></div>
+    <div class="modal card" style="max-width:860px;width:95%;max-height:92vh;display:flex;flex-direction:column;padding:24px;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,0.18)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <h2 style="font-size:20px;margin:0 0 4px;font-weight:700">Add New Product</h2>
+          <div class="hint" style="font-size:13px">Select an existing account and paste raw tour details. All recognized fields will be extracted and auto-calculated into a new listing.</div>
+        </div>
+        <button class="btn ghost sm" id="btnCloseCreateModal" style="font-size:20px;line-height:1;padding:4px 8px;cursor:pointer">&times;</button>
+      </div>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 14px;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+        <label style="font-weight:600;font-size:13px;color:#1e293b;white-space:nowrap">Select Existing Account:</label>
+        <select id="createAcctSelect" style="flex:1;max-width:400px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;cursor:pointer">
+          ${acctOptions || '<option value="">(No accounts found - default)</option>'}
+        </select>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <button class="btn sm" id="btnFillCreateSample" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-weight:600;cursor:pointer">
+          📋 Load Full Sample Format
+        </button>
+        <span class="hint" style="font-size:12px">Paste your raw tour text below or load the format template.</span>
+      </div>
+
+      <div style="flex:1;min-height:340px;display:flex;flex-direction:column;margin-bottom:14px">
+        <textarea id="rawCreateProductText" style="flex:1;width:100%;height:350px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;padding:12px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical;outline:none;background:#fafbfc" placeholder="${esc(sampleTemplate)}"></textarea>
+      </div>
+
+      <div id="rawCreateErr" class="banner hidden" style="margin-bottom:12px"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center">
+        <button class="btn ghost" id="btnCancelCreate">Cancel</button>
+        <button class="btn primary" id="btnSaveCreate" style="padding:8px 20px;font-weight:600;display:flex;align-items:center;gap:6px">
+          <span>+</span> Save & Create Product
+        </button>
+      </div>
+    </div>`;
+
+  host.appendChild(wrap);
+
+  const txt = wrap.querySelector('#rawCreateProductText');
+  const sel = wrap.querySelector('#createAcctSelect');
+  const err = wrap.querySelector('#rawCreateErr');
+  const done = () => { host.innerHTML = ''; };
+
+  wrap.querySelector('.scrim').onclick = done;
+  wrap.querySelector('#btnCloseCreateModal').onclick = done;
+  wrap.querySelector('#btnCancelCreate').onclick = done;
+
+  wrap.querySelector('#btnFillCreateSample').onclick = () => {
+    txt.value = sampleTemplate;
+    txt.focus();
+  };
+
+  const btnSave = wrap.querySelector('#btnSaveCreate');
+  btnSave.onclick = async () => {
+    const rawVal = txt.value.trim();
+    if (!rawVal) {
+      err.textContent = 'Please enter or paste raw product text.';
+      err.classList.remove('hidden');
+      return;
+    }
+    const selectedAcct = sel ? sel.value : (defaultAcctId || '');
+    if (!selectedAcct) {
+      err.textContent = 'Please select an existing account.';
+      err.classList.remove('hidden');
+      return;
+    }
+
+    btnSave.disabled = true;
+    btnSave.textContent = 'Creating Product...';
+    err.classList.add('hidden');
+
+    try {
+      const res = await api('/api/products/create-from-raw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: selectedAcct,
+          raw_text: rawVal,
+          editor_email: S.user ? S.user.email : null
+        })
+      });
+
+      if (!res || !res.ok) {
+        throw new Error((res && res.detail) || (res && res.message) || 'Failed to create product.');
+      }
+
+      done();
+      toast(`Created new product ${res.product_code || ''} successfully!`, 'ok');
+      invalidate('/api/products');
+      invalidate('/api/overview');
+      invalidate('/api/accounts');
+      if (typeof viewProducts === 'function') {
+        viewProducts();
+      }
+      if (res.product_id && typeof openDrawer === 'function') {
+        openDrawer(res.product_id);
+      }
+    } catch(ex) {
+      err.textContent = ex.message || 'An error occurred while creating the product.';
+      err.classList.remove('hidden');
+      btnSave.disabled = false;
+      btnSave.innerHTML = '<span>+</span> Save & Create Product';
+    }
+  };
+}
+
 /* uploadImage() and deleteImage() were removed with photo storage. The dashboard
    no longer shows or accepts photos; POST /api/product/<id>/image refuses too, so
    there is no client left for them. A photo CHANGED on Viator is still recorded --

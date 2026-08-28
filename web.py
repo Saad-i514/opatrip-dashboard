@@ -23,6 +23,7 @@ import re
 import time
 from datetime import date
 from pathlib import Path
+import uuid
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
@@ -1771,6 +1772,275 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
 
     log(f"{email} updated product {pid} using structured raw text")
     return {"ok": True, "message": "Successfully parsed and updated product data."}
+
+
+class CreateProductRawIn(BaseModel):
+    account_id: int | str
+    raw_text: str
+    editor_email: str | None = None
+    note: str | None = None
+
+
+@app.post("/api/products/create-from-raw")
+def create_product_from_raw(body: CreateProductRawIn):
+    email = acting_email(body.editor_email)
+    raw = (body.raw_text or "").strip()
+    if not raw:
+        raise HTTPException(400, "Raw product text cannot be empty.")
+
+    parsed = parse_raw_product_text(raw)
+    title = parsed.get("title") or "New Tour Product"
+
+    with db.session() as con:
+        # Resolve account_id
+        acct_val = body.account_id
+        acct_row = None
+        if isinstance(acct_val, int) or (isinstance(acct_val, str) and acct_val.isdigit()):
+            acct_row = con.execute("SELECT id, name FROM accounts WHERE id=?", (int(acct_val),)).fetchone()
+        if not acct_row:
+            acct_row = con.execute("SELECT id, name FROM accounts WHERE name=?", (str(acct_val),)).fetchone()
+        if not acct_row:
+            # Fallback to first available account
+            acct_row = con.execute("SELECT id, name FROM accounts LIMIT 1").fetchone()
+        if not acct_row:
+            raise HTTPException(400, "No valid account found to assign this product.")
+
+        account_id = acct_row["id"]
+        
+        # Determine code
+        ov = parsed.get("overview") or {}
+        conn = parsed.get("connectivity") or {}
+        code = ov.get("product code") or conn.get("supplier code") or f"PROD-{uuid.uuid4().hex[:8].upper()}"
+
+        # Quality & Status
+        q = parsed.get("quality") or {}
+        st_val = q.get("status") or "LIVE"
+        q_lvl = (q.get("quality") or q.get("quality level") or "GOOD").upper()
+        
+        # Duration calculation
+        dur_mins = None
+        if "duration" in ov:
+            dur_mins = parse_duration_to_minutes(ov["duration"])
+
+        # Pricing & Margin calculation
+        pr = parsed.get("pricing") or {}
+        price_val, fee_val = None, None
+        if "public price" in pr or "price" in pr:
+            m = re.search(r"(\d+(?:\.\d+)?)", pr.get("public price") or pr.get("price") or "")
+            if m:
+                price_val = float(m.group(1))
+        if "guide fee" in pr or "fee" in pr:
+            m = re.search(r"(\d+(?:\.\d+)?)", pr.get("guide fee") or pr.get("fee") or "")
+            if m:
+                fee_val = float(m.group(1))
+
+        base_margin = None
+        boost_margin = float(pr.get("boost margin", 0) or 0)
+        is_opted_in = "yes" in str(pr.get("accelerate opted in", "")).lower() or "true" in str(pr.get("accelerate opted in", "")).lower()
+
+        if price_val and fee_val and price_val > 0:
+            base_margin = round(((price_val - fee_val) / price_val) * 100, 1)
+        elif "commission" in pr or "base margin" in pr:
+            m = re.search(r"(\d+(?:\.\d+)?)", pr.get("commission") or pr.get("base margin") or "")
+            if m:
+                base_margin = float(m.group(1))
+        else:
+            base_margin = 22.0
+
+        effective_margin = base_margin + (boost_margin if is_opted_in else 0)
+        loc = ov.get("location") or parsed.get("meeting", {}).get("meeting point")
+
+        rev_count = 18
+        if "reviews count" in q:
+            m_rc = re.search(r"\d+", q["reviews count"])
+            if m_rc:
+                rev_count = int(m_rc.group(0))
+
+        rev_rating = 4.95
+        if "review rating" in q:
+            m_rr = re.search(r"\d+(?:\.\d+)?", q["review rating"])
+            if m_rr:
+                rev_rating = float(m_rr.group(0))
+
+        # Check existing product or insert
+        prod_row = con.execute("SELECT id FROM products WHERE account_id=? AND product_code=?", (account_id, code)).fetchone()
+        if prod_row:
+            pid = prod_row["id"]
+            con.execute("""UPDATE products SET title=?, status=?, location=?, quality_level=?, review_count=?, review_rating=? WHERE id=?""",
+                        (title, st_val, loc, q_lvl, rev_count, rev_rating, pid))
+        else:
+            if store.is_cloud():
+                ins = con.execute("""INSERT INTO products (account_id, product_code, title, status, location, quality_level, review_count, review_rating)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
+                                  (account_id, code, title, st_val, loc, q_lvl, rev_count, rev_rating)).fetchone()
+                pid = ins[0]
+            else:
+                con.execute("""INSERT INTO products (account_id, product_code, title, status, location, quality_level, review_count, review_rating)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (account_id, code, title, st_val, loc, q_lvl, rev_count, rev_rating))
+                pid = con.execute("SELECT id FROM products WHERE account_id=? AND product_code=?", (account_id, code)).fetchone()["id"]
+
+        # Build comprehensive snapshot
+        p_obj = {
+            "productCode": code,
+            "title": title,
+            "status": st_val,
+            "duration": ov.get("duration") or "2h 30m",
+            "themes": ov.get("theme") or ov.get("themes") or "History, Heritage, Culture",
+            "category": ov.get("category") or "History & Culture",
+            "location": loc,
+            "productClassification": ov.get("product type") or "STANDARD_TOUR",
+            "resellerInfo": ov.get("reseller status") or "NOT_RESELLER",
+            "description": parsed.get("description") or "",
+            "briefDescription": (parsed.get("description") or "")[:240].strip(),
+            "inclusions": parsed.get("inclusions") or [],
+            "exclusions": parsed.get("exclusions") or [],
+            "additionalInfo": parsed.get("additionalInfo") or [],
+            "productFaqs": [{"question": item, "title": item} for item in parsed.get("faqs", [])],
+            "itinerary": {
+                "durationInMinutes": dur_mins or 150,
+                "privateTour": "private" in (ov.get("group type") or "private").lower(),
+                "skipTheLine": "yes" in str(ov.get("skip the line", "yes")).lower(),
+                "isCustomizable": "yes" in str(ov.get("customizable", "yes")).lower(),
+                "itineraryItems": parsed.get("attractions") or []
+            }
+        }
+
+        # Dwell time & compliance
+        if parsed.get("attractions"):
+            dwell_sum = sum(s.get("durationInMinutes") or 0 for s in parsed["attractions"])
+            if dwell_sum > 0:
+                p_obj["itinerary"]["timeAtStops"] = f"{dwell_sum} mins"
+            total_tour_mins = dur_mins or 150
+            p_obj.setdefault("activityItinerary", {})["isNonConformingItinerary"] = dwell_sum > total_tour_mins
+
+        # Pricing & Margin
+        rate_frac = round(effective_margin / 100.0, 2)
+        pricing_obj = {
+            "productProgramMargin": {
+                "baseMargin": base_margin,
+                "boostMargin": boost_margin,
+                "isOptedIn": is_opted_in,
+                "averageActualMargin": effective_margin,
+                "minimumActualMargin": effective_margin,
+                "targetedMinimumMargin": base_margin,
+                "maxMargin": 50
+            },
+            "minimalMargins": {
+                "ADULT": rate_frac, "SENIOR": rate_frac, "YOUTH": rate_frac,
+                "CHILD": rate_frac, "INFANT": rate_frac
+            },
+            "minimumSuggestedRetailPriceByAgeBands": {
+                "ADULT": 5, "SENIOR": 5, "YOUTH": 0, "CHILD": 0, "INFANT": 0
+            }
+        }
+        if price_val:
+            net_val = fee_val if fee_val is not None else round(price_val * (1 - (effective_margin or 22.0)/100.0), 2)
+            pkg_ref = f"PPP-DEFAULT_{code}"
+            pricing_obj["pricingPackages"] = {
+                pkg_ref: {
+                    "reference": pkg_ref,
+                    "type": "TRAVELLER_BY_AGE_BAND",
+                    "priceTiersForAgeBands": {
+                        "ADULT": [{
+                            "price": {
+                                "retailPrice": price_val,
+                                "netPrice": net_val,
+                                "marginPercent": effective_margin
+                            },
+                            "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
+                        }]
+                    }
+                }
+            }
+
+        p_obj["pricing"] = pricing_obj
+
+        # Meeting & Logistics
+        mtg = parsed.get("meeting") or {}
+        p_obj["departureAndReturn"] = {
+            "meetingPoint": mtg.get("meeting point") or loc,
+            "meetingMode": mtg.get("meeting arrangement") or "MEET_AT_DEPARTURE_POINT",
+            "routeMapLink": mtg.get("route map") or parsed.get("links", {}).get("route map"),
+            "endsAtStartPoint": "yes" in str(mtg.get("ends where starts", "yes")).lower()
+        }
+        p_obj["pickupOption"] = {
+            "pickupType": mtg.get("pickup transport type") or mtg.get("pickup type") or "VEHICLE",
+            "pickupVehicleDescription": mtg.get("pickup vehicle") or "Mercedes Executive Van",
+            "endsAtStartPoint": "yes" in str(mtg.get("ends where starts", "yes")).lower(),
+            "isPickupOfferedAndOptional": "yes" in str(mtg.get("pickup optional", "no")).lower()
+        }
+
+        # Booking & Tickets
+        bkg = parsed.get("booking") or {}
+        p_obj["bookingConfirmationSettings"] = {
+            "confirmationType": bkg.get("confirmation type") or "INSTANT",
+            "bookingCutoffInHours": int(re.search(r"\d+", bkg.get("cut-off hours") or "24").group(0))
+        }
+        p_obj["cancellationPolicy"] = {
+            "cancellationPolicyType": {"displayText": bkg.get("cancellation policy") or "STANDARD"},
+            "supplierCanCancelOnBadWeather": "yes" in str(bkg.get("bad-weather cancellation", "yes")).lower()
+        }
+        tkt = parsed.get("tickets") or {}
+        p_obj["voucher"] = {
+            "ticketType": tkt.get("ticket format") or "ELECTRONIC",
+            "ticketsPerBooking": tkt.get("tickets per booking") or "PER_BOOKING",
+            "showBarcodeOnTicket": "yes" in str(tkt.get("show barcode on ticket", "yes")).lower(),
+            "specialInstructions": tkt.get("special instructions") or ""
+        }
+
+        # Language guides
+        opt_lang = ov.get("languages") or ov.get("language") or "English"
+        p_obj["languageGuidesDetails"] = {
+            "languageGuides": [s.strip() for s in opt_lang.split(",")],
+            "languageGuidesAttributes": {
+                "isHumanGuideCertified": "yes" in str(ov.get("guide certified", "yes")).lower(),
+                "isHumanGuideDriver": "yes" in str(ov.get("guide is driver", "yes")).lower()
+            }
+        }
+
+        # Quality Traits
+        traits_map = {
+            "TITLE": bool(title and len(title) >= 10),
+            "ITINERARY": bool(parsed.get("attractions")),
+            "INCLUSION_EXCLUSION": bool(parsed.get("inclusions") or parsed.get("exclusions")),
+            "LANGUAGES": True,
+            "TRAVELLER_PICKUP": True,
+            "PRICING_MINIMAL_MARGINS": bool(effective_margin >= 20),
+            "PRODUCT_UNIQUENESS": bool(len(p_obj.get("description") or "") >= 50),
+            "CUSTOMIZABLE": True,
+            "START_END_POINTS": True,
+            "VOUCHER_BASICS": True,
+        }
+        snap_traits = {
+            t_k: {
+                "name": t_k.replace("_", " ").title(),
+                "isSatisfied": satisfied,
+                "violations": [] if satisfied else [{"type": f"MISSING_{t_k}"}]
+            }
+            for t_k, satisfied in traits_map.items()
+        }
+
+        snap = {
+            "product": p_obj,
+            "pricing": pricing_obj,
+            "product_options": {
+                f"OPT-{code}": {
+                    "ref": f"OPT-{code}",
+                    "title": f"Tour in {opt_lang}",
+                    "language": opt_lang
+                }
+            },
+            "product_traits": {code: snap_traits},
+            "imported_from_spreadsheet": True
+        }
+
+        sync_id = db.start_sync(con, account_id, email)
+        db.save_snapshot(con, pid, sync_id, account_id, email, snap)
+        db.finish_sync(con, sync_id, "done", f"Created product {code} from structured raw text by {email}")
+
+    log(f"{email} created product {pid} ({code}) using structured raw text")
+    return {"ok": True, "product_id": pid, "product_code": code, "title": title}
 
 
 @app.get("/api/thumb/{pid}")

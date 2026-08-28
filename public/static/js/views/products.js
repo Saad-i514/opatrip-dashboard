@@ -3,6 +3,7 @@ import { $, cachedApi, el, esc, q } from '../core.js';
 import { monthName, qualBadge, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { openDrawer, when } from './drawer.js';
+import { openCreateProductModal } from '../edit.js';
 
 /* ======================= products ======================= */
 
@@ -87,7 +88,10 @@ export async function viewProducts(){
       <option value="">Changed or not</option>
       ${opts(CHANGED, S.pf.changed)}</select>
     <span class="pill">${d.products.length} shown</span>
-    <button class="btn ghost sm" id="pclear">Clear</button>`;
+    <button class="btn ghost sm" id="pclear">Clear</button>
+    <button class="btn primary sm" id="btnAddProductBtn" style="margin-left:auto;padding:6px 14px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer">
+      <span>+</span> Add Product
+    </button>`;
   v.appendChild(f);
   const set = (k, val) => { S.pf[k] = val; viewProducts(); };
   f.querySelector('#pq').oninput = e=>{S.pf.q=e.target.value; debounce(viewProducts);};
@@ -101,6 +105,8 @@ export async function viewProducts(){
                          reviews:'',missing:'',month:'',changed:''});
     viewProducts();
   };
+  const addBtn = f.querySelector('#btnAddProductBtn');
+  if (addBtn) addBtn.onclick = () => openCreateProductModal(S.acct);
   // Say what is being filtered in words. A count alone ("447 shown") leaves people
   // wondering why the other 670 vanished.
   const active = [
