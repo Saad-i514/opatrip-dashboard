@@ -34,12 +34,12 @@ export function secOverview(p){
     ['Group type', it.privateTour===undefined?null:(it.privateTour?'Private':'Shared'), 'product.itinerary.privateTour'],
     ['Customizable', it.isCustomizable, 'product.itinerary.isCustomizable'],
     ['Customizable parts', (p.enabledCustomizationType||[]).length
-        ? chips((p.enabledCustomizationType||[]).map(sentence)) : null],
+        ? chips((p.enabledCustomizationType||[]).map(sentence)) : null, 'product.enabledCustomizationType'],
     ['Skip the line', it.skipTheLine, 'product.itinerary.skipTheLine'],
-    ['Product types', (tx.productTypes||[]).length?chips((tx.productTypes||[]).map(sentence)):null],
-    ['Tour modes', names('TOUR_MODE').length?chips(names('TOUR_MODE')):null],
-    ['Themes', p.themes ? chips(Array.isArray(p.themes)?p.themes:String(p.themes).split(',').map(s=>s.trim())) : (names('THEME').length?chips(names('THEME')):null)],
-    ['Guide languages', langs.length?chips(langs):null],
+    ['Product types', (tx.productTypes||[]).length?chips((tx.productTypes||[]).map(sentence)):null, 'product.taxonomy.productTypes'],
+    ['Tour modes', names('TOUR_MODE').length?chips(names('TOUR_MODE')):null, 'product.taxonomy.taxonomyItems.taxonomyItemsMap.TOUR_MODE'],
+    ['Themes', p.themes ? chips(Array.isArray(p.themes)?p.themes:String(p.themes).split(',').map(s=>s.trim())) : (names('THEME').length?chips(names('THEME')):null), 'product.themes'],
+    ['Guide languages', langs.length?chips(langs):null, 'product.languageGuidesDetails.languageGuides'],
     ['Guide certified', lga.isHumanGuideCertified, 'product.languageGuidesDetails.languageGuidesAttributes.isHumanGuideCertified'],
     ['Guide is the driver', lga.isHumanGuideDriver, 'product.languageGuidesDetails.languageGuidesAttributes.isHumanGuideDriver'],
     ['Guide status', lga.guideStatus ? sentence(lga.guideStatus) : null, 'product.languageGuidesDetails.languageGuidesAttributes.guideStatus'],
@@ -163,11 +163,11 @@ export function secTourDetails(p){
       && ai.isNonConformingItinerary === undefined) return null;
   const f = document.createDocumentFragment();
   f.appendChild(rows([
-    ['Total duration', totalDuration(it), 'product.itinerary.durationInMinutes'],
-    ['Stops', stops.length || null],
-    ['Time at stops', stops.length
-      ? fmtDuration(stops.reduce((a,s)=>a+(s.durationInMinutes||0),0)) : null],
-    ['Days', (it.days||[]).length || null],
+    ['Total duration', p.duration || totalDuration(it), 'product.itinerary.durationInMinutes'],
+    ['Stops', stops.length || null, 'product.itinerary.itineraryItems'],
+    ['Time at stops', stops.length && stops.some(s=>s.durationInMinutes)
+      ? fmtDuration(stops.reduce((a,s)=>a+(s.durationInMinutes||0),0)) : null, 'product.itinerary.timeAtStops'],
+    ['Days', (it.days||[]).length || null, 'product.itinerary.days'],
     ['Meets Viator’s itinerary rules', ai.isNonConformingItinerary === undefined
       ? null : !ai.isNonConformingItinerary,
      'product.activityItinerary.isNonConformingItinerary'],
@@ -235,12 +235,12 @@ export function secMeeting(p){
   if (!pts.length && !po.pickupOptionType && !dr.type && !meetingPoint && !routeMap) return null;
   const f = document.createDocumentFragment();
   f.appendChild(rows([
-    ['Meeting point / Area', meetingPoint],
+    ['Meeting point / Area', meetingPoint, 'product.departureAndReturn.meetingPoint'],
     ['Meeting arrangement', (dr.meetingMode||po.pickupOptionType||dr.type)
-      ? sentence(dr.meetingMode||po.pickupOptionType||dr.type) : null, 'product.pickupOption.pickupOptionType'],
-    ['Pickup transport type', pickupType],
-    ['Pickup vehicle', pickupVehicle],
-    ['Route map link', routeMap ? `<a href="${esc(routeMap)}" target="_blank" rel="noopener">Open Route on Google Maps ↗</a>` : null],
+      ? sentence(dr.meetingMode||po.pickupOptionType||dr.type) : null, 'product.departureAndReturn.meetingMode'],
+    ['Pickup transport type', pickupType, 'product.pickupOption.pickupType'],
+    ['Pickup vehicle', pickupVehicle, 'product.pickupOption.pickupVehicleDescription'],
+    ['Route map link', routeMap ? `<a href="${esc(routeMap)}" target="_blank" rel="noopener">Open Route on Google Maps ↗</a>` : null, 'product.departureAndReturn.routeMapLink'],
     ...(p.hasStartEndPointLocationDropped
         ? [['Start/end point location dropped by Viator', 'Yes — re-check the meeting point',
             'product.hasStartEndPointLocationDropped']] : []),
