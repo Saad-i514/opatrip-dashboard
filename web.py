@@ -1371,6 +1371,15 @@ def parse_raw_product_text(text: str) -> dict:
         elif upper in ("TICKETS", "VOUCHER"):
             current_section = "TICKETS"
             continue
+        elif upper in ("ADDITIONAL INFO", "ADDITIONAL INFORMATION", "KNOW BEFORE YOU GO"):
+            current_section = "ADDITIONAL_INFO"
+            continue
+        elif upper in ("FAQS", "FAQ", "FREQUENTLY ASKED QUESTIONS"):
+            current_section = "FAQS"
+            continue
+        elif upper in ("CONNECTIVITY", "CONNECTION", "PRODUCT CONNECTION"):
+            current_section = "CONNECTIVITY"
+            continue
         elif upper in ("LINKS", "SOURCE LINKS", "SOURCES"):
             current_section = "LINKS"
             continue
@@ -1410,6 +1419,21 @@ def parse_raw_product_text(text: str) -> dict:
             if ":" in line:
                 k, v = line.split(":", 1)
                 data["tickets"][k.strip().lower()] = v.strip()
+
+        elif current_section == "ADDITIONAL_INFO":
+            clean = re.sub(r"^[\*\-•\d\.]+\s*", "", line).strip()
+            if clean:
+                data.setdefault("additionalInfo", []).append(clean)
+
+        elif current_section == "FAQS":
+            clean = re.sub(r"^[\*\-•\d\.]+\s*", "", line).strip()
+            if clean:
+                data.setdefault("faqs", []).append(clean)
+
+        elif current_section == "CONNECTIVITY":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data.setdefault("connectivity", {})[k.strip().lower()] = v.strip()
 
         elif current_section == "ATTRACTIONS":
             clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
@@ -1511,7 +1535,11 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
                 "title": f"Tour in {opt_lang}",
                 "language": opt_lang
             }
-            p_obj.setdefault("languageGuidesDetails", {})["languageGuides"] = [opt_lang]
+            p_obj.setdefault("languageGuidesDetails", {})["languageGuides"] = [s.strip() for s in opt_lang.split(",")]
+        if "guide certified" in ov:
+            p_obj.setdefault("languageGuidesDetails", {}).setdefault("languageGuidesAttributes", {})["isHumanGuideCertified"] = "yes" in ov["guide certified"].lower() or "true" in ov["guide certified"].lower()
+        if "guide is driver" in ov:
+            p_obj.setdefault("languageGuidesDetails", {}).setdefault("languageGuidesAttributes", {})["isHumanGuideDriver"] = "yes" in ov["guide is driver"].lower() or "true" in ov["guide is driver"].lower()
         if "location" in ov:
             p_obj["location"] = ov["location"]
             con.execute("UPDATE products SET location=? WHERE id=?", (ov["location"], pid))
@@ -1522,10 +1550,23 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
             p_obj.setdefault("itinerary", {})["skipTheLine"] = "yes" in ov["skip the line"].lower() or "true" in ov["skip the line"].lower()
         if "customizable" in ov:
             p_obj.setdefault("itinerary", {})["isCustomizable"] = "yes" in ov["customizable"].lower() or "true" in ov["customizable"].lower()
+        if "customizable parts" in ov:
+            p_obj["enabledCustomizationType"] = [s.strip().upper().replace(" ", "_") for s in ov["customizable parts"].split(",")]
         if "product type" in ov:
             p_obj["productClassification"] = ov["product type"]
         if "itinerary type" in ov:
             p_obj.setdefault("itinerary", {})["productItineraryType"] = ov["itinerary type"].upper()
+        if "tour modes" in ov:
+            modes = [s.strip().upper().replace(" ", "_") for s in ov["tour modes"].split(",")]
+            p_obj.setdefault("taxonomy", {}).setdefault("taxonomyItems", {}).setdefault("taxonomyItemsMap", {})["TOUR_MODE"] = [{"name": m} for m in modes]
+        if "product types" in ov:
+            p_obj.setdefault("taxonomy", {})["productTypes"] = [s.strip().upper().replace(" ", "_") for s in ov["product types"].split(",")]
+        if "reseller status" in ov:
+            p_obj["resellerInfo"] = ov["reseller status"]
+        if "helpline" in ov:
+            p_obj.setdefault("contactDetail", {})["phoneNumber"] = ov["helpline"]
+        if "public page" in ov:
+            p_obj["localizedViatorUrl"] = ov["public page"]
 
         # 3. Update Meeting & Pickup
         mtg = parsed.get("meeting") or {}
@@ -1547,6 +1588,12 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
             p_obj.setdefault("pickupOption", {})["pickupVehicleDescription"] = mtg.get("pickup vehicle") or mtg.get("vehicle description")
         if "meeting arrangement" in mtg:
             p_obj.setdefault("departureAndReturn", {})["meetingMode"] = mtg["meeting arrangement"]
+        if "ends where starts" in mtg or "ends at start point" in mtg:
+            val_ends = "yes" in str(mtg.get("ends where starts") or mtg.get("ends at start point")).lower()
+            p_obj.setdefault("pickupOption", {})["endsAtStartPoint"] = val_ends
+            p_obj.setdefault("departureAndReturn", {})["endsAtStartPoint"] = val_ends
+        if "pickup optional" in mtg:
+            p_obj.setdefault("pickupOption", {})["isPickupOfferedAndOptional"] = "yes" in str(mtg["pickup optional"]).lower()
 
         # 4. Update Attractions & Auto-Calculate Dwell Time Sum and Compliance
         if parsed.get("attractions"):
@@ -1569,6 +1616,12 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
         if parsed.get("description"):
             p_obj["description"] = parsed["description"]
             p_obj["briefDescription"] = parsed["description"][:240].strip()
+
+        # Additional info & FAQs
+        if parsed.get("additionalInfo"):
+            p_obj["additionalInfo"] = parsed["additionalInfo"]
+        if parsed.get("faqs"):
+            p_obj["productFaqs"] = [{"question": q, "title": q} for q in parsed["faqs"]]
 
         # 6. Update Pricing & Automated Viator Program Margin Calculation
         pr = parsed.get("pricing") or {}
@@ -1657,6 +1710,13 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
         tkt = parsed.get("tickets") or {}
         if "ticket format" in tkt:
             p_obj.setdefault("voucher", {})["ticketType"] = tkt["ticket format"]
+
+        # Connectivity
+        conn = parsed.get("connectivity") or {}
+        if "supplier code" in conn or "product code" in conn:
+            p_obj.setdefault("connectionDetails", {})["supplierProductCode"] = conn.get("supplier code") or conn.get("product code")
+        if "reservation system" in conn:
+            snap.setdefault("connectivity", {})["reservationSystemName"] = conn["reservation system"]
 
         # 9. Quality & Status
         q = parsed.get("quality") or {}
