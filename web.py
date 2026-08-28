@@ -1353,6 +1353,8 @@ class SpreadsheetImportIn(BaseModel):
     country: str | None = None
     spreadsheet_url: str | None = None
     csv_content: str | None = None
+    file_b64: str | None = None
+    filename: str | None = None
 
 
 def _download_google_sheet_csv(url: str) -> str:
@@ -1378,7 +1380,7 @@ def _download_google_sheet_csv(url: str) -> str:
                 raise HTTPException(
                     400,
                     "Unable to access Google Spreadsheet. Please ensure the link sharing permission "
-                    "in Google Drive is set to 'Anyone with the link can view', or upload a CSV file directly."
+                    "in Google Drive is set to 'Anyone with the link can view', or upload the spreadsheet file directly."
                 )
             return data
     except HTTPException:
@@ -1387,26 +1389,81 @@ def _download_google_sheet_csv(url: str) -> str:
         raise HTTPException(
             400,
             f"Failed to fetch spreadsheet from Google: {e}. "
-            "Please check permissions ('Anyone with the link can view') or upload a CSV file directly."
+            "Please check permissions ('Anyone with the link can view') or upload the spreadsheet file directly."
         )
+
+
+def _parse_xlsx_bytes(data_bytes: bytes) -> list[dict]:
+    """Parse Excel (.xlsx) file into list of row dicts using standard library."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+    import io
+    try:
+        with zipfile.ZipFile(io.BytesIO(data_bytes)) as z:
+            shared_strings = []
+            if "xl/sharedStrings.xml" in z.namelist():
+                tree = ET.fromstring(z.read("xl/sharedStrings.xml"))
+                ns = {"ns": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+                for si in tree.findall(".//ns:si", ns) or tree.findall(".//si"):
+                    t = si.find(".//ns:t", ns) or si.find(".//t")
+                    shared_strings.append(t.text if t is not None and t.text else "")
+            sheet_xml = z.read("xl/worksheets/sheet1.xml")
+            tree = ET.fromstring(sheet_xml)
+            ns = {"ns": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+            rows = []
+            for row in tree.findall(".//ns:row", ns) or tree.findall(".//row"):
+                r_data = []
+                for c in row.findall(".//ns:c", ns) or row.findall(".//c"):
+                    t_attr = c.attrib.get("t")
+                    v = c.find(".//ns:v", ns) or c.find(".//v")
+                    val = v.text if v is not None and v.text else ""
+                    if t_attr == "s" and val.isdigit() and int(val) < len(shared_strings):
+                        val = shared_strings[int(val)]
+                    r_data.append(val)
+                if r_data:
+                    rows.append(r_data)
+            if not rows:
+                return []
+            headers = [str(h).strip() for h in rows[0]]
+            out_rows = []
+            for r in rows[1:]:
+                d = {}
+                for idx, h in enumerate(headers):
+                    if h:
+                        d[h] = r[idx] if idx < len(r) else ""
+                out_rows.append(d)
+            return out_rows
+    except Exception as ex:
+        raise HTTPException(400, f"Failed to parse Excel file: {ex}. Please upload as CSV or check file format.")
 
 
 @app.post("/api/spreadsheet/import")
 def spreadsheet_import(i: SpreadsheetImportIn):
-    """Import product catalogue data into an account from a Google Spreadsheet or CSV."""
-    raw_csv = (i.csv_content or "").strip()
-    if not raw_csv and i.spreadsheet_url:
-        raw_csv = _download_google_sheet_csv(i.spreadsheet_url.strip())
-    
-    if not raw_csv:
-        raise HTTPException(400, "No spreadsheet data provided. Please provide a Google Spreadsheet URL or upload a CSV file.")
-
+    """Import product catalogue data into an account from a Google Spreadsheet or uploaded file."""
+    import base64
     import csv
     import io
-    reader = csv.DictReader(io.StringIO(raw_csv))
-    rows = list(reader)
+
+    rows = []
+    if i.file_b64:
+        fn = (i.filename or "").lower()
+        file_bytes = base64.b64decode(i.file_b64)
+        if fn.endswith(".xlsx") or fn.endswith(".xls"):
+            rows = _parse_xlsx_bytes(file_bytes)
+        else:
+            text = file_bytes.decode("utf-8", errors="replace")
+            reader = csv.DictReader(io.StringIO(text))
+            rows = list(reader)
+    elif i.csv_content:
+        reader = csv.DictReader(io.StringIO(i.csv_content.strip()))
+        rows = list(reader)
+    elif i.spreadsheet_url:
+        raw_csv = _download_google_sheet_csv(i.spreadsheet_url.strip())
+        reader = csv.DictReader(io.StringIO(raw_csv))
+        rows = list(reader)
+
     if not rows:
-        raise HTTPException(400, "The spreadsheet contains no data rows.")
+        raise HTTPException(400, "No data rows found. Please provide a valid Google Spreadsheet link or upload a spreadsheet file.")
 
     # Helper to resolve case-insensitive column headers
     def get_col(row, *aliases):
@@ -1450,8 +1507,8 @@ def spreadsheet_import(i: SpreadsheetImportIn):
         updated_count = 0
 
         for idx, row in enumerate(rows):
-            code = get_col(row, "product_code", "product code", "code", "productcode", "product id", "id", "tour code", "item code")
-            title = get_col(row, "title", "product title", "product name", "tour name", "name", "tour title")
+            code = get_col(row, "job id", "job_id", "product_code", "product code", "code", "productcode", "product id", "id", "tour code", "item code")
+            title = get_col(row, "product title", "product_title", "title", "product name", "tour name", "name", "tour title")
             
             if not title and not code:
                 continue
@@ -1464,7 +1521,15 @@ def spreadsheet_import(i: SpreadsheetImportIn):
 
             raw_status = get_col(row, "status", "product status", "lifecycle", "state") or "LIVE"
             canon_status = db.canonical_status(con, plat_id, raw_status)
-            location = get_col(row, "location", "city", "destination", "country", "place")
+
+            # Location from Meeting Point / Pickup Area or Location column
+            location_raw = get_col(row, "meeting point / pickup area", "meeting point", "pickup area", "location", "city", "destination", "country", "place")
+            location = location_raw
+            if location_raw and "," in location_raw:
+                parts = [p.strip() for p in location_raw.split(",") if p.strip()]
+                if len(parts) >= 2:
+                    location = parts[-1]
+
             quality = get_col(row, "quality", "quality level", "quality_level", "rating score")
             conn_state = get_col(row, "connection", "connection state", "connection_state", "connected")
             
@@ -1473,9 +1538,38 @@ def spreadsheet_import(i: SpreadsheetImportIn):
             review_count = int(rev_cnt_raw) if rev_cnt_raw and rev_cnt_raw.isdigit() else None
             review_rating = float(rev_rating_raw) if rev_rating_raw and re.match(r"^\d+(\.\d+)?$", rev_rating_raw) else None
 
-            price_raw = get_col(row, "price", "retail price", "retail_price", "srp", "suggested retail price", "cost")
+            # Pricing
+            price_raw = get_col(row, "public price (usd)", "public price", "guide fee", "price", "retail price", "retail_price", "srp", "suggested retail price", "cost")
             currency = get_col(row, "currency", "curr") or "USD"
-            opt_title = get_col(row, "option", "option title", "tour grade", "tour_grade")
+
+            # Details
+            duration = get_col(row, "duration", "total duration")
+            theme_cat = get_col(row, "theme category", "category", "themes")
+            inclusions_raw = get_col(row, "inclusions", "included")
+            exclusions_raw = get_col(row, "exclusions", "excluded")
+            description = get_col(row, "unique description", "description", "brief description", "summary")
+            opt_title = get_col(row, "guide languages", "guide language", "language", "option", "option title", "tour grade")
+            attractions_raw = get_col(row, "attractions", "itinerary", "highlights")
+
+            inclusions_list = [x.strip() for x in (inclusions_raw or "").splitlines() if x.strip()]
+            exclusions_list = [x.strip() for x in (exclusions_raw or "").splitlines() if x.strip()]
+
+            # Itinerary stops
+            itinerary_items = []
+            if attractions_raw:
+                for line in attractions_raw.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
+                    parts = re.split(r"\s*[–—\-]\s*", clean_line, maxsplit=1)
+                    stop_name = parts[0].strip()
+                    details = parts[1].strip() if len(parts) > 1 else ""
+                    itinerary_items.append({
+                        "title": stop_name,
+                        "description": details,
+                        "admissionType": "NOT_APPLICABLE" if "na" in details.lower() else ("NO" if "no" in details.lower() else "YES")
+                    })
 
             tid = db.upsert_tour(con, title)
 
@@ -1508,6 +1602,15 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                     "status": raw_status,
                     "location": location,
                     "currency": currency,
+                    "duration": duration,
+                    "category": theme_cat,
+                    "description": description,
+                    "briefDescription": description[:240] if description else None,
+                    "inclusions": inclusions_list,
+                    "exclusions": exclusions_list,
+                    "itinerary": {
+                        "itineraryItems": itinerary_items
+                    } if itinerary_items else {},
                     "quality": {"level": quality} if quality else None,
                     "pricing": {
                         "scheduleStartDay": "MONDAY",
@@ -1525,9 +1628,9 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                 "product_options": {
                     f"OPT-{code}": {
                         "ref": f"OPT-{code}",
-                        "title": opt_title or title,
+                        "title": f"Tour in {opt_title}" if opt_title and not opt_title.lower().startswith("tour") else (opt_title or title),
                         "tourGradeCode": "TG1",
-                        "language": "en"
+                        "language": opt_title or "English"
                     }
                 } if opt_title else {},
                 "imported_from_spreadsheet": True,
@@ -1537,17 +1640,18 @@ def spreadsheet_import(i: SpreadsheetImportIn):
             if price_raw:
                 try:
                     price_val = float(re.sub(r"[^\d.]+", "", price_raw))
-                    pkg_ref = f"PPP-DEFAULT_{code}"
-                    normalized["product"]["pricing"]["pricingPackages"][pkg_ref] = {
-                        "reference": pkg_ref,
-                        "type": "TRAVELLER_BY_AGE_BAND",
-                        "priceTiersForAgeBands": {
-                            "ADULT": [{
-                                "price": {"retailPrice": price_val, "netPrice": round(price_val * 0.78, 2)},
-                                "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
-                            }]
+                    if price_val > 0:
+                        pkg_ref = f"PPP-DEFAULT_{code}"
+                        normalized["product"]["pricing"]["pricingPackages"][pkg_ref] = {
+                            "reference": pkg_ref,
+                            "type": "TRAVELLER_BY_AGE_BAND",
+                            "priceTiersForAgeBands": {
+                                "ADULT": [{
+                                    "price": {"retailPrice": price_val, "netPrice": round(price_val * 0.78, 2)},
+                                    "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
+                                }]
+                            }
                         }
-                    }
                 except Exception:
                     pass
 
@@ -1595,4 +1699,5 @@ def status():
 def sessions_list():
     """Always empty: a session is an open browser, and this deployment has none."""
     return {"sessions": [], "read_only": True}
+
 

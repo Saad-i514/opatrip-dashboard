@@ -28,7 +28,9 @@ export function openAddAccountModal(){
         newId = host.querySelector('#mNewAcctId'),
         newCountry = host.querySelector('#mNewAcctCountry'),
         sheetUrl = host.querySelector('#mSheetUrl'),
+        dropZone = host.querySelector('#mDropZone'),
         csvFile = host.querySelector('#mCsvFile'),
+        fileNameDisplay = host.querySelector('#mFileName'),
         err = host.querySelector('#mErr'),
         goBtn = host.querySelector('#mGo');
 
@@ -52,15 +54,55 @@ export function openAddAccountModal(){
   };
   newId.oninput = () => { newId.dataset.edited = '1'; };
 
-  let fileContent = null;
-  csvFile.onchange = (e) => {
-    const f = e.target.files[0];
-    if (f) {
+  let filePayload = null;
+  const handleFile = (f) => {
+    if (!f) return;
+    fileNameDisplay.classList.remove('hidden');
+    fileNameDisplay.textContent = `✓ Selected: ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+    sheetUrl.value = ''; // clear URL input when file is selected
+    
+    if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) {
       const reader = new FileReader();
-      reader.onload = () => { fileContent = reader.result; };
-      reader.readAsText(f);
+      reader.onload = () => {
+        const bytes = new Uint8Array(reader.result);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        filePayload = {
+          filename: f.name,
+          data_b64: btoa(binary),
+          type: 'excel'
+        };
+      };
+      reader.readAsArrayBuffer(f);
     } else {
-      fileContent = null;
+      const reader = new FileReader();
+      reader.onload = () => {
+        filePayload = {
+          filename: f.name,
+          data_csv: reader.result,
+          type: 'csv'
+        };
+      };
+      reader.readAsText(f);
+    }
+  };
+
+  dropZone.onclick = () => csvFile.click();
+  csvFile.onchange = (e) => handleFile(e.target.files[0]);
+
+  dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--accent)'; };
+  dropZone.ondragleave = () => { dropZone.style.borderColor = 'var(--line-2)'; };
+  dropZone.ondrop = (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--line-2)';
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  };
+
+  sheetUrl.oninput = () => {
+    if (sheetUrl.value.trim()) {
+      filePayload = null;
+      csvFile.value = '';
+      fileNameDisplay.classList.add('hidden');
     }
   };
 
@@ -90,9 +132,9 @@ export function openAddAccountModal(){
     }
 
     const urlVal = (sheetUrl.value || '').trim();
-    if (!urlVal && !fileContent) {
+    if (!urlVal && !filePayload) {
       err.className = 'banner';
-      err.textContent = 'Please provide a Google Spreadsheet link or choose a CSV file to upload.';
+      err.textContent = 'Please provide a Google Spreadsheet link or upload a spreadsheet file from your laptop.';
       sheetUrl.focus();
       return;
     }
@@ -107,7 +149,9 @@ export function openAddAccountModal(){
         account_name: targetAcctName || null,
         country: targetCountry || null,
         spreadsheet_url: urlVal || null,
-        csv_content: fileContent || null,
+        csv_content: filePayload && filePayload.type === 'csv' ? filePayload.data_csv : null,
+        file_b64: filePayload && filePayload.type === 'excel' ? filePayload.data_b64 : null,
+        filename: filePayload ? filePayload.filename : null,
       };
       const res = await post('/api/spreadsheet/import', payload);
       close();

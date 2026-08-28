@@ -41,7 +41,7 @@
    their own shapes — .pick and .btn style those. Anything NOT listed silently falls back
    to the browser's default border: password was missing, so the sign-in form showed a
    light grey box above a black one. Add the type here when a new one appears. */
-select,input[type=text],input[type=email],input[type=password]{background:var(--surface);
+select,input[type=text],input[type=email],input[type=password],input[type=url]{background:var(--surface);
   border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;color:var(--ink);
   outline:none;min-width:0}
 select:focus,input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}

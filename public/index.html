@@ -133,39 +133,48 @@
 <div id="modalHost"></div>
 <template id="tplAdd">
   <div class="scrim"></div>
-  <div class="modal card" style="max-width:520px">
+  <div class="modal card" style="max-width:540px">
     <h2 style="font-size:18px;margin-bottom:5px">Add Account &amp; Import Spreadsheet</h2>
     <p class="hint" style="margin:0 0 16px">
-      Choose an account and provide a Google Spreadsheet link to import product listings directly into the dashboard.
+      Choose a target account and provide a Google Spreadsheet link or upload a spreadsheet file from your laptop.
     </p>
     
     <label class="fl" style="margin-bottom:12px">Target Account
-      <select id="mAcctChoice">
+      <select id="mAcctChoice" style="width:100%">
         <option value="">-- Select an existing account --</option>
         <option value="__NEW__">+ Create a new account...</option>
       </select>
     </label>
 
-    <div id="mNewAcctFields" class="hidden" style="background:var(--bg-subtle,#f9fafb);padding:12px;border-radius:8px;margin-bottom:14px;border:1px solid var(--border,#e5e7eb)">
+    <div id="mNewAcctFields" class="hidden" style="background:var(--surface-2);padding:14px;border-radius:10px;margin-bottom:14px;border:1px solid var(--line-2)">
       <label class="fl" style="margin-bottom:10px">New Account Name
         <input type="text" id="mNewAcctName" placeholder="e.g. Opatrip US LLC - Local Tours in Switzerland">
       </label>
-      <label class="fl" style="margin-bottom:10px">Account ID / Code
-        <input type="text" id="mNewAcctId" placeholder="e.g. opatrip-switzerland">
-      </label>
-      <label class="fl" style="margin-bottom:0">Country (optional)
-        <input type="text" id="mNewAcctCountry" placeholder="e.g. Switzerland">
-      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label class="fl" style="margin-bottom:0">Account ID / Code
+          <input type="text" id="mNewAcctId" placeholder="e.g. opatrip-switzerland">
+        </label>
+        <label class="fl" style="margin-bottom:0">Country (optional)
+          <input type="text" id="mNewAcctCountry" placeholder="e.g. Switzerland">
+        </label>
+      </div>
     </div>
 
-    <label class="fl" style="margin-bottom:12px">Google Spreadsheet Link
+    <label class="fl" style="margin-bottom:14px">Google Spreadsheet Link
       <input type="url" id="mSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=0">
       <span class="hint">Ensure the spreadsheet sharing permission is set to <b>“Anyone with the link can view”</b>.</span>
     </label>
 
-    <div style="margin:10px 0 14px;display:flex;align-items:center;gap:10px">
-      <span class="hint" style="white-space:nowrap">Or upload CSV directly:</span>
-      <input type="file" id="mCsvFile" accept=".csv" style="font-size:12px">
+    <div style="position:relative;text-align:center;margin:12px 0 14px">
+      <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--line)"></div>
+      <span style="position:relative;background:var(--surface);padding:0 10px;font-size:12px;color:var(--ink-3);font-weight:600;text-transform:uppercase">OR</span>
+    </div>
+
+    <div id="mDropZone" style="border:2px dashed var(--line-2);border-radius:10px;padding:16px;text-align:center;background:var(--surface-2);cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:16px">
+      <div style="font-size:13.5px;font-weight:600;color:var(--ink)">Upload Spreadsheet File from Laptop</div>
+      <div class="hint" style="font-size:12px;margin-top:3px">Click to choose a <b>.xlsx</b>, <b>.xls</b>, <b>.csv</b>, or <b>.tsv</b> file</div>
+      <input type="file" id="mCsvFile" accept=".csv,.tsv,.xlsx,.xls" style="display:none">
+      <div id="mFileName" class="hidden" style="margin-top:8px;font-size:13px;font-weight:600;color:var(--accent)"></div>
     </div>
 
     <div id="mErr" class="banner hidden" style="margin-bottom:14px"></div>
