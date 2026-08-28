@@ -642,38 +642,40 @@ Review rating: 4.95`;
   }).join('');
 
   wrap.innerHTML = `<div class="scrim"></div>
-    <div class="modal card" style="max-width:860px;width:95%;max-height:92vh;display:flex;flex-direction:column;padding:24px;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,0.18)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="modal card" style="max-width:880px;width:95%;max-height:92vh;display:flex;flex-direction:column;padding:24px;border-radius:14px;box-shadow:0 24px 48px rgba(15,23,42,0.18);border:1px solid #e2e8f0;background:#ffffff">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #f1f5f9">
         <div>
-          <h2 style="font-size:20px;margin:0 0 4px;font-weight:700">Add New Product</h2>
-          <div class="hint" style="font-size:13px">Select an existing account and paste raw tour details. All recognized fields will be extracted and auto-calculated into a new listing.</div>
+          <h2 style="font-size:20px;margin:0 0 4px;font-weight:700;color:#0f172a;letter-spacing:-0.01em">Add New Product</h2>
+          <div class="hint" style="font-size:13px;color:#64748b;line-height:1.4">Select an existing account and paste raw tour details. All recognized fields will be extracted and auto-calculated into a new listing.</div>
         </div>
-        <button class="btn ghost sm" id="btnCloseCreateModal" style="font-size:20px;line-height:1;padding:4px 8px;cursor:pointer">&times;</button>
+        <button class="btn ghost sm" id="btnCloseCreateModal" style="font-size:22px;line-height:1;padding:4px 10px;cursor:pointer;color:#94a3b8;border-radius:6px" title="Close">&times;</button>
       </div>
 
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 14px;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
-        <label style="font-weight:600;font-size:13px;color:#1e293b;white-space:nowrap">Select Existing Account:</label>
-        <select id="createAcctSelect" style="flex:1;max-width:400px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;cursor:pointer">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 16px;border-radius:10px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px">
+        <label for="createAcctSelect" style="font-weight:600;font-size:13px;color:#334155;display:flex;align-items:center;gap:6px">
+          <span>🏢</span> Select Existing Account:
+        </label>
+        <select id="createAcctSelect" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13.5px;font-weight:500;background:#ffffff;color:#0f172a;cursor:pointer;outline:none;box-shadow:0 1px 2px rgba(0,0,0,0.04);transition:border-color 0.15s">
           ${acctOptions || '<option value="">(No accounts found - default)</option>'}
         </select>
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-        <button class="btn sm" id="btnFillCreateSample" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-weight:600;cursor:pointer">
-          📋 Load Full Sample Format
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <button class="btn sm" id="btnFillCreateSample" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#1e293b;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+          <span>📋</span> Load Full Sample Format
         </button>
-        <span class="hint" style="font-size:12px">Paste your raw tour text below or load the format template.</span>
+        <span class="hint" style="font-size:12px;color:#64748b">Paste your raw tour text below or load the format template.</span>
       </div>
 
       <div style="flex:1;min-height:340px;display:flex;flex-direction:column;margin-bottom:14px">
-        <textarea id="rawCreateProductText" style="flex:1;width:100%;height:350px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;padding:12px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical;outline:none;background:#fafbfc" placeholder="${esc(sampleTemplate)}"></textarea>
+        <textarea id="rawCreateProductText" style="flex:1;width:100%;height:350px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;padding:14px;border:1px solid #cbd5e1;border-radius:10px;resize:vertical;outline:none;background:#fafbfc;color:#1e293b;box-sizing:border-box" placeholder="${esc(sampleTemplate)}"></textarea>
       </div>
 
       <div id="rawCreateErr" class="banner hidden" style="margin-bottom:12px"></div>
 
-      <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center">
-        <button class="btn ghost" id="btnCancelCreate">Cancel</button>
-        <button class="btn primary" id="btnSaveCreate" style="padding:8px 20px;font-weight:600;display:flex;align-items:center;gap:6px">
+      <div style="display:flex;gap:12px;justify-content:flex-end;align-items:center;padding-top:8px;border-top:1px solid #f1f5f9">
+        <button class="btn ghost" id="btnCancelCreate" style="padding:8px 16px;font-weight:500">Cancel</button>
+        <button class="btn primary" id="btnSaveCreate" style="padding:8px 22px;font-weight:600;display:flex;align-items:center;gap:6px;border-radius:8px">
           <span>+</span> Save & Create Product
         </button>
       </div>
