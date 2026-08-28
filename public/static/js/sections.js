@@ -365,6 +365,18 @@ export function commissionOf(p){
   }
   const base = num(ppm.baseMargin), boost = num(ppm.boostMargin);
   if (base !== null) return ppm.isOptedIn ? base + (boost||0) : base;
+  if (num(p.commission_percent) !== null) return num(p.commission_percent);
+
+  // Auto-calculate from price and guide fee if available
+  try {
+    const pkgs = Object.values(pr.pricingPackages||{});
+    if (pkgs.length) {
+      const tier = (pkgs[0].priceTiersForAgeBands?.ADULT||[])[0];
+      const ret = tier?.price?.retailPrice;
+      const net = tier?.price?.netPrice;
+      if (ret && net && ret > 0) return Math.round(((ret - net)/ret)*1000)/10;
+    }
+  } catch(e){}
   return null;
 }
 

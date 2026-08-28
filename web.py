@@ -1576,6 +1576,29 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                         "admissionType": "NOT_APPLICABLE" if "na" in details.lower() else ("NO" if "no" in details.lower() else "YES")
                     })
 
+            price_val = None
+            fee_val = None
+            comm_percent = None
+
+            if price_raw and not price_raw.startswith("http"):
+                m = re.search(r"(\d+(?:\.\d+)?)", price_raw)
+                if m:
+                    try:
+                        price_val = float(m.group(1))
+                    except Exception:
+                        pass
+
+            if guide_fee_raw and not guide_fee_raw.startswith("http"):
+                m = re.search(r"(\d+(?:\.\d+)?)", guide_fee_raw)
+                if m:
+                    try:
+                        fee_val = float(m.group(1))
+                    except Exception:
+                        pass
+
+            if price_val and fee_val and price_val > 0:
+                comm_percent = round(((price_val - fee_val) / price_val) * 100, 1)
+
             tid = db.upsert_tour(con, title)
 
             existing_prod = con.execute(
@@ -1595,6 +1618,7 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                 connection_state=conn_state,
                 review_count=review_count,
                 review_rating=review_rating,
+                commission_percent=comm_percent,
                 tour_id=tid,
                 platform_id=plat_id,
             )
@@ -1618,6 +1642,7 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                     "admissionSourceLinks": adm_links,
                     "hoursSourceLinks": hours_links,
                     "guideFee": guide_fee_raw,
+                    "commission_percent": comm_percent,
                     "departureAndReturn": {
                         "type": meeting_mode,
                         "meetingMode": meeting_mode,
@@ -1634,6 +1659,10 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                     "quality": {"level": quality} if quality else None,
                     "pricing": {
                         "scheduleStartDay": "MONDAY",
+                        "productProgramMargin": {
+                            "baseMargin": comm_percent,
+                            "isOptedIn": False
+                        } if comm_percent is not None else None,
                         "seasons": {
                             f"SEA-DEFAULT_{code}": {
                                 "seasonRef": f"SEA-DEFAULT_{code}",
@@ -1657,23 +1686,23 @@ def spreadsheet_import(i: SpreadsheetImportIn):
                 "raw_row_data": dict(row)
             }
 
-            if price_raw:
-                try:
-                    price_val = float(re.sub(r"[^\d.]+", "", price_raw))
-                    if price_val > 0:
-                        pkg_ref = f"PPP-DEFAULT_{code}"
-                        normalized["product"]["pricing"]["pricingPackages"][pkg_ref] = {
-                            "reference": pkg_ref,
-                            "type": "TRAVELLER_BY_AGE_BAND",
-                            "priceTiersForAgeBands": {
-                                "ADULT": [{
-                                    "price": {"retailPrice": price_val, "netPrice": round(price_val * 0.78, 2)},
-                                    "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
-                                }]
-                            }
-                        }
-                except Exception:
-                    pass
+            if price_val:
+                net_val = fee_val if fee_val is not None else round(price_val * (1 - (comm_percent or 22.0)/100.0), 2)
+                pkg_ref = f"PPP-DEFAULT_{code}"
+                normalized["product"]["pricing"]["pricingPackages"][pkg_ref] = {
+                    "reference": pkg_ref,
+                    "type": "TRAVELLER_BY_AGE_BAND",
+                    "priceTiersForAgeBands": {
+                        "ADULT": [{
+                            "price": {
+                                "retailPrice": price_val,
+                                "netPrice": net_val,
+                                "marginPercent": comm_percent
+                            },
+                            "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
+                        }]
+                    }
+                }
 
             db.save_snapshot(con, pid, sync_id, account_pk, operator_email, normalized)
 
