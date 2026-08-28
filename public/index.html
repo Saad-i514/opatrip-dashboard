@@ -105,8 +105,6 @@
   </div>
   <div class="grow"></div>
   <select id="acct" title="Show data for" style="max-width:280px"></select>
-  <button class="btn" id="btnFetch" disabled>Fetch</button>
-  <button class="btn ghost" id="btnStop">Stop</button>
   <button class="btn primary" id="btnAdd">+ Add Account</button>
 </div>
 
@@ -135,24 +133,45 @@
 <div id="modalHost"></div>
 <template id="tplAdd">
   <div class="scrim"></div>
-  <div class="modal card">
-    <h2 style="font-size:18px;margin-bottom:5px">Add account &amp; sign in</h2>
-    <p class="hint" style="margin:0 0 18px">
-      <b>Open browser</b> launches a Viator window. Sign in there by hand (including any
-      2FA), then come back and press <b>Fetch</b>.
+  <div class="modal card" style="max-width:520px">
+    <h2 style="font-size:18px;margin-bottom:5px">Add Account &amp; Import Spreadsheet</h2>
+    <p class="hint" style="margin:0 0 16px">
+      Choose an account and provide a Google Spreadsheet link to import product listings directly into the dashboard.
     </p>
-    <label class="fl">Email you'll sign in with
-      <input type="email" id="mEmail" placeholder="you@gmail.com" autocomplete="email">
-      <span class="hint">Recorded against every change found, so you can see who ran what.</span>
+    
+    <label class="fl" style="margin-bottom:12px">Target Account
+      <select id="mAcctChoice">
+        <option value="">-- Select an existing account --</option>
+        <option value="__NEW__">+ Create a new account...</option>
+      </select>
     </label>
-    <label class="fl">Viator account
-      <select id="mAcct"></select>
-      <span class="hint">Leave as “New account” — the account is detected after you sign in.</span>
+
+    <div id="mNewAcctFields" class="hidden" style="background:var(--bg-subtle,#f9fafb);padding:12px;border-radius:8px;margin-bottom:14px;border:1px solid var(--border,#e5e7eb)">
+      <label class="fl" style="margin-bottom:10px">New Account Name
+        <input type="text" id="mNewAcctName" placeholder="e.g. Opatrip US LLC - Local Tours in Switzerland">
+      </label>
+      <label class="fl" style="margin-bottom:10px">Account ID / Code
+        <input type="text" id="mNewAcctId" placeholder="e.g. opatrip-switzerland">
+      </label>
+      <label class="fl" style="margin-bottom:0">Country (optional)
+        <input type="text" id="mNewAcctCountry" placeholder="e.g. Switzerland">
+      </label>
+    </div>
+
+    <label class="fl" style="margin-bottom:12px">Google Spreadsheet Link
+      <input type="url" id="mSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=0">
+      <span class="hint">Ensure the spreadsheet sharing permission is set to <b>“Anyone with the link can view”</b>.</span>
     </label>
+
+    <div style="margin:10px 0 14px;display:flex;align-items:center;gap:10px">
+      <span class="hint" style="white-space:nowrap">Or upload CSV directly:</span>
+      <input type="file" id="mCsvFile" accept=".csv" style="font-size:12px">
+    </div>
+
     <div id="mErr" class="banner hidden" style="margin-bottom:14px"></div>
     <div style="display:flex;gap:9px;justify-content:flex-end">
       <button class="btn ghost" id="mCancel">Cancel</button>
-      <button class="btn primary" id="mGo">Open browser</button>
+      <button class="btn primary" id="mGo">Import Spreadsheet</button>
     </div>
   </div>
 </template>

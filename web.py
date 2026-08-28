@@ -1346,6 +1346,236 @@ def image(image_id: int):
     raise HTTPException(404, "image not available")
 
 
+class SpreadsheetImportIn(BaseModel):
+    account_choice: str = "existing"  # "existing" or "new"
+    account_id: str
+    account_name: str | None = None
+    country: str | None = None
+    spreadsheet_url: str | None = None
+    csv_content: str | None = None
+
+
+def _download_google_sheet_csv(url: str) -> str:
+    """Extract CSV from a Google Spreadsheet shareable link."""
+    m_id = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", url)
+    if not m_id:
+        raise HTTPException(400, "Invalid Google Spreadsheet link. URL must look like: https://docs.google.com/spreadsheets/d/.../edit")
+    sheet_id = m_id.group(1)
+    m_gid = re.search(r"[?&#]gid=([0-9]+)", url)
+    gid = m_gid.group(1) if m_gid else "0"
+    export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    
+    import urllib.request
+    req = urllib.request.Request(
+        export_url,
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = resp.read().decode("utf-8", errors="replace")
+            # If Google redirects to a sign-in HTML page
+            if "<html" in data.lower() and "google.com" in data.lower():
+                raise HTTPException(
+                    400,
+                    "Unable to access Google Spreadsheet. Please ensure the link sharing permission "
+                    "in Google Drive is set to 'Anyone with the link can view', or upload a CSV file directly."
+                )
+            return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            400,
+            f"Failed to fetch spreadsheet from Google: {e}. "
+            "Please check permissions ('Anyone with the link can view') or upload a CSV file directly."
+        )
+
+
+@app.post("/api/spreadsheet/import")
+def spreadsheet_import(i: SpreadsheetImportIn):
+    """Import product catalogue data into an account from a Google Spreadsheet or CSV."""
+    raw_csv = (i.csv_content or "").strip()
+    if not raw_csv and i.spreadsheet_url:
+        raw_csv = _download_google_sheet_csv(i.spreadsheet_url.strip())
+    
+    if not raw_csv:
+        raise HTTPException(400, "No spreadsheet data provided. Please provide a Google Spreadsheet URL or upload a CSV file.")
+
+    import csv
+    import io
+    reader = csv.DictReader(io.StringIO(raw_csv))
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(400, "The spreadsheet contains no data rows.")
+
+    # Helper to resolve case-insensitive column headers
+    def get_col(row, *aliases):
+        for a in aliases:
+            for k, v in row.items():
+                if k and k.strip().lower() == a.lower():
+                    val = (v or "").strip()
+                    if val:
+                        return val
+        return None
+
+    user = me()
+    operator_email = user.get("email") or "spreadsheet-import@opatrip.com"
+
+    with db.session() as con:
+        # Resolve target account
+        acct_id = i.account_id.strip()
+        acct = con.execute("SELECT * FROM accounts WHERE viator_account_id=?", (acct_id,)).fetchone()
+        
+        if not acct:
+            acct_name = (i.account_name or acct_id).strip()
+            acct = db.upsert_account(con, viator_account_id=acct_id, name=acct_name, country=i.country)
+        elif i.account_name:
+            con.execute("UPDATE accounts SET name=? WHERE viator_account_id=?", (i.account_name.strip(), acct_id))
+            acct = con.execute("SELECT * FROM accounts WHERE viator_account_id=?", (acct_id,)).fetchone()
+
+        account_pk = acct["id"]
+        plat_id = db.platform_id(con, "viator") or 1
+
+        # Create a sync run record for the import
+        now_ts = db.now()
+        sync_sql = store.insert_id(
+            "syncs",
+            ("account_id", "operator_email", "started_at", "status", "products_seen", "changes_found"),
+            "id"
+        )
+        sync_row = con.execute(sync_sql, (account_pk, operator_email, now_ts, "running", len(rows), 0)).fetchone()
+        sync_id = sync_row[0] if sync_row else None
+
+        imported_count = 0
+        updated_count = 0
+
+        for idx, row in enumerate(rows):
+            code = get_col(row, "product_code", "product code", "code", "productcode", "product id", "id", "tour code", "item code")
+            title = get_col(row, "title", "product title", "product name", "tour name", "name", "tour title")
+            
+            if not title and not code:
+                continue
+
+            if not code:
+                code = f"IMP-{idx+1:04d}"
+
+            if not title:
+                title = f"Product {code}"
+
+            raw_status = get_col(row, "status", "product status", "lifecycle", "state") or "LIVE"
+            canon_status = db.canonical_status(con, plat_id, raw_status)
+            location = get_col(row, "location", "city", "destination", "country", "place")
+            quality = get_col(row, "quality", "quality level", "quality_level", "rating score")
+            conn_state = get_col(row, "connection", "connection state", "connection_state", "connected")
+            
+            rev_cnt_raw = get_col(row, "review count", "review_count", "reviews", "total reviews")
+            rev_rating_raw = get_col(row, "rating", "review rating", "review_rating", "stars")
+            review_count = int(rev_cnt_raw) if rev_cnt_raw and rev_cnt_raw.isdigit() else None
+            review_rating = float(rev_rating_raw) if rev_rating_raw and re.match(r"^\d+(\.\d+)?$", rev_rating_raw) else None
+
+            price_raw = get_col(row, "price", "retail price", "retail_price", "srp", "suggested retail price", "cost")
+            currency = get_col(row, "currency", "curr") or "USD"
+            opt_title = get_col(row, "option", "option title", "tour grade", "tour_grade")
+
+            tid = db.upsert_tour(con, title)
+
+            existing_prod = con.execute(
+                "SELECT id FROM products WHERE account_id=? AND product_code=?",
+                (account_pk, code)
+            ).fetchone()
+
+            pid = db.upsert_product(
+                con,
+                account_pk,
+                code,
+                title=title,
+                status=raw_status,
+                status_canonical=canon_status,
+                location=location,
+                quality_level=quality,
+                connection_state=conn_state,
+                review_count=review_count,
+                review_rating=review_rating,
+                tour_id=tid,
+                platform_id=plat_id,
+            )
+
+            # Build normalized snapshot
+            normalized = {
+                "product": {
+                    "productCode": code,
+                    "title": title,
+                    "status": raw_status,
+                    "location": location,
+                    "currency": currency,
+                    "quality": {"level": quality} if quality else None,
+                    "pricing": {
+                        "scheduleStartDay": "MONDAY",
+                        "seasons": {
+                            f"SEA-DEFAULT_{code}": {
+                                "seasonRef": f"SEA-DEFAULT_{code}",
+                                "isDefaultSeason": True,
+                                "isActive": True,
+                                "isVisible": True,
+                            }
+                        },
+                        "pricingPackages": {}
+                    }
+                },
+                "product_options": {
+                    f"OPT-{code}": {
+                        "ref": f"OPT-{code}",
+                        "title": opt_title or title,
+                        "tourGradeCode": "TG1",
+                        "language": "en"
+                    }
+                } if opt_title else {},
+                "imported_from_spreadsheet": True,
+                "raw_row_data": dict(row)
+            }
+
+            if price_raw:
+                try:
+                    price_val = float(re.sub(r"[^\d.]+", "", price_raw))
+                    pkg_ref = f"PPP-DEFAULT_{code}"
+                    normalized["product"]["pricing"]["pricingPackages"][pkg_ref] = {
+                        "reference": pkg_ref,
+                        "type": "TRAVELLER_BY_AGE_BAND",
+                        "priceTiersForAgeBands": {
+                            "ADULT": [{
+                                "price": {"retailPrice": price_val, "netPrice": round(price_val * 0.78, 2)},
+                                "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
+                            }]
+                        }
+                    }
+                except Exception:
+                    pass
+
+            db.save_snapshot(con, pid, sync_id, account_pk, operator_email, normalized)
+
+            if existing_prod:
+                updated_count += 1
+            else:
+                imported_count += 1
+
+        if sync_id:
+            con.execute(
+                "UPDATE syncs SET finished_at=?, status='done', products_seen=?, changes_found=0 WHERE id=?",
+                (db.now(), len(rows), sync_id)
+            )
+        con.execute("UPDATE accounts SET last_sync_at=? WHERE id=?", (db.now(), account_pk))
+
+    acct_display = acct["name"] or acct["viator_account_id"]
+    return {
+        "ok": True,
+        "account_id": acct["viator_account_id"],
+        "account_name": acct_display,
+        "products_imported": imported_count,
+        "products_updated": updated_count,
+        "message": f"Successfully imported {imported_count} new product(s) and updated {updated_count} product(s) in {acct_display}."
+    }
+
+
 @app.get("/api/status")
 def status():
     """Always idle — nothing can be capturing here.
@@ -1365,3 +1595,4 @@ def status():
 def sessions_list():
     """Always empty: a session is an open browser, and this deployment has none."""
     return {"sessions": [], "read_only": True}
+

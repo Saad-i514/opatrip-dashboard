@@ -5,7 +5,7 @@ import { label } from './format.js';
 import { loadAccounts, renderFilterBar } from './ui.js';
 import { renderSyncProgress } from './progress.js';
 import { confirmDialog } from './toast.js';
-import { installReadOnly, automationNotice, setOwner } from './readonly.js';
+import { installReadOnly, openAddAccountModal, setOwner } from './readonly.js';
 import { ensureSignedIn, renderWhoAmI, showLogin } from './login.js';
 import { viewStats } from './views/stats.js';
 import { viewProducts } from './views/products.js';
@@ -109,11 +109,9 @@ $('#acct').onchange = e=>{ S.acct=e.target.value; localStorage.setItem('acct',S.
   // all of them at once rather than leaving another account's rows on screen
   invalidate();
   loadAccounts().then(()=>go(S.tab)); };
-/* Read-only deployment: these three would start or stop a capture, which happens on a
-   staff laptop, not here. They explain that instead of failing. */
-$('#btnAdd').onclick = automationNotice;
-$('#btnStop').onclick = automationNotice;
-$('#btnFetch').onclick = automationNotice;
+/* Read-only deployment: Add Account opens the spreadsheet import modal. */
+const addBtn = $('#btnAdd');
+if (addBtn) addBtn.onclick = openAddAccountModal;
 installReadOnly();
 
 /* The Storage box is gone from the sidebar, and loadStorage() with it. It also set

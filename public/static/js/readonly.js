@@ -1,13 +1,9 @@
-/* Read-only deployment: capture cannot be started from the web.
-
-   The three controls that would start or stop a capture stay VISIBLE and clickable —
-   hiding them would leave people hunting for a feature and eventually asking why the
-   data is stale. Clicking one explains who runs captures and how to reach them.
-
-   This is the courteous half of the guarantee, not the guarantee itself. The deployed
-   server has no capture code and no /api/fetch route at all (see web.py), so editing
-   this file in a browser gets you nothing. */
-import { $, esc } from './core.js';
+/* Read-only deployment: Add Account & Spreadsheet import modal. */
+import { $, esc, post, invalidate } from './core.js';
+import { S } from './state.js';
+import { loadAccounts } from './ui.js';
+import { toast } from './toast.js';
+import { go } from './app.js';
 
 /* Filled from /api/status so the name and address have ONE source — config.py on the
    server. These defaults only show if the status call has not landed yet. */
@@ -15,58 +11,129 @@ export const OWNER = {name: 'Maniha', role: 'Head of Automation Department',
                       email: 'maniha@opatrip.com'};
 export function setOwner(o){ if (o && o.email) Object.assign(OWNER, o); }
 
-export function automationNotice(){
+export function openAddAccountModal(){
   const host = $('#modalHost');
+  if (!host) return;
   host.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.innerHTML = `<div class="scrim"></div>
-    <div class="modal wide an-modal" role="dialog" aria-modal="true" aria-labelledby="anTitle">
-      <div class="an-badge">● Runs on your laptop, not here</div>
-      <h2 id="anTitle" style="font-size:19px;margin:10px 0 8px">
-        Fetching data is done with the Automation Tool</h2>
-      <p class="an-body">
-        To fetch data, please run the <b>Automation Tool on your laptop</b>, following the
-        guide and guidance provided by
-        <b>${esc(OWNER.name)}</b> (${esc(OWNER.role)},
-        <a href="mailto:${esc(OWNER.email)}">${esc(OWNER.email)}</a>).
-        If you face any issue, please let her know.
-      </p>
-      <p class="an-body">
-        Your co-operation means a lot to us in improving our systems. Everything else on
-        this dashboard works normally — products, reports, change history, photos and
-        edits are all live.
-      </p>
-      <div class="an-why">
-        <b>Why it works this way.</b> The capture tool signs in to the Viator supplier
-        portal with a real staff account. Keeping that on your own laptop keeps those
-        credentials off a shared server — and keeps each person's sign-in traceable to
-        them.
-      </div>
-      <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:18px">
-        <button class="btn ghost" data-close>Close</button>
-        <a class="btn primary" href="mailto:${esc(OWNER.email)}?subject=${
-          encodeURIComponent('Automation Tool — help needed')}">Email ${esc(OWNER.name)}</a>
-      </div>
-    </div>`;
-  host.appendChild(wrap);
-  const close = () => { host.innerHTML = ''; document.removeEventListener('keydown', k); };
-  const k = e => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', k);
-  wrap.querySelector('.scrim').onclick = close;
-  wrap.querySelector('[data-close]').onclick = close;
-  wrap.querySelector('[data-close]').focus();
+  const tpl = $('#tplAdd');
+  if (!tpl) return;
+  host.appendChild(tpl.content.cloneNode(true));
+  const close = () => { host.innerHTML = ''; };
+  host.querySelector('.scrim').onclick = close;
+  host.querySelector('#mCancel').onclick = close;
+
+  const acctChoice = host.querySelector('#mAcctChoice'),
+        newFields = host.querySelector('#mNewAcctFields'),
+        newName = host.querySelector('#mNewAcctName'),
+        newId = host.querySelector('#mNewAcctId'),
+        newCountry = host.querySelector('#mNewAcctCountry'),
+        sheetUrl = host.querySelector('#mSheetUrl'),
+        csvFile = host.querySelector('#mCsvFile'),
+        err = host.querySelector('#mErr'),
+        goBtn = host.querySelector('#mGo');
+
+  // Populate accounts
+  acctChoice.innerHTML = '<option value="">-- Select an existing account --</option>' +
+    (S.accounts || []).map(a => `<option value="${esc(a.viator_account_id)}">${esc(a.name || a.viator_account_id)}</option>`).join('') +
+    '<option value="__NEW__">+ Create a new account...</option>';
+
+  if (S.acct) acctChoice.value = S.acct;
+
+  acctChoice.onchange = () => {
+    newFields.classList.toggle('hidden', acctChoice.value !== '__NEW__');
+    if (acctChoice.value === '__NEW__') newName.focus();
+  };
+  if (acctChoice.value === '__NEW__') newFields.classList.remove('hidden');
+
+  newName.oninput = () => {
+    if (!newId.dataset.edited) {
+      newId.value = (newName.value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+  };
+  newId.oninput = () => { newId.dataset.edited = '1'; };
+
+  let fileContent = null;
+  csvFile.onchange = (e) => {
+    const f = e.target.files[0];
+    if (f) {
+      const reader = new FileReader();
+      reader.onload = () => { fileContent = reader.result; };
+      reader.readAsText(f);
+    } else {
+      fileContent = null;
+    }
+  };
+
+  const submit = async () => {
+    err.className = 'banner hidden';
+    const choice = acctChoice.value;
+    if (!choice) {
+      err.className = 'banner';
+      err.textContent = 'Please choose an existing account or select "+ Create a new account".';
+      acctChoice.focus();
+      return;
+    }
+    let targetAcctId = choice;
+    let targetAcctName = '';
+    let targetCountry = '';
+
+    if (choice === '__NEW__') {
+      targetAcctName = (newName.value || '').trim();
+      targetAcctId = (newId.value || '').trim() || targetAcctName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      targetCountry = (newCountry.value || '').trim();
+      if (!targetAcctName || !targetAcctId) {
+        err.className = 'banner';
+        err.textContent = 'Please enter a name and ID for the new account.';
+        (targetAcctName ? newId : newName).focus();
+        return;
+      }
+    }
+
+    const urlVal = (sheetUrl.value || '').trim();
+    if (!urlVal && !fileContent) {
+      err.className = 'banner';
+      err.textContent = 'Please provide a Google Spreadsheet link or choose a CSV file to upload.';
+      sheetUrl.focus();
+      return;
+    }
+
+    goBtn.disabled = true;
+    goBtn.textContent = 'Importing data...';
+
+    try {
+      const payload = {
+        account_choice: choice === '__NEW__' ? 'new' : 'existing',
+        account_id: targetAcctId,
+        account_name: targetAcctName || null,
+        country: targetCountry || null,
+        spreadsheet_url: urlVal || null,
+        csv_content: fileContent || null,
+      };
+      const res = await post('/api/spreadsheet/import', payload);
+      close();
+      toast(res.message || 'Spreadsheet imported successfully!', 'ok');
+      invalidate();
+      S.acct = res.account_id || targetAcctId;
+      localStorage.setItem('acct', S.acct);
+      await loadAccounts();
+      go('products');
+    } catch(ex) {
+      err.className = 'banner';
+      err.textContent = ex.message || 'Failed to import spreadsheet.';
+      goBtn.disabled = false;
+      goBtn.textContent = 'Import Spreadsheet';
+    }
+  };
+
+  goBtn.onclick = submit;
 }
 
-/** Point every capture control at the notice, and make sure none of them looks broken. */
+/** Point Add Account to the spreadsheet import modal. */
 export function installReadOnly(){
-  for (const id of ['#btnFetch', '#btnStop', '#btnAdd']){
-    const b = $(id);
-    if (!b) continue;
-    // Fetch ships disabled (it waits for a browser session that can never exist here),
-    // and a disabled button swallows clicks — so it would silently do nothing.
-    b.disabled = false;
-    b.onclick = automationNotice;
-    b.title = `Captures run on your laptop — click for ${OWNER.name}'s details`;
+  const btn = $('#btnAdd');
+  if (btn) {
+    btn.disabled = false;
+    btn.onclick = openAddAccountModal;
+    btn.title = 'Add an account and import listings from a Google Spreadsheet';
   }
-  // The limit box was removed from the top bar, so there is nothing to disable here.
 }
