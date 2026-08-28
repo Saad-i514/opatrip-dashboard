@@ -1289,6 +1289,295 @@ def edit_product(pid: int, e: EditIn):
     return {"ok": True, **out}
 
 
+class RawProductTextIn(BaseModel):
+    raw_text: str
+    editor_email: str | None = None
+    note: str | None = None
+
+
+def parse_raw_product_text(text: str) -> dict:
+    """Parses structured multiline product text into normalized fields."""
+    lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    if not lines:
+        return {}
+
+    data = {
+        "title": None,
+        "overview": {},
+        "attractions": [],
+        "inclusions": [],
+        "exclusions": [],
+        "description": "",
+        "pricing": {},
+        "meeting": {},
+        "links": {},
+        "quality": {},
+    }
+
+    current_section = "HEADER"
+    desc_lines = []
+
+    for line in lines:
+        if re.match(r"^[-—_=\*]{3,}$", line):
+            continue
+
+        upper = line.upper().strip(":# ")
+        if upper in ("OVERVIEW", "PRODUCT SETUP", "SETUP"):
+            current_section = "OVERVIEW"
+            continue
+        elif upper in ("ATTRACTIONS", "ITINERARY", "STOPS", "HIGHLIGHTS"):
+            current_section = "ATTRACTIONS"
+            continue
+        elif upper in ("INCLUSIONS", "WHAT'S INCLUDED", "WHATS INCLUDED", "INCLUDED"):
+            current_section = "INCLUSIONS"
+            continue
+        elif upper in ("EXCLUSIONS", "WHAT'S EXCLUDED", "WHATS EXCLUDED", "EXCLUDED"):
+            current_section = "EXCLUSIONS"
+            continue
+        elif upper in ("DESCRIPTION", "UNIQUE DESCRIPTION", "SUMMARY", "ABOUT"):
+            current_section = "DESCRIPTION"
+            continue
+        elif upper in ("PRICING", "PRICE", "SCHEDULES & PRICES", "SCHEDULES AND PRICES", "RATES"):
+            current_section = "PRICING"
+            continue
+        elif upper in ("MEETING", "MEETING & PICKUP", "MEETING AND PICKUP", "PICKUP", "LOGISTICS"):
+            current_section = "MEETING"
+            continue
+        elif upper in ("LINKS", "SOURCE LINKS", "SOURCES"):
+            current_section = "LINKS"
+            continue
+        elif upper in ("QUALITY", "REVIEWS", "STATUS"):
+            current_section = "QUALITY"
+            continue
+
+        if current_section == "HEADER":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                if k.strip().lower() in ("title", "product title", "name"):
+                    data["title"] = v.strip()
+                else:
+                    data["overview"][k.strip().lower()] = v.strip()
+            else:
+                if not data["title"]:
+                    data["title"] = line.strip()
+
+        elif current_section == "OVERVIEW":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data["overview"][k.strip().lower()] = v.strip()
+
+        elif current_section == "MEETING":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data["meeting"][k.strip().lower()] = v.strip()
+            elif line.startswith("http"):
+                data["meeting"]["route map"] = line.strip()
+
+        elif current_section == "ATTRACTIONS":
+            clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
+            parts = re.split(r"\s*[–—\-]\s*", clean_line, maxsplit=1)
+            stop_name = parts[0].strip()
+            details = parts[1].strip() if len(parts) > 1 else ""
+            data["attractions"].append({
+                "title": stop_name,
+                "description": details,
+                "admissionType": "NOT_APPLICABLE" if "na" in details.lower() else ("NO" if "no" in details.lower() else "YES")
+            })
+
+        elif current_section == "INCLUSIONS":
+            clean = re.sub(r"^[\*\-•\d\.]+\s*", "", line).strip()
+            if clean:
+                data["inclusions"].append(clean)
+
+        elif current_section == "EXCLUSIONS":
+            clean = re.sub(r"^[\*\-•\d\.]+\s*", "", line).strip()
+            if clean:
+                data["exclusions"].append(clean)
+
+        elif current_section == "DESCRIPTION":
+            desc_lines.append(line)
+
+        elif current_section == "PRICING":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data["pricing"][k.strip().lower()] = v.strip()
+
+        elif current_section == "LINKS":
+            if ":" in line and not line.startswith("http"):
+                k, v = line.split(":", 1)
+                data["links"][k.strip().lower()] = v.strip()
+            elif line.startswith("http"):
+                if "map" in line.lower() or "google.com/maps" in line:
+                    data["links"]["route map"] = line.strip()
+                elif "admission" in line.lower():
+                    data["links"].setdefault("admission links", []).append(line.strip())
+                else:
+                    data["links"].setdefault("source links", []).append(line.strip())
+
+        elif current_section == "QUALITY":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data["quality"][k.strip().lower()] = v.strip()
+
+    if desc_lines:
+        data["description"] = "\n\n".join(desc_lines)
+
+    return data
+
+
+@app.post("/api/product/{pid}/raw-data")
+def update_product_from_raw_data(pid: int, body: RawProductTextIn):
+    email = acting_email(body.editor_email)
+    raw = (body.raw_text or "").strip()
+    if not raw:
+        raise HTTPException(400, "Raw text cannot be empty.")
+
+    parsed = parse_raw_product_text(raw)
+    with db.session() as con:
+        guard_product(con, pid)
+        prod = con.execute("SELECT * FROM products WHERE id=?", (pid,)).fetchone()
+        if not prod:
+            raise HTTPException(404, "Product not found")
+
+        account_id = prod["account_id"]
+        code = prod["product_code"]
+
+        snap = db.latest_snapshot(con, pid) or {"product": {}, "pricing": {}, "product_options": {}}
+        p_obj = snap.get("product") or {}
+        pricing_obj = p_obj.get("pricing") or snap.get("pricing") or {}
+
+        # Update title
+        if parsed.get("title"):
+            p_obj["title"] = parsed["title"]
+            con.execute("UPDATE products SET title=? WHERE id=?", (parsed["title"], pid))
+
+        # Update overview
+        ov = parsed.get("overview") or {}
+        if "duration" in ov:
+            p_obj["duration"] = ov["duration"]
+        if "theme" in ov or "themes" in ov:
+            p_obj["themes"] = ov.get("theme") or ov.get("themes")
+        if "category" in ov or "theme category" in ov:
+            p_obj["category"] = ov.get("category") or ov.get("theme category")
+        if "languages" in ov or "language" in ov:
+            opt_lang = ov.get("languages") or ov.get("language")
+            snap.setdefault("product_options", {})[f"OPT-{code}"] = {
+                "ref": f"OPT-{code}",
+                "title": f"Tour in {opt_lang}",
+                "language": opt_lang
+            }
+        if "location" in ov:
+            p_obj["location"] = ov["location"]
+            con.execute("UPDATE products SET location=? WHERE id=?", (ov["location"], pid))
+
+        # Update meeting & pickup
+        mtg = parsed.get("meeting") or {}
+        meeting_point = mtg.get("meeting point") or mtg.get("meeting point / area") or ov.get("meeting point")
+        if meeting_point:
+            p_obj.setdefault("departureAndReturn", {})["meetingPoint"] = meeting_point
+            if not p_obj.get("location"):
+                p_obj["location"] = meeting_point
+                con.execute("UPDATE products SET location=? WHERE id=?", (meeting_point, pid))
+
+        route_map = mtg.get("route map") or mtg.get("route map link") or parsed.get("links", {}).get("route map")
+        if route_map:
+            p_obj["routeMapLink"] = route_map
+            p_obj.setdefault("departureAndReturn", {})["routeMapLink"] = route_map
+
+        if "pickup type" in mtg:
+            p_obj.setdefault("pickupOption", {})["pickupType"] = mtg["pickup type"]
+        if "pickup vehicle" in mtg or "vehicle description" in mtg:
+            p_obj.setdefault("pickupOption", {})["pickupVehicleDescription"] = mtg.get("pickup vehicle") or mtg.get("vehicle description")
+
+        # Update attractions
+        if parsed.get("attractions"):
+            p_obj.setdefault("itinerary", {})["itineraryItems"] = parsed["attractions"]
+
+        # Update inclusions / exclusions / description
+        if parsed.get("inclusions"):
+            p_obj["inclusions"] = parsed["inclusions"]
+        if parsed.get("exclusions"):
+            p_obj["exclusions"] = parsed["exclusions"]
+        if parsed.get("description"):
+            p_obj["description"] = parsed["description"]
+            p_obj["briefDescription"] = parsed["description"][:240]
+
+        # Update pricing & commission
+        pr = parsed.get("pricing") or {}
+        price_val, fee_val = None, None
+        if "public price" in pr or "price" in pr:
+            m = re.search(r"(\d+(?:\.\d+)?)", pr.get("public price") or pr.get("price") or "")
+            if m:
+                price_val = float(m.group(1))
+        if "guide fee" in pr or "fee" in pr:
+            p_obj["guideFee"] = pr.get("guide fee") or pr.get("fee")
+            m = re.search(r"(\d+(?:\.\d+)?)", pr.get("guide fee") or pr.get("fee") or "")
+            if m:
+                fee_val = float(m.group(1))
+
+        comm_percent = None
+        if price_val and fee_val and price_val > 0:
+            comm_percent = round(((price_val - fee_val) / price_val) * 100, 1)
+        elif "commission" in pr:
+            m = re.search(r"(\d+(?:\.\d+)?)", pr["commission"])
+            if m:
+                comm_percent = float(m.group(1))
+
+        if comm_percent is not None:
+            p_obj["commission_percent"] = comm_percent
+            pricing_obj.setdefault("productProgramMargin", {})["baseMargin"] = comm_percent
+            pricing_obj["productProgramMargin"]["isOptedIn"] = False
+            con.execute("UPDATE products SET commission_percent=? WHERE id=?", (comm_percent, pid))
+
+        if price_val:
+            net_val = fee_val if fee_val is not None else round(price_val * (1 - (comm_percent or 22.0)/100.0), 2)
+            pkg_ref = f"PPP-DEFAULT_{code}"
+            pricing_obj.setdefault("pricingPackages", {})[pkg_ref] = {
+                "reference": pkg_ref,
+                "type": "TRAVELLER_BY_AGE_BAND",
+                "priceTiersForAgeBands": {
+                    "ADULT": [{
+                        "price": {
+                            "retailPrice": price_val,
+                            "netPrice": net_val,
+                            "marginPercent": comm_percent
+                        },
+                        "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
+                    }]
+                }
+            }
+
+        # Update links
+        links = parsed.get("links") or {}
+        if links.get("admission links"):
+            p_obj["admissionSourceLinks"] = links["admission links"]
+        if links.get("source links"):
+            p_obj["hoursSourceLinks"] = links["source links"]
+
+        # Quality & Status
+        q = parsed.get("quality") or {}
+        if "quality" in q or "quality level" in q:
+            q_val = (q.get("quality") or q.get("quality level")).upper()
+            p_obj.setdefault("quality", {})["level"] = q_val
+            con.execute("UPDATE products SET quality_level=? WHERE id=?", (q_val, pid))
+        if "status" in q:
+            st_val = q["status"]
+            p_obj["status"] = st_val
+            canon = status_canonical(st_val)
+            con.execute("UPDATE products SET status=?, status_canonical=? WHERE id=?", (st_val, canon, pid))
+
+        p_obj["pricing"] = pricing_obj
+        snap["product"] = p_obj
+        snap["imported_from_spreadsheet"] = True
+
+        sync_id = db.start_sync(con, account_id, email)
+        db.save_snapshot(con, pid, sync_id, account_id, email, snap)
+        db.finish_sync(con, sync_id, "done", f"Updated product data via structured raw text by {email}")
+
+    log(f"{email} updated product {pid} using structured raw text")
+    return {"ok": True, "message": "Successfully parsed and updated product data."}
+
+
 @app.get("/api/thumb/{pid}")
 def thumb(pid: int):
     """Local file first, then R2, then the CDN.

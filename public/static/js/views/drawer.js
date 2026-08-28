@@ -4,7 +4,7 @@ import { getPath, historyFor, label, PATH_LABELS, personName, qualBadge, setEdit
          statusBadge, valueBox, whenLong } from '../format.js';
 import { skLines } from '../ui.js';
 import { buildSections, commissionOf, totalDuration, tree } from '../sections.js';
-import { editSection, editValue } from '../edit.js';
+import { editSection, editValue, openAddDataModal } from '../edit.js';
 import { secs } from '../progress.js';
 import { toast } from '../toast.js';
 
@@ -29,7 +29,7 @@ export async function openDrawer(pid){
   // gone — Viator shows the photos in the Photos strip, and so do we, right below.
   const head = el('div','dhead');
   head.innerHTML = `<button class="vback" id="xClose">&lsaquo; Back to product list</button>
-    <div class="dhead-top">
+    <div class="dhead-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px">
           <h2 class="vtitle" style="margin:0">${esc(p.title||'(untitled)')}</h2>
@@ -46,6 +46,9 @@ export async function openDrawer(pid){
             p.location?' · '+esc(p.location):''}</span>
         </div>
       </div>
+      <button class="btn primary sm" id="btnAddDataToProduct" style="white-space:nowrap;margin-top:2px;display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;padding:6px 14px">
+        <span>+ Add data to product</span>
+      </button>
     </div>`;
   dr.appendChild(head);
 
@@ -60,6 +63,10 @@ export async function openDrawer(pid){
     editStatusBtn.onclick = () => editValue(p.id, {
       path: 'product.status', label: 'Status', value: (cur && cur.product ? cur.product.status : p.status)
     }, () => openDrawer(p.id));
+  }
+  const addDataBtn = head.querySelector('#btnAddDataToProduct');
+  if (addDataBtn) {
+    addDataBtn.onclick = () => openAddDataModal(p.id, cur, () => openDrawer(p.id));
   }
 
   const body = el('div','dbody');

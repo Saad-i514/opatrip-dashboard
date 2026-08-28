@@ -311,6 +311,152 @@ export async function editField(pid, key, current, onSaved){
   const inp = $(`#f_${key}`); if (inp) inp.focus();
 }
 
+/** Opens modal for adding bulk/raw structured text to the product. */
+export async function openAddDataModal(pid, cur, onSaved) {
+  const who = await askEditor();
+  if (!who) return;
+
+  const host = $('#modalHost'); host.innerHTML = '';
+  const wrap = el('div');
+  
+  const curP = (cur && cur.product) || {};
+  const initialTitle = curP.title || '';
+
+  const sampleTemplate = `${initialTitle || 'Private LGBT+ History & Nightlife Tour of Soho, London'}
+────────────────────────────────────────
+OVERVIEW
+Duration: ${curP.duration || '3h 0m'}
+Theme: ${curP.themes || 'Lifestyle & Celebrations — LGBT, Nightlife, Party/Celebration'}
+Category: ${curP.category || 'Walking Tours'}
+Languages: English
+Max travelers: 15
+Meeting point: Trafalgar Square, London
+
+ATTRACTIONS
+1. Trafalgar Square, London — 10 min, admission: NA
+2. Old Compton Street, London — 15 min, admission: NA
+3. Admiral Duncan, London — 20 min, admission: NA
+4. Soho Square, London — 12 min, admission: NA
+5. Piccadilly Circus, London — 10 min, admission: NA
+6. Rupert Street Bar, London — 25 min, admission: Yes
+7. Comptons of Soho, London — 14 min, admission: NA
+
+INCLUSIONS
+Professional local guide: Stu Helm
+All admission tickets (including Rupert Street Bar weekend cover charge)
+Food tastings
+
+EXCLUSIONS
+Gratuities (at client's discretion)
+Shopping and personal expenses
+
+DESCRIPTION
+Step into the soul of London's LGBTQ+ history on this private 3-hour walking tour through the legendary streets of Soho. Beginning at iconic Trafalgar Square, the journey winds through Old Compton Street — the undisputed centre of London's gay village — before ducking into the Admiral Duncan, a pub that has stood as a beacon of community and resilience since 1832. Stroll through the leafy calm of Soho Square, absorb the neon spectacle of Piccadilly Circus, and raise a glass at Rupert Street Bar, one of the capital's longest-running LGBTQ+ venues, with your cover charge included. The tour wraps up at Comptons of Soho, a Victorian institution and enduring symbol of queer culture since 1986. Food tastings are included along the way, and your expert private guide brings every story to life — from hard-won freedoms to the vibrant scene thriving today.
+
+PRICING
+Public price: 829
+Guide fee: 232
+Currency: USD
+
+MEETING & PICKUP
+Meeting point: Trafalgar Square, London
+Meeting arrangement: MEET_AT_DEPARTURE_POINT
+Pickup type: VEHICLE
+Pickup vehicle: Mercedes Executive Van
+Route map: https://maps.google.com/?q=Soho+London
+
+LINKS
+Admission source links:
+https://www.example.com/admission-tickets
+Hours source links:
+https://www.example.com/hours-and-times
+
+QUALITY
+Quality level: GOOD
+Status: LIVE`;
+
+  wrap.innerHTML = `<div class="scrim"></div>
+    <div class="modal card" style="max-width:850px;width:95%;max-height:92vh;display:flex;flex-direction:column;padding:24px;border-radius:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <h2 style="font-size:20px;margin:0 0 4px;font-weight:700">Add Data to Product</h2>
+          <div class="hint" style="font-size:13px">Paste structured multiline text below. All recognized sections and fields will be automatically extracted and saved into this product.</div>
+        </div>
+        <button class="btn ghost sm" id="btnCloseRawModal" style="font-size:20px;line-height:1;padding:4px 8px;cursor:pointer">&times;</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <button class="btn sm" id="btnFillSample" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-weight:600;cursor:pointer">
+          📋 Load Full Sample Format
+        </button>
+        <span class="hint" style="font-size:12px">Use section headers like OVERVIEW, ATTRACTIONS, INCLUSIONS, EXCLUSIONS, DESCRIPTION, PRICING, LINKS, QUALITY</span>
+      </div>
+
+      <div style="flex:1;min-height:360px;display:flex;flex-direction:column;margin-bottom:14px">
+        <textarea id="rawProductText" style="flex:1;width:100%;height:380px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;padding:12px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical;outline:none;background:#fafbfc" placeholder="${esc(sampleTemplate)}"></textarea>
+      </div>
+
+      <div id="rawErr" class="banner hidden" style="margin-bottom:12px"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center">
+        <button class="btn ghost" id="btnCancelRaw">Cancel</button>
+        <button class="btn primary" id="btnSaveRaw" style="padding:8px 20px;font-weight:600">Save & Update Product</button>
+      </div>
+    </div>`;
+
+  host.appendChild(wrap);
+
+  const txt = wrap.querySelector('#rawProductText');
+  const err = wrap.querySelector('#rawErr');
+  const done = () => { host.innerHTML = ''; };
+
+  wrap.querySelector('.scrim').onclick = done;
+  wrap.querySelector('#btnCloseRawModal').onclick = done;
+  wrap.querySelector('#btnCancelRaw').onclick = done;
+
+  wrap.querySelector('#btnFillSample').onclick = () => {
+    txt.value = sampleTemplate;
+    txt.focus();
+  };
+
+  wrap.querySelector('#btnSaveRaw').onclick = async () => {
+    const rawVal = txt.value.trim();
+    if (!rawVal) {
+      err.className = 'banner';
+      err.textContent = 'Please enter or paste your formatted product text.';
+      txt.focus();
+      return;
+    }
+
+    const saveBtn = wrap.querySelector('#btnSaveRaw');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving & Updating…';
+    err.className = 'banner hidden';
+
+    try {
+      const res = await post(`/api/product/${pid}/raw-data`, {
+        raw_text: rawVal,
+        editor_email: who
+      });
+      if (res && res.ok) {
+        toast('Product data successfully updated!', {kind: 'ok'});
+        done();
+        invalidate();
+        if (onSaved) onSaved();
+      } else {
+        throw new Error(res?.error || res?.message || 'Failed to update product data');
+      }
+    } catch (e) {
+      err.className = 'banner';
+      err.textContent = e.message || String(e);
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save & Update Product';
+    }
+  };
+
+  txt.focus();
+}
+
 /* uploadImage() and deleteImage() were removed with photo storage. The dashboard
    no longer shows or accepts photos; POST /api/product/<id>/image refuses too, so
    there is no client left for them. A photo CHANGED on Viator is still recorded --
