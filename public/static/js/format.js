@@ -101,13 +101,9 @@ export function getPath(obj, path){
    possible to ADD, not just correct. */
 export function rows(pairs){
   const ctx = EDITCTX;
-  // path is usually one snapshot path, but a row can show TWO fields merged into one
-  // sentence ("4.8 from 230 reviews" is rating AND totalReviewCount) — pass an array
-  // there so Edit history can still jump to it for either one. Multi-path rows are jump
-  // targets only, never editable: ctx.edit() changes a single field, and there is no
-  // single correct value to write back for two.
+  const isSpreadsheet = ctx && (ctx.snapshot?.imported_from_spreadsheet || !!ctx.snapshot?.raw_row_data);
   const solo = p => typeof p === 'string' ? p : null;
-  const editable = !!ctx && pairs.some(p => Array.isArray(p) && p.length > 2 && solo(p[2]));
+  const editable = !!ctx && !isSpreadsheet && pairs.some(p => Array.isArray(p) && p.length > 2 && solo(p[2]));
   const wrap = el('div', editable ? 'rows editable' : 'rows');
   let any = false;
   pairs.forEach(entry => {
@@ -117,7 +113,7 @@ export function rows(pairs){
     const ed = (ctx && path) ? (ctx.edits || {})[path] : null;
     const blank = v === undefined || v === null || v === ''
                   || (Array.isArray(v) && !v.length);
-    if (blank && !ed && !(editable && path)) return;
+    if (blank && !ed && (isSpreadsheet || !(editable && path))) return;
     any = true;
     const text = typeof k === 'string' ? label(k) : k;
     if (typeof text === 'string') paths.forEach(p => PATH_LABELS.set(p, text));

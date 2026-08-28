@@ -25,9 +25,10 @@ export function secOverview(p){
     .filter(Boolean);
   const lga = (p.languageGuidesDetails||{}).languageGuidesAttributes||{};
   f.appendChild(rows([
-    ['Description', p.briefDescription ? esc(p.briefDescription) : null, 'product.briefDescription'],
-    ['Total duration', totalDuration(it), 'product.itinerary.durationInMinutes'],
-    ['Location', p.primaryLocationDetails && p.primaryLocationDetails.name, 'product.primaryLocationDetails.name'],
+    ['Description', p.description ? esc(p.description) : (p.briefDescription ? esc(p.briefDescription) : null), 'product.description'],
+    ['Total duration', p.duration || totalDuration(it), 'product.itinerary.durationInMinutes'],
+    ['Category', p.category, 'product.category'],
+    ['Location', p.location || (p.primaryLocationDetails && p.primaryLocationDetails.name), 'product.location'],
     ['Product type', p.productClassification ? sentence(p.productClassification) : null, 'product.productClassification'],
     ['Itinerary type', it.productItineraryType ? sentence(it.productItineraryType) : null, 'product.itinerary.productItineraryType'],
     ['Group type', it.privateTour===undefined?null:(it.privateTour?'Private':'Shared'), 'product.itinerary.privateTour'],
@@ -37,7 +38,7 @@ export function secOverview(p){
     ['Skip the line', it.skipTheLine, 'product.itinerary.skipTheLine'],
     ['Product types', (tx.productTypes||[]).length?chips((tx.productTypes||[]).map(sentence)):null],
     ['Tour modes', names('TOUR_MODE').length?chips(names('TOUR_MODE')):null],
-    ['Themes', names('THEME').length?chips(names('THEME')):null],
+    ['Themes', p.themes ? chips(Array.isArray(p.themes)?p.themes:String(p.themes).split(',').map(s=>s.trim())) : (names('THEME').length?chips(names('THEME')):null)],
     ['Guide languages', langs.length?chips(langs):null],
     ['Guide certified', lga.isHumanGuideCertified, 'product.languageGuidesDetails.languageGuidesAttributes.isHumanGuideCertified'],
     ['Guide is the driver', lga.isHumanGuideDriver, 'product.languageGuidesDetails.languageGuidesAttributes.isHumanGuideDriver'],
@@ -827,17 +828,27 @@ function group(...parts){
    satisfies that structurally (see strip_translations). */
 export function buildSections(cur){
   const p = cur.product||{};
+  const isSpreadsheet = cur.imported_from_spreadsheet || !!cur.raw_row_data;
   const out = [];
-  const add = (n, node) => { if (node) out.push([n,node]); };
+  const add = (n, node) => {
+    if (node && node.children && node.children.length > 0) out.push([n,node]);
+  };
   add('Product content', group(['Product setup', secOverview(p)],
                                ['Tour details', secTourDetails(p)],
                                ['Meeting & pickup', secMeeting(p)]));
   add('Schedules & prices', group(['Pricing', secPricing(p, cur)]));
-  add('Booking details', group(['Booking settings', secBooking(p)]));
-  add('Tickets', group(['Ticket settings', secTickets(p)]));
-  add('Product connection', group(['Connection', secConnection(p, cur)]));
-  add('Special offers', group(['Special offers', secOffers(p)]));
-  add('Quality', group(['Quality', secQuality(cur)]));
+  if (!isSpreadsheet) {
+    add('Booking details', group(['Booking settings', secBooking(p)]));
+    add('Tickets', group(['Ticket settings', secTickets(p)]));
+    add('Product connection', group(['Connection', secConnection(p, cur)]));
+    add('Special offers', group(['Special offers', secOffers(p)]));
+    add('Quality', group(['Quality', secQuality(cur)]));
+  } else {
+    const bk = group(['Booking settings', secBooking(p)]);
+    if (bk) add('Booking details', bk);
+    const conn = group(['Connection', secConnection(p, cur)]);
+    if (conn) add('Product connection', conn);
+  }
   return out;
 }
 
