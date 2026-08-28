@@ -108,7 +108,7 @@ export async function viewProducts(){
     viewProducts();
   };
   const addBtn = f.querySelector('#btnAddProductBtn');
-  if (addBtn) addBtn.onclick = () => openCreateProductModal(S.acct);
+  if (addBtn) addBtn.onclick = () => openCreateProductModal(S.acct, () => viewProducts());
   // Say what is being filtered in words. A count alone ("447 shown") leaves people
   // wondering why the other 670 vanished.
   const active = [

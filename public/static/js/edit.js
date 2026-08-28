@@ -13,6 +13,7 @@
 import { S } from './state.js';
 import { $, api, cachedApi, el, esc, invalidate, post, session } from './core.js';
 import { toast } from './toast.js';
+import { openDrawer } from './views/drawer.js';
 
 export const EMAIL_OK = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
@@ -511,8 +512,8 @@ Review rating: 4.95`;
   txt.focus();
 }
 
-export async function openCreateProductModal(preselectedAccount = null) {
-  const host = $('#dialog-host');
+export async function openCreateProductModal(preselectedAccount = null, onCreated = null) {
+  const host = $('#modalHost');
   if (!host) return;
   host.innerHTML = '';
   const wrap = el('div');
@@ -733,10 +734,10 @@ Review rating: 4.95`;
       invalidate('/api/products');
       invalidate('/api/overview');
       invalidate('/api/accounts');
-      if (typeof viewProducts === 'function') {
-        viewProducts();
+      if (typeof onCreated === 'function') {
+        onCreated();
       }
-      if (res.product_id && typeof openDrawer === 'function') {
+      if (res.product_id) {
         openDrawer(res.product_id);
       }
     } catch(ex) {
