@@ -22,7 +22,10 @@ export function openAddAccountModal(){
   host.querySelector('.scrim').onclick = close;
   host.querySelector('#mCancel').onclick = close;
 
-  const acctChoice = host.querySelector('#mAcctChoice'),
+  const btnModeExisting = host.querySelector('#mBtnModeExisting'),
+        btnModeNew = host.querySelector('#mBtnModeNew'),
+        existingWrap = host.querySelector('#mExistingAcctWrap'),
+        acctChoice = host.querySelector('#mAcctChoice'),
         newFields = host.querySelector('#mNewAcctFields'),
         newName = host.querySelector('#mNewAcctName'),
         newId = host.querySelector('#mNewAcctId'),
@@ -35,17 +38,23 @@ export function openAddAccountModal(){
         goBtn = host.querySelector('#mGo');
 
   // Populate accounts
-  acctChoice.innerHTML = '<option value="">-- Select an existing account --</option>' +
-    (S.accounts || []).map(a => `<option value="${esc(a.viator_account_id)}">${esc(a.name || a.viator_account_id)}</option>`).join('') +
-    '<option value="__NEW__">+ Create a new account...</option>';
+  acctChoice.innerHTML = '<option value="">-- Choose an existing account --</option>' +
+    (S.accounts || []).map(a => `<option value="${esc(a.viator_account_id)}">${esc(a.name || a.viator_account_id)}</option>`).join('');
 
   if (S.acct) acctChoice.value = S.acct;
 
-  acctChoice.onchange = () => {
-    newFields.classList.toggle('hidden', acctChoice.value !== '__NEW__');
-    if (acctChoice.value === '__NEW__') newName.focus();
+  let mode = 'existing';
+  const setMode = (m) => {
+    mode = m;
+    btnModeExisting.className = `btn sm ${m === 'existing' ? 'primary' : 'ghost'}`;
+    btnModeNew.className = `btn sm ${m === 'new' ? 'primary' : 'ghost'}`;
+    existingWrap.classList.toggle('hidden', m !== 'existing');
+    newFields.classList.toggle('hidden', m !== 'new');
+    if (m === 'new') newName.focus();
   };
-  if (acctChoice.value === '__NEW__') newFields.classList.remove('hidden');
+
+  btnModeExisting.onclick = () => setMode('existing');
+  btnModeNew.onclick = () => setMode('new');
 
   newName.oninput = () => {
     if (!newId.dataset.edited) {
@@ -108,18 +117,19 @@ export function openAddAccountModal(){
 
   const submit = async () => {
     err.className = 'banner hidden';
-    const choice = acctChoice.value;
-    if (!choice) {
-      err.className = 'banner';
-      err.textContent = 'Please choose an existing account or select "+ Create a new account".';
-      acctChoice.focus();
-      return;
-    }
-    let targetAcctId = choice;
+    let targetAcctId = '';
     let targetAcctName = '';
     let targetCountry = '';
 
-    if (choice === '__NEW__') {
+    if (mode === 'existing') {
+      targetAcctId = acctChoice.value;
+      if (!targetAcctId) {
+        err.className = 'banner';
+        err.textContent = 'Please choose an existing account from the dropdown.';
+        acctChoice.focus();
+        return;
+      }
+    } else {
       targetAcctName = (newName.value || '').trim();
       targetAcctId = (newId.value || '').trim() || targetAcctName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       targetCountry = (newCountry.value || '').trim();
@@ -144,7 +154,7 @@ export function openAddAccountModal(){
 
     try {
       const payload = {
-        account_choice: choice === '__NEW__' ? 'new' : 'existing',
+        account_choice: mode,
         account_id: targetAcctId,
         account_name: targetAcctName || null,
         country: targetCountry || null,

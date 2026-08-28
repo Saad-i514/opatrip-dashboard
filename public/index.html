@@ -136,16 +136,26 @@
   <div class="modal card" style="max-width:540px">
     <h2 style="font-size:18px;margin-bottom:5px">Add Account &amp; Import Spreadsheet</h2>
     <p class="hint" style="margin:0 0 16px">
-      Choose a target account and provide a Google Spreadsheet link or upload a spreadsheet file from your laptop.
+      Choose whether to import into an existing account or create a brand new account.
     </p>
     
-    <label class="fl" style="margin-bottom:12px">Target Account
-      <select id="mAcctChoice" style="width:100%">
-        <option value="">-- Select an existing account --</option>
-        <option value="__NEW__">+ Create a new account...</option>
-      </select>
-    </label>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;gap:6px;background:var(--surface-2);padding:4px;border-radius:10px;border:1px solid var(--line-2)">
+        <button type="button" id="mBtnModeExisting" class="btn sm primary" style="flex:1;text-align:center;padding:7px 12px;font-size:13px;border-radius:7px">Add to Existing Account</button>
+        <button type="button" id="mBtnModeNew" class="btn sm ghost" style="flex:1;text-align:center;padding:7px 12px;font-size:13px;border-radius:7px">+ Create New Account</button>
+      </div>
+    </div>
 
+    <!-- Existing account selector -->
+    <div id="mExistingAcctWrap" style="margin-bottom:14px">
+      <label class="fl" style="margin-bottom:0">Select Existing Account
+        <select id="mAcctChoice" style="width:100%">
+          <option value="">-- Choose an existing account --</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- New account fields -->
     <div id="mNewAcctFields" class="hidden" style="background:var(--surface-2);padding:14px;border-radius:10px;margin-bottom:14px;border:1px solid var(--line-2)">
       <label class="fl" style="margin-bottom:10px">New Account Name
         <input type="text" id="mNewAcctName" placeholder="e.g. Opatrip US LLC - Local Tours in Switzerland">
