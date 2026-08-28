@@ -441,10 +441,11 @@ Review rating: 4.95`;
       </div>
 
       <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-        <button class="btn sm" id="btnFillSample" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-weight:600;cursor:pointer">
-          📋 Load Full Sample Format
+        <button class="btn sm" id="btnFillSample" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#1e293b;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#4f46e5;flex-shrink:0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg>
+          Load Full Sample Format
         </button>
-        <span class="hint" style="font-size:12px">Use section headers like OVERVIEW, ATTRACTIONS, INCLUSIONS, EXCLUSIONS, DESCRIPTION, PRICING, LINKS, QUALITY</span>
+        <span class="hint" style="font-size:12px;color:#64748b">Use section headers like OVERVIEW, ATTRACTIONS, INCLUSIONS, EXCLUSIONS, DESCRIPTION, PRICING, LINKS, QUALITY</span>
       </div>
 
       <div style="flex:1;min-height:360px;display:flex;flex-direction:column;margin-bottom:14px">
@@ -653,7 +654,8 @@ Review rating: 4.95`;
 
       <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 16px;border-radius:10px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px">
         <label for="createAcctSelect" style="font-weight:600;font-size:13px;color:#334155;display:flex;align-items:center;gap:6px">
-          <span>🏢</span> Select Existing Account:
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand,#2563eb);flex-shrink:0"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="22.01"></line><line x1="15" y1="22" x2="15" y2="22.01"></line><line x1="9" y1="6" x2="9" y2="6.01"></line><line x1="15" y1="6" x2="15" y2="6.01"></line><line x1="9" y1="10" x2="9" y2="10.01"></line><line x1="15" y1="10" x2="15" y2="10.01"></line><line x1="9" y1="14" x2="9" y2="14.01"></line><line x1="15" y1="14" x2="15" y2="14.01"></line><line x1="9" y1="18" x2="9" y2="18.01"></line><line x1="15" y1="18" x2="15" y2="18.01"></line></svg>
+          Select Existing Account:
         </label>
         <select id="createAcctSelect" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13.5px;font-weight:500;background:#ffffff;color:#0f172a;cursor:pointer;outline:none;box-shadow:0 1px 2px rgba(0,0,0,0.04);transition:border-color 0.15s">
           ${acctOptions || '<option value="">(No accounts found - default)</option>'}
@@ -662,7 +664,8 @@ Review rating: 4.95`;
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
         <button class="btn sm" id="btnFillCreateSample" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#1e293b;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-          <span>📋</span> Load Full Sample Format
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#4f46e5;flex-shrink:0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg>
+          Load Full Sample Format
         </button>
         <span class="hint" style="font-size:12px;color:#64748b">Paste your raw tour text below or load the format template.</span>
       </div>
@@ -676,7 +679,8 @@ Review rating: 4.95`;
       <div style="display:flex;gap:12px;justify-content:flex-end;align-items:center;padding-top:8px;border-top:1px solid #f1f5f9">
         <button class="btn ghost" id="btnCancelCreate" style="padding:8px 16px;font-weight:500">Cancel</button>
         <button class="btn primary" id="btnSaveCreate" style="padding:8px 22px;font-weight:600;display:flex;align-items:center;gap:6px;border-radius:8px">
-          <span>+</span> Save & Create Product
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Save & Create Product
         </button>
       </div>
     </div>`;
