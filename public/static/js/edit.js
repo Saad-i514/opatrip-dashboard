@@ -322,63 +322,100 @@ export async function openAddDataModal(pid, cur, onSaved) {
   const curP = (cur && cur.product) || {};
   const initialTitle = curP.title || '';
 
-  const sampleTemplate = `${initialTitle || 'Private LGBT+ History & Nightlife Tour of Soho, London'}
+  const sampleTemplate = `${initialTitle || 'Private Berlin Michelin-Star Tour for French Couples'}
 ────────────────────────────────────────
 OVERVIEW
-Duration: ${curP.duration || '3h 0m'}
-Theme: ${curP.themes || 'Lifestyle & Celebrations — LGBT, Nightlife, Party/Celebration'}
-Category: ${curP.category || 'Walking Tours'}
-Languages: English
+Duration: ${curP.duration || '2h 30m'}
+Theme: ${curP.themes || 'History, Heritage, Culture'}
+Category: ${curP.category || 'History & Culture'}
+Languages: French, English
 Max travelers: 15
 Group type: Private
 Skip the line: Yes
 Customizable: Yes
+Customizable parts: Start Time, Duration, Inclusions
 Product type: STANDARD_TOUR
-Location: London, United Kingdom
+Itinerary type: STANDARD
+Tour modes: WALKING_TOUR, VEHICLE_TOUR
+Product types: CULTURAL_TOURS, HISTORICAL_TOURS
+Reseller status: NOT_RESELLER
+Guide certified: Yes
+Guide is driver: Yes
+Helpline: +49 30 1234567
+Public page: https://www.viator.com/tours/Berlin/sample
+Location: Berlin, Germany
 
 ATTRACTIONS
-1. Trafalgar Square, London — 10 min, admission: NA
-2. Old Compton Street, London — 15 min, admission: NA
-3. Admiral Duncan, London — 20 min, admission: NA
-4. Soho Square, London — 12 min, admission: NA
-5. Piccadilly Circus, London — 10 min, admission: NA
-6. Rupert Street Bar, London — 25 min, admission: Yes
-7. Comptons of Soho, London — 14 min, admission: NA
+1. Brandenburg Gate — 20 min, admission: NA — Historic gateway in Berlin
+2. Reichstag Building — 25 min, admission: NA — German parliament building
+3. Soviet War Memorial — 15 min, admission: NA — Memorial in Tiergarten
+4. Memorial to Murdered Jews — 20 min, admission: NA — Place of remembrance
+5. Potsdamer Platz — 15 min, admission: NA — Modern city center
+6. Topography of Terror — 30 min, admission: Yes — Indoor and outdoor exhibition
+7. Checkpoint Charlie — 15 min, admission: NA — Famous Cold War crossing point
 
 INCLUSIONS
 Professional local guide: Stu Helm
-All admission tickets (including Rupert Street Bar weekend cover charge)
-Food tastings
+All admission tickets (including special exhibition entry)
+Food tastings and refreshments
+Private vehicle transport
 
 EXCLUSIONS
 Gratuities (at client's discretion)
-Shopping and personal expenses
+Personal shopping expenses
 
 DESCRIPTION
-Step into the soul of London's LGBTQ+ history on this private 3-hour walking tour through the legendary streets of Soho. Beginning at iconic Trafalgar Square, the journey winds through Old Compton Street — the undisputed centre of London's gay village — before ducking into the Admiral Duncan, a pub that has stood as a beacon of community and resilience since 1832. Stroll through the leafy calm of Soho Square, absorb the neon spectacle of Piccadilly Circus, and raise a glass at Rupert Street Bar, one of the capital's longest-running LGBTQ+ venues, with your cover charge included. The tour wraps up at Comptons of Soho, a Victorian institution and enduring symbol of queer culture since 1986. Food tastings are included along the way, and your expert private guide brings every story to life — from hard-won freedoms to the vibrant scene thriving today.
+Step into the soul of Berlin's history on this private 2.5-hour walking tour through the legendary streets of Berlin. Beginning at iconic Brandenburg Gate, the journey winds through the Reichstag and Memorials.
+
+ADDITIONAL INFO
+Wheelchair accessible
+Near public transportation
+Stroller accessible
+Comfortable walking shoes recommended
+
+FAQS
+What should I wear? — Comfortable walking shoes are recommended.
+Is transport included? — Yes, private Mercedes vehicle is included.
 
 PRICING
 Public price: 829
 Guide fee: 232
 Currency: USD
+Price unit: PER_PERSON
+Dynamic pricing: No
 Base margin: 22
 Boost margin: 2
 Accelerate opted in: Yes
 
 MEETING & PICKUP
-Meeting point: Trafalgar Square, London
+Meeting point: Pariser Platz, 10117 Berlin, Germany
+Meeting address: Pariser Platz, 10117 Berlin, Germany
 Meeting arrangement: MEET_AT_DEPARTURE_POINT
-Pickup type: VEHICLE
+Pickup transport type: VEHICLE
 Pickup vehicle: Mercedes Executive Van
-Route map: https://maps.google.com/?q=Soho+London
+Route map: https://maps.google.com/?q=Berlin
+Ends where starts: Yes
+Pickup optional: No
 
 BOOKING
 Confirmation type: INSTANT
 Cut-off hours: 24
 Cancellation policy: STANDARD
+Bad-weather cancellation: Yes
+Email every booking: Yes
 
-TICKETS
+TRAVELLER REQUIREMENTS
+Required info: Full names, Passport details, Mobile phone number
+
+TICKETS & VOUCHER
 Ticket format: ELECTRONIC
+Tickets per booking: PER_BOOKING
+Show barcode on ticket: Yes
+Special instructions: Present your mobile voucher to the tour guide at the fountain.
+
+CONNECTIVITY
+Supplier code: PROD-BER-001
+Reservation system: Custom Viator Connect
 
 LINKS
 Admission source links:
@@ -386,11 +423,11 @@ https://www.example.com/admission-tickets
 Hours source links:
 https://www.example.com/hours-and-times
 
-QUALITY
+QUALITY & STATUS
 Quality level: GOOD
 Status: LIVE
-Reviews count: 12
-Review rating: 4.9`;
+Reviews count: 18
+Review rating: 4.95`;
 
   wrap.innerHTML = `<div class="scrim"></div>
     <div class="modal card" style="max-width:850px;width:95%;max-height:92vh;display:flex;flex-direction:column;padding:24px;border-radius:12px">
