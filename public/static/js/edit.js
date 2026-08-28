@@ -346,13 +346,13 @@ Public page: https://www.viator.com/tours/Berlin/sample
 Location: Berlin, Germany
 
 ATTRACTIONS
-1. Brandenburg Gate — 20 min, admission: NA — Historic gateway in Berlin
-2. Reichstag Building — 25 min, admission: NA — German parliament building
-3. Soviet War Memorial — 15 min, admission: NA — Memorial in Tiergarten
-4. Memorial to Murdered Jews — 20 min, admission: NA — Place of remembrance
-5. Potsdamer Platz — 15 min, admission: NA — Modern city center
-6. Topography of Terror — 30 min, admission: Yes — Indoor and outdoor exhibition
-7. Checkpoint Charlie — 15 min, admission: NA — Famous Cold War crossing point
+1. Brandenburg Gate — 20 min, admission: Free Entry — Marvel at the iconic 18th-century neoclassical monument and hear stories of the Cold War divide
+2. Reichstag Building — 25 min, admission: Included — Explore the historic parliament building with reserved admission to the iconic glass dome
+3. Soviet War Memorial Tiergarten — 15 min, admission: Free Entry — Walk through the serene memorial garden flanking 1945 artillery monuments
+4. Memorial to the Murdered Jews of Europe — 20 min, admission: Free Entry — Walk through the field of 2,711 concrete stelae with guided historical context
+5. Potsdamer Platz — 15 min, admission: Free Entry — Explore the bustling epicenter of modern Berlin architecture and former No Man's Land
+6. Topography of Terror — 30 min, admission: Included — Guided walkthrough of the indoor and outdoor exhibition along the surviving Berlin Wall segment
+7. Checkpoint Charlie — 15 min, admission: Free Entry — Stop at the famed Cold War crossing point and guardhouse for photos and historical stories
 
 INCLUSIONS
 Professional local guide: Stu Helm
