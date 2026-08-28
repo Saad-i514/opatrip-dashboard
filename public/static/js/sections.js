@@ -1,5 +1,5 @@
 import { el, esc, q } from './core.js';
-import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, iconList, label, list, PATH_LABELS, readable, rows, section, sentence } from './format.js';
+import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, iconList, label, linkList, list, PATH_LABELS, readable, rows, section, sentence } from './format.js';
 import { when } from './views/drawer.js';
 
 /* ======================= per-product readable sections ======================= */
@@ -178,36 +178,38 @@ export function secTourDetails(p){
     <th>Admission</th><th>What happens</th></tr></thead><tbody>${
     stops.map((s,i)=>{
       const loc = s.poiLocation||{};
-      const adm = s.admissionInclusionType;
-      const admTxt = adm==='FREE' ? 'Free' : adm==='YES' ? 'Included'
-        : adm==='NO' ? 'Not included' : (adm?sentence(adm):'—');
+      const stopName = s.title || loc.name || loc.searchString || '—';
+      const adm = s.admissionType || s.admissionInclusionType;
+      const admTxt = adm==='FREE' ? 'Free' : (adm==='YES'||adm==='INCLUDED') ? 'Included'
+        : (adm==='NO'||adm==='NOT_INCLUDED') ? 'Not included' : (adm==='NOT_APPLICABLE' ? 'N/A' : (adm?sentence(adm):'—'));
       const extras = placeExtras(loc);
-      // Lets Edit history jump straight to THIS stop, not just the Stops table in
-      // general — itineraryItemReference is the same id flatten() already keys this
-      // stop's own change rows by, so the two can never point at different things.
+      const durTxt = s.durationInMinutes ? fmtDuration(s.durationInMinutes) : (s.description && /^\d+\s*min/i.test(s.description) ? s.description.split(',')[0].trim() : '—');
+      const descTxt = (s.description && /^\d+\s*min/i.test(s.description) && s.description.includes(','))
+        ? s.description.substring(s.description.indexOf(',') + 1).trim()
+        : (s.description || '');
       const jp = s.itineraryItemReference
         ? `product.itinerary.itineraryItems[${s.itineraryItemReference}]` : null;
-      if (jp) PATH_LABELS.set(jp, `Stop ${i+1} — ${loc.name||loc.searchString||'itinerary'}`);
+      if (jp) PATH_LABELS.set(jp, `Stop ${i+1} — ${stopName}`);
       return `<tr${jp ? ` data-jump-path="${esc(jp)}"` : ''}>
         <td class="mono">${i+1}</td>
-        <td><div style="font-weight:600">${esc(loc.name||loc.searchString||'—')}</div>
+        <td><div style="font-weight:600">${esc(stopName)}</div>
             ${loc.searchString&&loc.name?`<div class="hint">${esc(loc.searchString)}</div>`:''}
             ${extras?`<div class="hint" style="margin-top:4px">${extras}</div>`:''}</td>
-        <td style="white-space:nowrap">${esc(fmtDuration(s.durationInMinutes)||'—')}</td>
+        <td style="white-space:nowrap">${esc(durTxt)}</td>
         <td>${esc(admTxt)}</td>
-        <td>${esc(s.description||'')}</td></tr>`;
+        <td>${esc(descTxt)}</td></tr>`;
     }).join('')}</tbody></table>`;
   f.appendChild(section(`Stops (${stops.length})`, t));
   
-  const admLinks = p.admissionSourceLinks || (p.raw_row_data ? (p.raw_row_data['Admission Source Links']||'').split('\n').filter(Boolean) : []);
-  const hrsLinks = p.hoursSourceLinks || (p.raw_row_data ? (p.raw_row_data['Hours Source Links']||'').split('\n').filter(Boolean) : []);
+  const admLinks = p.admissionSourceLinks || (p.raw_row_data ? (p.raw_row_data['Admission Source Links']||'').split('\n').map(x=>x.trim()).filter(Boolean) : []);
+  const hrsLinks = p.hoursSourceLinks || (p.raw_row_data ? (p.raw_row_data['Hours Source Links']||'').split('\n').map(x=>x.trim()).filter(Boolean) : []);
   if (admLinks.length) {
     f.appendChild(section(`Admission source links (${admLinks.length})`,
-      el('div', '', list(admLinks.map(l => `<a href="${esc(l.trim())}" target="_blank" rel="noopener">${esc(l.trim())} ↗</a>`)))));
+      el('div', '', linkList(admLinks))));
   }
   if (hrsLinks.length) {
     f.appendChild(section(`Hours source links (${hrsLinks.length})`,
-      el('div', '', list(hrsLinks.map(l => `<a href="${esc(l.trim())}" target="_blank" rel="noopener">${esc(l.trim())} ↗</a>`)))));
+      el('div', '', linkList(hrsLinks))));
   }
   return f;
 }
