@@ -1295,6 +1295,26 @@ class RawProductTextIn(BaseModel):
     note: str | None = None
 
 
+def parse_duration_to_minutes(d_str: str) -> int | None:
+    if not d_str:
+        return None
+    d_str = str(d_str).lower().strip()
+    # Match patterns like "3h 30m", "2h", "90m", "2 hours", "1.5 hours"
+    hrs, mins = 0, 0
+    m_h = re.search(r"(\d+(?:\.\d+)?)\s*(?:h|hr|hour|hours)", d_str)
+    if m_h:
+        hrs = float(m_h.group(1))
+    m_m = re.search(r"(\d+)\s*(?:m|min|minute|minutes)", d_str)
+    if m_m:
+        mins = int(m_m.group(1))
+    if hrs or mins:
+        return int(hrs * 60 + mins)
+    m_single = re.match(r"^(\d+)$", d_str)
+    if m_single:
+        return int(m_single.group(1))
+    return None
+
+
 def parse_raw_product_text(text: str) -> dict:
     """Parses structured multiline product text into normalized fields."""
     lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
@@ -1310,6 +1330,8 @@ def parse_raw_product_text(text: str) -> dict:
         "description": "",
         "pricing": {},
         "meeting": {},
+        "booking": {},
+        "tickets": {},
         "links": {},
         "quality": {},
     }
@@ -1343,6 +1365,12 @@ def parse_raw_product_text(text: str) -> dict:
         elif upper in ("MEETING", "MEETING & PICKUP", "MEETING AND PICKUP", "PICKUP", "LOGISTICS"):
             current_section = "MEETING"
             continue
+        elif upper in ("BOOKING", "BOOKING DETAILS", "CANCELLATION"):
+            current_section = "BOOKING"
+            continue
+        elif upper in ("TICKETS", "VOUCHER"):
+            current_section = "TICKETS"
+            continue
         elif upper in ("LINKS", "SOURCE LINKS", "SOURCES"):
             current_section = "LINKS"
             continue
@@ -1373,13 +1401,25 @@ def parse_raw_product_text(text: str) -> dict:
             elif line.startswith("http"):
                 data["meeting"]["route map"] = line.strip()
 
+        elif current_section == "BOOKING":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data["booking"][k.strip().lower()] = v.strip()
+
+        elif current_section == "TICKETS":
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data["tickets"][k.strip().lower()] = v.strip()
+
         elif current_section == "ATTRACTIONS":
             clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
             parts = re.split(r"\s*[–—\-]\s*", clean_line, maxsplit=1)
             stop_name = parts[0].strip()
             details = parts[1].strip() if len(parts) > 1 else ""
+            stop_dur = parse_duration_to_minutes(details)
             data["attractions"].append({
                 "title": stop_name,
+                "durationInMinutes": stop_dur,
                 "description": details,
                 "admissionType": "NOT_APPLICABLE" if "na" in details.lower() else ("NO" if "no" in details.lower() else "YES")
             })
@@ -1446,15 +1486,20 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
         p_obj = snap.get("product") or {}
         pricing_obj = p_obj.get("pricing") or snap.get("pricing") or {}
 
-        # Update title
+        # 1. Update Title
         if parsed.get("title"):
             p_obj["title"] = parsed["title"]
             con.execute("UPDATE products SET title=? WHERE id=?", (parsed["title"], pid))
 
-        # Update overview
+        # 2. Update Overview & Auto-Calculate Duration in Minutes
         ov = parsed.get("overview") or {}
+        dur_mins = None
         if "duration" in ov:
             p_obj["duration"] = ov["duration"]
+            dur_mins = parse_duration_to_minutes(ov["duration"])
+            if dur_mins:
+                p_obj.setdefault("itinerary", {})["durationInMinutes"] = dur_mins
+
         if "theme" in ov or "themes" in ov:
             p_obj["themes"] = ov.get("theme") or ov.get("themes")
         if "category" in ov or "theme category" in ov:
@@ -1466,11 +1511,23 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
                 "title": f"Tour in {opt_lang}",
                 "language": opt_lang
             }
+            p_obj.setdefault("languageGuidesDetails", {})["languageGuides"] = [opt_lang]
         if "location" in ov:
             p_obj["location"] = ov["location"]
             con.execute("UPDATE products SET location=? WHERE id=?", (ov["location"], pid))
 
-        # Update meeting & pickup
+        if "group type" in ov:
+            p_obj.setdefault("itinerary", {})["privateTour"] = "private" in ov["group type"].lower()
+        if "skip the line" in ov:
+            p_obj.setdefault("itinerary", {})["skipTheLine"] = "yes" in ov["skip the line"].lower() or "true" in ov["skip the line"].lower()
+        if "customizable" in ov:
+            p_obj.setdefault("itinerary", {})["isCustomizable"] = "yes" in ov["customizable"].lower() or "true" in ov["customizable"].lower()
+        if "product type" in ov:
+            p_obj["productClassification"] = ov["product type"]
+        if "itinerary type" in ov:
+            p_obj.setdefault("itinerary", {})["productItineraryType"] = ov["itinerary type"].upper()
+
+        # 3. Update Meeting & Pickup
         mtg = parsed.get("meeting") or {}
         meeting_point = mtg.get("meeting point") or mtg.get("meeting point / area") or ov.get("meeting point")
         if meeting_point:
@@ -1488,21 +1545,32 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
             p_obj.setdefault("pickupOption", {})["pickupType"] = mtg["pickup type"]
         if "pickup vehicle" in mtg or "vehicle description" in mtg:
             p_obj.setdefault("pickupOption", {})["pickupVehicleDescription"] = mtg.get("pickup vehicle") or mtg.get("vehicle description")
+        if "meeting arrangement" in mtg:
+            p_obj.setdefault("departureAndReturn", {})["meetingMode"] = mtg["meeting arrangement"]
 
-        # Update attractions
+        # 4. Update Attractions & Auto-Calculate Dwell Time Sum and Compliance
         if parsed.get("attractions"):
             p_obj.setdefault("itinerary", {})["itineraryItems"] = parsed["attractions"]
+            dwell_sum = sum(s.get("durationInMinutes") or 0 for s in parsed["attractions"])
+            if dwell_sum > 0:
+                p_obj["itinerary"]["timeAtStops"] = f"{dwell_sum} mins"
+            # Itinerary compliance check
+            total_tour_mins = dur_mins or p_obj.get("itinerary", {}).get("durationInMinutes") or 0
+            if total_tour_mins and dwell_sum > total_tour_mins:
+                p_obj.setdefault("activityItinerary", {})["isNonConformingItinerary"] = True
+            else:
+                p_obj.setdefault("activityItinerary", {})["isNonConformingItinerary"] = False
 
-        # Update inclusions / exclusions / description
+        # 5. Update Inclusions / Exclusions / Description & Brief Description Snippet
         if parsed.get("inclusions"):
             p_obj["inclusions"] = parsed["inclusions"]
         if parsed.get("exclusions"):
             p_obj["exclusions"] = parsed["exclusions"]
         if parsed.get("description"):
             p_obj["description"] = parsed["description"]
-            p_obj["briefDescription"] = parsed["description"][:240]
+            p_obj["briefDescription"] = parsed["description"][:240].strip()
 
-        # Update pricing & commission
+        # 6. Update Pricing & Automated Viator Program Margin Calculation
         pr = parsed.get("pricing") or {}
         price_val, fee_val = None, None
         if "public price" in pr or "price" in pr:
@@ -1515,22 +1583,43 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
             if m:
                 fee_val = float(m.group(1))
 
-        comm_percent = None
-        if price_val and fee_val and price_val > 0:
-            comm_percent = round(((price_val - fee_val) / price_val) * 100, 1)
-        elif "commission" in pr:
-            m = re.search(r"(\d+(?:\.\d+)?)", pr["commission"])
-            if m:
-                comm_percent = float(m.group(1))
+        base_margin = None
+        boost_margin = float(pr.get("boost margin", 0) or 0)
+        is_opted_in = "yes" in str(pr.get("accelerate opted in", "")).lower() or "true" in str(pr.get("accelerate opted in", "")).lower()
 
-        if comm_percent is not None:
-            p_obj["commission_percent"] = comm_percent
-            pricing_obj.setdefault("productProgramMargin", {})["baseMargin"] = comm_percent
-            pricing_obj["productProgramMargin"]["isOptedIn"] = False
-            con.execute("UPDATE products SET commission_percent=? WHERE id=?", (comm_percent, pid))
+        if price_val and fee_val and price_val > 0:
+            base_margin = round(((price_val - fee_val) / price_val) * 100, 1)
+        elif "commission" in pr or "base margin" in pr:
+            m = re.search(r"(\d+(?:\.\d+)?)", pr.get("commission") or pr.get("base margin") or "")
+            if m:
+                base_margin = float(m.group(1))
+
+        effective_margin = base_margin
+        if base_margin is not None:
+            effective_margin = base_margin + (boost_margin if is_opted_in else 0)
+            p_obj["commission_percent"] = effective_margin
+            pricing_obj["productProgramMargin"] = {
+                "baseMargin": base_margin,
+                "boostMargin": boost_margin,
+                "isOptedIn": is_opted_in,
+                "averageActualMargin": effective_margin,
+                "minimumActualMargin": effective_margin,
+                "targetedMinimumMargin": base_margin,
+                "maxMargin": 50
+            }
+            # Automated Minimal Margins per age band
+            rate_frac = round(effective_margin / 100.0, 2)
+            pricing_obj["minimalMargins"] = {
+                "ADULT": rate_frac, "SENIOR": rate_frac, "YOUTH": rate_frac,
+                "CHILD": rate_frac, "INFANT": rate_frac
+            }
+            pricing_obj["minimumSuggestedRetailPriceByAgeBands"] = {
+                "ADULT": 5, "SENIOR": 5, "YOUTH": 0, "CHILD": 0, "INFANT": 0
+            }
+            con.execute("UPDATE products SET commission_percent=? WHERE id=?", (effective_margin, pid))
 
         if price_val:
-            net_val = fee_val if fee_val is not None else round(price_val * (1 - (comm_percent or 22.0)/100.0), 2)
+            net_val = fee_val if fee_val is not None else round(price_val * (1 - (effective_margin or 22.0)/100.0), 2)
             pkg_ref = f"PPP-DEFAULT_{code}"
             pricing_obj.setdefault("pricingPackages", {})[pkg_ref] = {
                 "reference": pkg_ref,
@@ -1540,21 +1629,36 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
                         "price": {
                             "retailPrice": price_val,
                             "netPrice": net_val,
-                            "marginPercent": comm_percent
+                            "marginPercent": effective_margin
                         },
                         "minMaxTravellers": {"lowerEndpoint": 1, "upperEndpoint": 15}
                     }]
                 }
             }
 
-        # Update links
+        # 7. Update Links
         links = parsed.get("links") or {}
         if links.get("admission links"):
             p_obj["admissionSourceLinks"] = links["admission links"]
         if links.get("source links"):
             p_obj["hoursSourceLinks"] = links["source links"]
 
-        # Quality & Status
+        # 8. Booking & Voucher Settings
+        bkg = parsed.get("booking") or {}
+        if "cancellation policy" in bkg:
+            p_obj.setdefault("cancellationPolicy", {}).setdefault("cancellationPolicyType", {})["displayText"] = bkg["cancellation policy"]
+        if "confirmation type" in bkg:
+            p_obj.setdefault("bookingConfirmationSettings", {})["confirmationType"] = bkg["confirmation type"]
+        if "cut-off hours" in bkg:
+            m_co = re.search(r"(\d+)", bkg["cut-off hours"])
+            if m_co:
+                p_obj.setdefault("bookingConfirmationSettings", {})["bookingCutoffInHours"] = int(m_co.group(1))
+
+        tkt = parsed.get("tickets") or {}
+        if "ticket format" in tkt:
+            p_obj.setdefault("voucher", {})["ticketType"] = tkt["ticket format"]
+
+        # 9. Quality & Status
         q = parsed.get("quality") or {}
         if "quality" in q or "quality level" in q:
             q_val = (q.get("quality") or q.get("quality level")).upper()
@@ -1565,6 +1669,35 @@ def update_product_from_raw_data(pid: int, body: RawProductTextIn):
             p_obj["status"] = st_val
             canon = status_canonical(st_val)
             con.execute("UPDATE products SET status=?, status_canonical=? WHERE id=?", (st_val, canon, pid))
+        if "reviews count" in q or "review count" in q:
+            m_rc = re.search(r"(\d+)", q.get("reviews count") or q.get("review count") or "")
+            if m_rc:
+                con.execute("UPDATE products SET review_count=? WHERE id=?", (int(m_rc.group(1)), pid))
+        if "review rating" in q or "rating" in q:
+            m_rr = re.search(r"(\d+(?:\.\d+)?)", q.get("review rating") or q.get("rating") or "")
+            if m_rr:
+                con.execute("UPDATE products SET review_rating=? WHERE id=?", (float(m_rr.group(1)), pid))
+
+        # 10. Automated Viator Quality Traits Evaluation
+        traits_map = {
+            "TITLE": bool(p_obj.get("title") and len(p_obj["title"]) >= 10),
+            "ITINERARY": bool(p_obj.get("itinerary", {}).get("itineraryItems")),
+            "INCLUSION_EXCLUSION": bool(p_obj.get("inclusions") or p_obj.get("exclusions")),
+            "LANGUAGES": bool(snap.get("product_options") or p_obj.get("languageGuidesDetails")),
+            "TRAVELLER_PICKUP": bool(p_obj.get("departureAndReturn") or p_obj.get("pickupOption")),
+            "PRICING_MINIMAL_MARGINS": bool(effective_margin and effective_margin >= 20),
+            "PRODUCT_UNIQUENESS": bool(p_obj.get("description") and len(p_obj["description"]) >= 50),
+            "CUSTOMIZABLE": True,
+            "START_END_POINTS": True,
+            "VOUCHER_BASICS": True,
+        }
+        snap_traits = snap.setdefault("product_traits", {}).setdefault(code, {})
+        for t_k, satisfied in traits_map.items():
+            snap_traits[t_k] = {
+                "name": t_k.replace("_", " ").title(),
+                "isSatisfied": satisfied,
+                "violations": [] if satisfied else [{"type": f"MISSING_{t_k}"}]
+            }
 
         p_obj["pricing"] = pricing_obj
         snap["product"] = p_obj

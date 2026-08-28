@@ -330,7 +330,11 @@ Theme: ${curP.themes || 'Lifestyle & Celebrations — LGBT, Nightlife, Party/Cel
 Category: ${curP.category || 'Walking Tours'}
 Languages: English
 Max travelers: 15
-Meeting point: Trafalgar Square, London
+Group type: Private
+Skip the line: Yes
+Customizable: Yes
+Product type: STANDARD_TOUR
+Location: London, United Kingdom
 
 ATTRACTIONS
 1. Trafalgar Square, London — 10 min, admission: NA
@@ -357,6 +361,9 @@ PRICING
 Public price: 829
 Guide fee: 232
 Currency: USD
+Base margin: 22
+Boost margin: 2
+Accelerate opted in: Yes
 
 MEETING & PICKUP
 Meeting point: Trafalgar Square, London
@@ -364,6 +371,14 @@ Meeting arrangement: MEET_AT_DEPARTURE_POINT
 Pickup type: VEHICLE
 Pickup vehicle: Mercedes Executive Van
 Route map: https://maps.google.com/?q=Soho+London
+
+BOOKING
+Confirmation type: INSTANT
+Cut-off hours: 24
+Cancellation policy: STANDARD
+
+TICKETS
+Ticket format: ELECTRONIC
 
 LINKS
 Admission source links:
@@ -373,7 +388,9 @@ https://www.example.com/hours-and-times
 
 QUALITY
 Quality level: GOOD
-Status: LIVE`;
+Status: LIVE
+Reviews count: 12
+Review rating: 4.9`;
 
   wrap.innerHTML = `<div class="scrim"></div>
     <div class="modal card" style="max-width:850px;width:95%;max-height:92vh;display:flex;flex-direction:column;padding:24px;border-radius:12px">
