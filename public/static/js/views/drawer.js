@@ -254,8 +254,32 @@ function renderEntityRow(g, jumpToField){
   }
   return row;
 }
+// Matches db.py's LIFECYCLE_LABELS exactly — field_path values save_snapshot() writes for
+// a product's own first capture / a draft going live, instead of either "0 changes" (looks
+// like nothing happened) or a field-by-field flood of every field reading (none) -> value.
+// Rendered as a single plain line: no Before/After (there is nothing to compare — this IS
+// the first thing on file) and no "Go to field" (there is no page field behind it).
+const LIFECYCLE_LABELS = {
+  '_event.newly_added': 'Newly Added',
+  '_event.draft_completed': 'Previously Draft, Now Complete',
+};
+function renderLifecycleRow(it){
+  const name = personName(it.who, session.people);
+  const row = el('div','eh');
+  row.innerHTML = `
+    <div class="eh-av" title="${esc(it.who)}">${esc((name[0]||'?').toUpperCase())}</div>
+    <div style="min-width:0">
+      <div class="eh-what"><span class="badge b-active">${esc(LIFECYCLE_LABELS[it.path] || it.path)}</span></div>
+      <div class="eh-foot"><b>${esc(name)}</b>
+        <span class="eh-when">${esc(whenLong(it.at))}</span>
+      </div>
+    </div>`;
+  return row;
+}
 function editHistoryCard(d, jumpToField){
-  const items = historyFor(d);
+  const allItems = historyFor(d);
+  const lifecycleItems = allItems.filter(it => LIFECYCLE_LABELS[it.path]);
+  const items = allItems.filter(it => !LIFECYCLE_LABELS[it.path]);
   const c = el('div','card');
   const b = el('div','pad');
 
@@ -295,11 +319,13 @@ function editHistoryCard(d, jumpToField){
   const entityGroups = [...groups.values()].sort((a, b2) =>
     String(b2.list[0].at || '').localeCompare(String(a.list[0].at || '')));
 
+  const thingCount = entityGroups.length + lifecycleItems.length;
+  const changeCount = items.length + lifecycleItems.length;
   c.appendChild(el('div','card-h', '<h3>Edit history</h3>'
-    + `<span class="sub">${entityGroups.length} thing${entityGroups.length===1?'':'s'} changed · `
-    + `${items.length} change${items.length===1?'':'s'} in total</span>`));
+    + `<span class="sub">${thingCount} thing${thingCount===1?'':'s'} changed · `
+    + `${changeCount} change${changeCount===1?'':'s'} in total</span>`));
 
-  if (!entityGroups.length){
+  if (!entityGroups.length && !lifecycleItems.length){
     b.appendChild(el('div','empty','<div class="big">Nothing has changed yet</div>'
       + 'The first capture is the starting point. From the next check onwards, anything '
       + 'Viator changes — and anything anyone corrects here — is listed on this page.'));
@@ -326,16 +352,22 @@ function editHistoryCard(d, jumpToField){
     name, list,
     at: list.reduce((m,g)=>String(g.list[0].at||'') > m ? String(g.list[0].at||'') : m, ''),
   }));
-  // Sections interleave with standalone boxes by their own most recent change, same as
-  // every box always has — grouping by section does not mean "always last."
-  const top = [...sections.map(s=>({kind:'section', s})), ...standalone.map(g=>({kind:'entity', g}))]
+  // Sections interleave with standalone boxes and lifecycle events by their own most
+  // recent change, same as every box always has — grouping by section does not mean
+  // "always last." A lifecycle event is always the OLDEST thing on file for a product (it
+  // marks the first capture), so in practice this sorts it to the very bottom of the feed
+  // — its rightful place, as the start of the trail.
+  const top = [...sections.map(s=>({kind:'section', s})),
+               ...standalone.map(g=>({kind:'entity', g})),
+               ...lifecycleItems.map(it=>({kind:'lifecycle', it}))]
     .sort((a,b) => {
-      const at = x => x.kind==='section' ? x.s.at : String(x.g.list[0].at||'');
+      const at = x => x.kind==='section' ? x.s.at : x.kind==='lifecycle' ? String(x.it.at||'') : String(x.g.list[0].at||'');
       return at(b).localeCompare(at(a));
     });
 
   top.forEach(item => {
     if (item.kind === 'entity'){ feed.appendChild(renderEntityRow(item.g, jumpToField)); return; }
+    if (item.kind === 'lifecycle'){ feed.appendChild(renderLifecycleRow(item.it)); return; }
     const { s } = item;
     const things = s.list.length;
     const changes = s.list.reduce((n,g)=>n+g.list.length, 0);

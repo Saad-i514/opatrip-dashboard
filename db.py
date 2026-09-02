@@ -604,6 +604,24 @@ def _latest_snapshot_row(con, product_id):
             r["n"])
 
 
+# field_path values that mark a PRODUCT LIFECYCLE event rather than a captured field —
+# never produced by diff() (which only ever emits real dotted snapshot paths), so the
+# dashboard can tell the two apart on sight. drawer.js renders these as a single labelled
+# line with no "Go to field" jump, since there is no page field to jump to.
+LIFECYCLE_LABELS = {
+    "_event.newly_added": "Newly Added",
+    "_event.draft_completed": "Previously Draft, Now Complete",
+}
+
+
+def _log_lifecycle_event(con, product_id, sync_id, account_id, operator_email, t, field_path):
+    con.execute(
+        """INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value,
+                                detected_at, account_id, operator_email, source)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (product_id, sync_id, field_path, None, "true", t, account_id, operator_email, "diff"))
+
+
 def save_snapshot(con, product_id, sync_id, account_id, operator_email,
                   normalized, raw_network=None, portal_modified_by=None):
     """Write a snapshot and the field-level changes vs the previous one.
@@ -614,25 +632,35 @@ def save_snapshot(con, product_id, sync_id, account_id, operator_email,
     payload = json.dumps(normalized, ensure_ascii=False)
 
     # ---- 1. first sight: the baseline. Stored once, never overwritten. --------------
+    # A brand-new product is a real, worth-seeing event — not silence. One synthetic row
+    # (never diffed, never subject to VOLATILE_*/REDUNDANT_TOKENS — those only apply to
+    # diff()) marks it, so the dashboard shows "1 change: Newly Added" instead of either
+    # "0 changes" (looks like nothing happened) or a field-by-field flood of every field
+    # reading old_value=NULL (which case 1b below proved is not "an edit anyone made").
     if prev is None:
         con.execute("""INSERT INTO snapshots (product_id, sync_id, captured_at,
                                               normalized_json, raw_network_json)
                        VALUES (?,?,?,?,?)""",
                     (product_id, sync_id, t, payload, raw_json))
-        return 0                       # a baseline is not a change
+        _log_lifecycle_event(con, product_id, sync_id, account_id, operator_email, t,
+                             "_event.newly_added")
+        return 1
 
     # ---- 1b. a draft going live: the only snapshot on file is a STUB (drafts are
     # deliberately never deep-fetched — see draft_stub()), so this is really the first
     # real capture too. Diffing a stub against a full product would report EVERY field as
     # "changed" (nothing to compare it to), which is not an edit anyone made on Viator —
     # measured on a real run: 8 products going draft->live produced 5,987 of 6,392 change
-    # rows in one sync, all old_value=NULL. Treated as a fresh baseline, same as case 1.
+    # rows in one sync, all old_value=NULL. Treated as a fresh baseline, same as case 1,
+    # but — same reasoning as case 1 — marked with one synthetic row rather than silence.
     if "stub" in prev and "product" not in prev and "product" in normalized:
         con.execute("""INSERT INTO snapshots (product_id, sync_id, captured_at,
                                               normalized_json, raw_network_json)
                        VALUES (?,?,?,?,?)""",
                     (product_id, sync_id, t, payload, raw_json))
-        return 0
+        _log_lifecycle_event(con, product_id, sync_id, account_id, operator_email, t,
+                             "_event.draft_completed")
+        return 1
 
     rows = diff(prev, normalized)
 
