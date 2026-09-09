@@ -183,7 +183,7 @@ export async function viewStats(){
     // sub is blank: "1117 added in 30 days" was removed on request.
     kpiCard('◧','var(--accent-soft)',
             S.acct ? 'Products in this account' : 'Total Products Ever Added',
-            {...K.products, sub: '', filter: {}}) +
+            {...K.products, delta: null, sub: '', filter: {}}) +
     kpiCard('●','var(--green-bg)','Live', box('LIVE','selling on the platform')) +
     kpiCard('▤','#FEF3C7','Draft', box('DRAFT','recorded, not yet submitted')) +
     kpiCard('✕','var(--red-bg)','Rejected', box('REJECTED','needs fixing and resubmitting'));
