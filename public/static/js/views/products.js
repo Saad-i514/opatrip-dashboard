@@ -48,16 +48,17 @@ export async function viewProducts(){
   // every filter travels as a query param, so a filtered view is a shareable URL and the
   // server does the narrowing — filtering 1,100 rows in the browser would mean shipping
   // all of them first
-  for (const k of ['q','lifecycle','platform','reviews','missing','month','changed'])
+  for (const k of ['q','lifecycle','platform','reviews','missing','month','changed','country','city'])
     if (S.pf[k]) ps.set(k, S.pf[k]);
   if (S.pf.status) ps.set('status', S.pf.status);
   // Served from the cache when we have it, so coming back to this tab is instant;
   // a refresh goes out behind it and repaints only if something actually changed.
   const key = '/api/products?'+ps;
+  const fparams = q(S.pf.country ? 'country='+encodeURIComponent(S.pf.country) : '');
   const [d, opts0] = await Promise.all([
     cachedApi(key, () => { if (S.tab === 'products' && key === '/api/products?'+ps)
                              viewProducts(); }),
-    cachedApi('/api/filters'+q()),   // months come from the data, so no empty option exists
+    cachedApi('/api/filters'+fparams),   // months come from the data, so no empty option exists
   ]);
   v.dataset.painted='1';
   v.innerHTML='';
@@ -77,6 +78,10 @@ export async function viewProducts(){
   f.innerHTML = `
     <input type="text" id="pq" placeholder="Search by name or product code"
            value="${esc(S.pf.q)}" style="min-width:240px;flex:1;max-width:360px">
+    <select id="pcountry" title="Country"><option value="">All countries</option>
+      ${opts((opts0.countries||[]).map(c=>[c, c]), S.pf.country)}</select>
+    <select id="pcity" title="City / Destination"><option value="">All cities</option>
+      ${opts((opts0.cities||[]).map(c=>[c, c]), S.pf.city)}</select>
     <select id="pplat" title="Platform"><option value="">All platforms</option>
       ${opts((opts0.platforms||[]).map(p=>[p.code, p.name]), S.pf.platform)}</select>
     <select id="pmonth" title="Month the product was first captured">
@@ -97,6 +102,8 @@ export async function viewProducts(){
   v.appendChild(f);
   const set = (k, val) => { S.pf[k] = val; viewProducts(); };
   f.querySelector('#pq').oninput = e=>{S.pf.q=e.target.value; debounce(viewProducts);};
+  f.querySelector('#pcountry').onchange = e=>{ S.pf.country=e.target.value; S.pf.city=''; viewProducts(); };
+  f.querySelector('#pcity').onchange    = e=>set('city', e.target.value);
   f.querySelector('#pplat').onchange   = e=>set('platform', e.target.value);
   f.querySelector('#pmonth').onchange  = e=>set('month', e.target.value);
   f.querySelector('#plife').onchange   = e=>set('lifecycle', e.target.value);
@@ -104,7 +111,8 @@ export async function viewProducts(){
   f.querySelector('#pchanged').onchange= e=>set('changed', e.target.value);
   f.querySelector('#pclear').onclick = ()=>{
     Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',
-                         reviews:'',missing:'',month:'',changed:''});
+                         reviews:'',missing:'',month:'',changed:'',
+                         country:'',city:''});
     viewProducts();
   };
   const addBtn = f.querySelector('#btnAddProductBtn');
@@ -113,6 +121,8 @@ export async function viewProducts(){
   // wondering why the other 670 vanished.
   const active = [
     S.pf.q && `matching “${S.pf.q}”`,
+    S.pf.country && `in ${S.pf.country}`,
+    S.pf.city && `city: ${S.pf.city}`,
     S.pf.platform && `on ${S.pf.platform}`,
     S.pf.lifecycle && (LIFECYCLE.find(x=>x[0]===S.pf.lifecycle)||[,S.pf.lifecycle])[1],
     S.pf.reviews && (REVIEWS.find(x=>x[0]===S.pf.reviews)||[,S.pf.reviews])[1],

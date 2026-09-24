@@ -678,7 +678,7 @@ def review_bands():
 
 
 @app.get("/api/filters")
-def filter_options(account: str | None = None):
+def filter_options(account: str | None = None, country: str | None = None):
     """Everything the product filter bar needs, in one call.
 
     The months come from the data rather than a generated range, so the dropdown can
@@ -698,7 +698,24 @@ def filter_options(account: str | None = None):
             """SELECT code, name FROM platforms ORDER BY sort_order""")]
         lifecycle = [dict(r) for r in con.execute(
             """SELECT code, label FROM statuses ORDER BY sort_order""")]
+        countries = [r[0] for r in con.execute(
+            f"""SELECT DISTINCT a.country FROM accounts a
+                {where}
+                {'AND' if where else 'WHERE'} a.country IS NOT NULL AND a.country != ''
+                ORDER BY a.country""", args)]
+        city_where = where
+        city_args = list(args)
+        if country:
+            city_where += (" AND " if city_where else "WHERE ") + "a.country=?"
+            city_args.append(country)
+        cities = [r[0] for r in con.execute(
+            f"""SELECT DISTINCT p.location FROM products p
+                JOIN accounts a ON a.id=p.account_id
+                {city_where}
+                {'AND' if city_where else 'WHERE'} p.location IS NOT NULL AND p.location != ''
+                ORDER BY p.location""", city_args)]
     return {"platforms": plats, "months": months, "lifecycle": lifecycle,
+            "countries": countries, "cities": cities,
             "reviews": [{"key": k, "label": v[0]} for k, v in REVIEW_BANDS.items()
                         if k not in ("none",)]}
 
@@ -822,7 +839,8 @@ def products(account: str | None = None, q: str | None = None,
              status: str | None = None, connection: str | None = None,
              platform: str | None = None, lifecycle: str | None = None,
              reviews: str | None = None, missing: str | None = None,
-             month: str | None = None, changed: str | None = None):
+             month: str | None = None, changed: str | None = None,
+             country: str | None = None, city: str | None = None):
     # Only what the list actually draws. `p.*` shipped every column of every row: at 3,295
     # products that was 3 MB, of which thumbnail_url (279 kB, and photos are not stored any
     # more) and the two *_seen_at stamps (174 kB) were never rendered. The product page
@@ -853,6 +871,12 @@ def products(account: str | None = None, q: str | None = None,
     if status:
         sql += " AND p.status=?"
         args.append(status)
+    if country:
+        sql += " AND a.country=?"
+        args.append(country)
+    if city:
+        sql += " AND p.location=?"
+        args.append(city)
     # lifecycle is the CANONICAL status (LIVE/DRAFT/...) — the same word the dashboard
     # cards and the donut use. `status` above is the platform's own raw word, kept so an
     # existing link with ?status=ACTIVE still works.

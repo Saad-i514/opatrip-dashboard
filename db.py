@@ -248,6 +248,7 @@ def init():
         con.commit()
         seed_reference(con)
         backfill_platform(con)
+        backfill_account_countries(con)
         con.commit()
 
 
@@ -345,6 +346,16 @@ def backfill_platform(con):
         canon = r["status_canonical"] or canonical_status(con, vid, r["status"])
         con.execute("UPDATE products SET tour_id=?, status_canonical=? WHERE id=?",
                     (tid, canon, r["id"]))
+
+
+def backfill_account_countries(con):
+    """Derive accounts.country from account name where missing."""
+    import re as _re
+    rows = con.execute("SELECT id, name FROM accounts WHERE (country IS NULL OR country = '') AND name IS NOT NULL").fetchall()
+    for r in rows:
+        m = _re.search(r"Tours in\s+(.+)$", r["name"] or "", _re.IGNORECASE)
+        if m:
+            con.execute("UPDATE accounts SET country=? WHERE id=?", (m.group(1).strip(), r["id"]))
 
 
 # --------------------------------------------------------------------------- diff
@@ -479,6 +490,10 @@ def diff(old, new):
 # ------------------------------------------------------------------- upsert helpers
 def upsert_account(con, viator_account_id, name=None, country=None,
                    signin_email=None, profile_dir=None):
+    if not country and name:
+        m = _re.search(r"Tours in\s+(.+)$", name, _re.IGNORECASE)
+        if m:
+            country = m.group(1).strip()
     con.execute(
         """INSERT INTO accounts (viator_account_id, name, country, signin_email, profile_dir)
            VALUES (?,?,?,?,?)
