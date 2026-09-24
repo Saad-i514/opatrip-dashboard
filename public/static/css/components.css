@@ -549,3 +549,31 @@ td.v.num, td.num{font-variant-numeric:tabular-nums}
    its own so it reads as "here it is", not a permanent marker. */
 @keyframes jumpFlash{from{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent-line)}to{background:transparent;box-shadow:0 0 0 0 transparent}}
 .jump-flash{animation:jumpFlash 1.8s ease-out;border-radius:6px}
+
+/* ---------- searchable select (combobox) ---------- */
+.searchable-select{position:relative;display:inline-flex;align-items:center}
+.searchable-select-btn{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line-2);border-radius:9px;padding:8px 12px;color:var(--ink);font:inherit;font-size:14px;cursor:pointer;outline:none;min-width:140px;max-width:220px;justify-content:space-between;transition:border-color .15s,box-shadow .15s;box-shadow:var(--shadow);user-select:none}
+.searchable-select-btn:hover{border-color:var(--ink-3)}
+.searchable-select.is-active .searchable-select-btn,.searchable-select-btn:focus-visible{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.searchable-select-btn.has-value{font-weight:500;border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink)}
+.searchable-select-val{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left}
+.searchable-select-arrow{flex:none;color:var(--ink-3);transition:transform .18s ease}
+.searchable-select.is-active .searchable-select-arrow{transform:rotate(180deg)}
+.searchable-select-clear{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.08);color:var(--accent-ink);font-size:13px;line-height:1;cursor:pointer;flex:none;transition:background .12s,color .12s;margin-right:2px}
+.searchable-select-clear:hover{background:var(--red-bg);color:var(--red)}
+.searchable-select-dropdown{position:absolute;top:calc(100% + 5px);left:0;min-width:230px;max-width:320px;width:max-content;background:var(--surface);border:1px solid var(--line-2);border-radius:11px;box-shadow:0 10px 25px -5px rgba(28,25,23,.12),0 8px 10px -6px rgba(28,25,23,.08);padding:8px;z-index:1000;display:flex;flex-direction:column;gap:6px;animation:sSelectPop .15s ease-out}
+@keyframes sSelectPop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.searchable-select-search-box{position:relative;display:flex;align-items:center}
+.searchable-select-search-box svg{position:absolute;left:10px;color:var(--ink-3);pointer-events:none}
+.searchable-select-input{width:100%;background:var(--surface-2)!important;border:1px solid var(--line)!important;border-radius:8px!important;padding:7px 28px 7px 32px!important;font-size:13.5px!important;color:var(--ink)!important;outline:none!important;box-sizing:border-box!important}
+.searchable-select-input:focus{border-color:var(--accent-line)!important;background:var(--surface)!important;box-shadow:0 0 0 2px var(--accent-soft)!important}
+.searchable-select-input-clear{position:absolute;right:8px;cursor:pointer;color:var(--ink-3);font-size:14px;line-height:1;padding:2px 4px;border-radius:4px}
+.searchable-select-input-clear:hover{color:var(--ink)}
+.searchable-select-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding-right:2px}
+.searchable-select-list::-webkit-scrollbar{width:5px}
+.searchable-select-list::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
+.searchable-select-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:7px;font-size:13.5px;color:var(--ink);cursor:pointer;transition:background .1s,color .1s;user-select:none}
+.searchable-select-item:hover,.searchable-select-item.is-focused{background:var(--surface-2)}
+.searchable-select-item.is-selected{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.searchable-select-item mark{background:transparent;color:var(--accent);font-weight:700;text-decoration:underline}
+.searchable-select-empty{padding:14px 10px;font-size:13px;color:var(--ink-3);text-align:center}
