@@ -43,12 +43,27 @@ function createSearchableSelect({ id, title, allLabel, searchPlaceholder, option
   const wrap = el('div', 'searchable-select');
   wrap.id = id + '_wrap';
 
+  // Normalize options to [{ value, label }] to support strings, [val, lab] pairs, or {value, label} objects
+  const rawOpts = (options || []).map(opt => {
+    if (Array.isArray(opt)) {
+      return { value: String(opt[0]), label: String(opt[1] || opt[0]) };
+    } else if (opt && typeof opt === 'object') {
+      return { value: String(opt.value != null ? opt.value : opt.key), label: String(opt.label || opt.name || opt.value) };
+    } else if (opt != null) {
+      return { value: String(opt), label: String(opt) };
+    }
+    return null;
+  }).filter(Boolean);
+
+  const selectedItem = rawOpts.find(o => o.value === value);
+  const displayVal = selectedItem ? selectedItem.label : (value || allLabel);
+
   const btn = el('button', 'searchable-select-btn' + (value ? ' has-value' : ''));
   btn.type = 'button';
   btn.id = id;
   btn.title = title;
   btn.innerHTML = `
-    <span class="searchable-select-val">${esc(value || allLabel)}</span>
+    <span class="searchable-select-val">${esc(displayVal)}</span>
     ${value ? `<span class="searchable-select-clear" title="Clear ${esc(title)}">×</span>` : ''}
     <svg class="searchable-select-arrow" viewBox="0 0 16 16" width="11" height="11">
       <path d="M3.5 6l4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -79,9 +94,8 @@ function createSearchableSelect({ id, title, allLabel, searchPlaceholder, option
     listEl.innerHTML = '';
     focusedIndex = -1;
 
-    const rawOpts = (options || []).filter(Boolean);
     const matches = qLower
-      ? rawOpts.filter(opt => String(opt).toLowerCase().includes(qLower))
+      ? rawOpts.filter(opt => opt.label.toLowerCase().includes(qLower) || opt.value.toLowerCase().includes(qLower))
       : rawOpts;
 
     if (!qLower){
@@ -103,16 +117,16 @@ function createSearchableSelect({ id, title, allLabel, searchPlaceholder, option
     }
 
     matches.forEach(opt => {
-      const isSel = opt === value;
+      const isSel = opt.value === value;
       const item = el('div', 'searchable-select-item' + (isSel ? ' is-selected' : ''));
 
-      let labelHtml = esc(opt);
+      let labelHtml = esc(opt.label);
       if (qLower){
-        const idx = opt.toLowerCase().indexOf(qLower);
+        const idx = opt.label.toLowerCase().indexOf(qLower);
         if (idx !== -1){
-          const before = esc(opt.slice(0, idx));
-          const match = esc(opt.slice(idx, idx + qLower.length));
-          const after = esc(opt.slice(idx + qLower.length));
+          const before = esc(opt.label.slice(0, idx));
+          const match = esc(opt.label.slice(idx, idx + qLower.length));
+          const after = esc(opt.label.slice(idx + qLower.length));
           labelHtml = `${before}<mark>${match}</mark>${after}`;
         }
       }
@@ -121,7 +135,7 @@ function createSearchableSelect({ id, title, allLabel, searchPlaceholder, option
       item.onclick = (e) => {
         e.stopPropagation();
         closeDropdown();
-        onChange(opt);
+        onChange(opt.value);
       };
       listEl.appendChild(item);
     });
@@ -275,8 +289,7 @@ export async function viewProducts(){
       ${opts((opts0.months||[]).map(m=>[m.month||m, `${monthName(m.month||m)}` + (m.n!=null?` (${m.n})`:'')]), S.pf.month)}</select>
     <select id="plife" title="Lifecycle status"><option value="">Any status</option>
       ${opts(LIFECYCLE, S.pf.lifecycle)}</select>
-    <select id="previews" title="Review count"><option value="">Any reviews</option>
-      ${opts(REVIEWS, S.pf.reviews)}</select>
+    <div id="previews_mount"></div>
     <select id="pchanged" title="Whether anything has changed since the first capture">
       <option value="">Changed or not</option>
       ${opts(CHANGED, S.pf.changed)}</select>
@@ -312,10 +325,20 @@ export async function viewProducts(){
     value: S.pf.city,
     onChange: val => set('city', val)
   }));
+
+  f.querySelector('#previews_mount').replaceWith(createSearchableSelect({
+    id: 'previews',
+    title: 'Review count',
+    allLabel: 'Any reviews',
+    searchPlaceholder: 'Search reviews…',
+    options: REVIEWS,
+    value: S.pf.reviews,
+    onChange: val => set('reviews', val)
+  }));
+
   f.querySelector('#pplat').onchange   = e=>set('platform', e.target.value);
   f.querySelector('#pmonth').onchange  = e=>set('month', e.target.value);
   f.querySelector('#plife').onchange   = e=>set('lifecycle', e.target.value);
-  f.querySelector('#previews').onchange= e=>set('reviews', e.target.value);
   f.querySelector('#pchanged').onchange= e=>set('changed', e.target.value);
   f.querySelector('#pclear').onclick = ()=>{
     Object.assign(S.pf, {q:'',status:'',lifecycle:'',platform:'',
