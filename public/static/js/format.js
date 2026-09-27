@@ -220,7 +220,9 @@ export function whenLong(t){
   const d = parseTs(t);
   if (!d) return String(t || '');
   const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
-  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, `
+  const nowYear = (new Date()).getFullYear();
+  const yearStr = d.getFullYear() !== nowYear ? `, ${d.getFullYear()}` : '';
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}${yearStr}, `
        + `${((h + 11) % 12) + 1}:${m} ${h < 12 ? 'AM' : 'PM'}`;
 }
 /* A person's name from whatever we hold. An email is not a name, but "quality4" reads
@@ -471,9 +473,14 @@ export const qualBadge = q => {
    read "NaN days ago". Only bare SQLite-style stamps need the timezone added. */
 export function parseTs(t){
   if (!t) return null;
-  let s = String(t).trim().replace(' ', 'T');
+  let s = String(t).trim();
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) {
+    s = s.replace(' ', 'T') + 'Z';
+  }
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
   if (!/(Z|[+-]\d{2}:?\d{2})$/.test(s)) s += 'Z';
-  const d = new Date(s);
+  d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
 export function daysSince(t){

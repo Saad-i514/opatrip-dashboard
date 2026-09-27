@@ -2,6 +2,7 @@ import { esc, $, post, api, cachedApi } from '../core.js';
 import { openDrawer } from './drawer.js';
 import { askEditor } from '../edit.js';
 import { toast } from '../toast.js';
+import { whenLong } from '../format.js';
 
 let gygCatalogCache = null;
 
@@ -914,7 +915,8 @@ function normalizeChange(item, currentStatus) {
   const fieldName = item.field && item.field !== path ? item.field : '';
   const beforeVal = (item.before !== undefined && item.before !== null) ? item.before : (item.old_value !== undefined ? item.old_value : '—');
   const afterVal = (item.after !== undefined && item.after !== null) ? item.after : (item.new_value !== undefined ? item.new_value : '—');
-  const dateStr = item.date || item.detected_at || item.at || 'Recently';
+  const rawDate = item.date || item.detected_at || item.at || '';
+  const dateStr = rawDate ? whenLong(rawDate) : 'Recently';
   const statusVal = item.status || currentStatus || 'Bookable';
   const sourceBadge = (item.source === 'dashboard' || item.editor) ? 'edited here' : 'changed on GetYourGuide';
   return { who, path, fieldName, before: beforeVal, after: afterVal, at: dateStr, status: statusVal, source: sourceBadge };
@@ -1007,7 +1009,7 @@ function renderGygHistoryCards(historyList, currentStatus) {
               </div>
               <div class="eh-foot" style="display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:12px; font-size:12.5px;">
                 <b style="color:#374151;">${esc(latest.who)}</b>
-                <span class="eh-when" style="color:#9CA3AF;">${esc(latest.at)}</span>
+                <span class="eh-when" style="color:#9CA3AF;">${esc(latest.at ? whenLong(latest.at) : 'Recently')}</span>
                 <span class="badge b-stub" style="background:#EEF2FF; color:#4F46E5; font-size:11px; padding:2px 7px; border-radius:4px;">
                   ${esc(latest.source)}
                 </span>
@@ -1020,7 +1022,7 @@ function renderGygHistoryCards(historyList, currentStatus) {
                     <div style="padding:9px 12px; margin-bottom:6px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:6px; font-size:12px;">
                       <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#6B7280;">
                         <span><b>${esc(past.who)}</b></span>
-                        <span>${esc(past.at)}</span>
+                        <span>${esc(past.at ? whenLong(past.at) : 'Recently')}</span>
                       </div>
                       <div style="color:#374151; word-break:break-word;">
                         <span style="color:#6B7280;">Was:</span> ${esc(String(past.before || '—'))} 
@@ -1041,7 +1043,7 @@ function renderGygHistoryCards(historyList, currentStatus) {
 
 function applyLocalEdits(p, sectionName, edits, who) {
   const historyList = p.history || (p.history = []);
-  const nowStr = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true });
+  const nowStr = new Date().toISOString();
   Object.keys(edits).forEach(k => {
     const oldVal = p[k];
     const newVal = edits[k];
