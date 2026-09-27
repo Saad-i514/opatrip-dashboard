@@ -19,9 +19,12 @@ async function loadGygProduct(tourId, productId = null, viatorTourId = null, via
         const details = data.details || {};
         const prod = data.product || {};
         const combined = { ...details, ...prod };
-        combined.tour_id = combined.tour_id || combined.product_code || tid;
-        combined.title = combined.title || prod.title;
-        combined.status = combined.status || prod.status;
+        combined.tour_id = prod.product_code || details.tour_id || details.product_code || combined.tour_id || tid;
+        combined.title = prod.title || details.title || combined.title;
+        combined.status = prod.status || details.status || combined.status;
+        if (details.short_description && !combined.short_description) combined.short_description = details.short_description;
+        if (details.full_description && !combined.full_description) combined.full_description = details.full_description;
+        if (details.highlights && (!combined.highlights || !combined.highlights.length)) combined.highlights = details.highlights;
         if (data.changes) combined.history = data.changes;
         if (Object.keys(details).length > 0 || combined.title) {
           return combined;
@@ -760,9 +763,35 @@ function renderDrawerContent(scrim, p, closeDrawer) {
   }
 }
 
+function isSameValue(a, b) {
+  if (a === b) return true;
+  if ((a === null || a === undefined || a === '') && (b === null || b === undefined || b === '')) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    const arrA = Array.isArray(a) ? a : (a ? [a] : []);
+    const arrB = Array.isArray(b) ? b : (b ? [b] : []);
+    if (arrA.length !== arrB.length) return false;
+    return JSON.stringify(arrA.map(x => typeof x === 'string' ? x.trim() : x)) ===
+           JSON.stringify(arrB.map(x => typeof x === 'string' ? x.trim() : x));
+  }
+  if (typeof a === 'object' && typeof b === 'object' && a && b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  const sa = String(a ?? '').replace(/\r\n/g, '\n').trim();
+  const sb = String(b ?? '').replace(/\r\n/g, '\n').trim();
+  return sa === sb;
+}
+
 async function openGygEditModal(p, sectionName, fields, onSaved) {
   const who = await askEditor();
   if (!who) return;
+
+  // Record original values for accurate diffing
+  fields.forEach(f => {
+    if (f.origValue === undefined) {
+      f.origValue = f.value !== undefined ? f.value : p[f.key];
+    }
+  });
+
   const host = $('#modalHost') || document.body;
   const wrap = document.createElement('div');
   wrap.innerHTML = `
@@ -777,14 +806,17 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
       </p>
       <div class="formgrid" style="display:flex; flex-direction:column; gap:12px;">
         ${fields.map(f => {
-          const val = f.value != null ? f.value : '';
-          const isTextArea = f.type === 'textarea' || (typeof val === 'string' && (val.length > 70 || val.includes('\n')));
+          let displayVal = f.value != null ? f.value : (p[f.key] != null ? p[f.key] : '');
+          if (Array.isArray(displayVal)) {
+            displayVal = displayVal.join('\n');
+          }
+          const isTextArea = f.type === 'textarea' || (typeof displayVal === 'string' && (displayVal.length > 70 || displayVal.includes('\n')));
           return `
             <label style="display:block;">
               <span style="font-size:13px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">${esc(f.label)}</span>
               ${isTextArea
-                ? `<textarea data-field="${esc(f.key)}" rows="${f.rows || 4}" style="width:100%; box-sizing:border-box; border:1px solid #D1D5DB; border-radius:6px; padding:8px 10px; font-size:13.5px; font-family:inherit;">${esc(val)}</textarea>`
-                : `<input type="text" data-field="${esc(f.key)}" value="${esc(val)}" style="width:100%; box-sizing:border-box; border:1px solid #D1D5DB; border-radius:6px; padding:8px 10px; font-size:13.5px; font-family:inherit;">`
+                ? `<textarea data-field="${esc(f.key)}" rows="${f.rows || 4}" style="width:100%; box-sizing:border-box; border:1px solid #D1D5DB; border-radius:6px; padding:8px 10px; font-size:13.5px; font-family:inherit;">${esc(displayVal)}</textarea>`
+                : `<input type="text" data-field="${esc(f.key)}" value="${esc(displayVal)}" style="width:100%; box-sizing:border-box; border:1px solid #D1D5DB; border-radius:6px; padding:8px 10px; font-size:13.5px; font-family:inherit;">`
               }
               ${f.hint ? `<span class="hint" style="font-size:11.5px; margin-top:3px; display:block; color:#9CA3AF;">${esc(f.hint)}</span>` : ''}
             </label>
@@ -814,7 +846,6 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
     const note = (wrap.querySelector('#gygEditNote').value || '').trim();
 
     const edits = {};
-    let hasChanges = false;
     fields.forEach(f => {
       const el = wrap.querySelector(`[data-field="${f.key}"]`);
       if (el) {
@@ -822,13 +853,16 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
         if (f.parser) {
           val = f.parser(val);
         }
-        edits[f.key] = val;
-        hasChanges = true;
+        const orig = f.origValue !== undefined ? f.origValue : (f.value !== undefined ? f.value : p[f.key]);
+        if (!isSameValue(orig, val)) {
+          edits[f.key] = val;
+        }
       }
     });
 
-    if (!hasChanges) {
+    if (Object.keys(edits).length === 0) {
       close();
+      toast('No changes detected', { kind: 'info' });
       return;
     }
 
@@ -949,6 +983,7 @@ function applyLocalEdits(p, sectionName, edits, who) {
   Object.keys(edits).forEach(k => {
     const oldVal = p[k];
     const newVal = edits[k];
+    if (isSameValue(oldVal, newVal)) return;
     historyList.unshift({
       date: nowStr,
       status: p.status || 'Bookable',

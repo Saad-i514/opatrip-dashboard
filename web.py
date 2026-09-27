@@ -1150,18 +1150,51 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
             row = con.execute("""SELECT * FROM products WHERE (product_code=? OR tour_id=? OR id=?) AND platform_id=? LIMIT 1""",
                               (tid, num_tid, num_tid, plat_id)).fetchone()
             if row:
-                p = dict(row)
+                prow = dict(row)
+                pcode = str(prow.get("product_code") or "").strip()
+                if _GYG_CATALOG_CACHE and pcode in _GYG_CATALOG_CACHE:
+                    p = _GYG_CATALOG_CACHE[pcode]
+                    tid = pcode
+                else:
+                    snap = con.execute("""SELECT normalized_json FROM snapshots WHERE product_id=?
+                                          ORDER BY id DESC LIMIT 1""", (prow["id"],)).fetchone()
+                    if snap and snap["normalized_json"]:
+                        try:
+                            p = json.loads(snap["normalized_json"])
+                        except Exception:
+                            p = dict(prow)
+                    else:
+                        p = dict(prow)
     if not p:
         raise HTTPException(404, f"GYG product '{tour_id}' not found")
+
+    def _is_diff(a, b):
+        if a is b:
+            return False
+        if (a is None or a == "" or a == "—") and (b is None or b == "" or b == "—"):
+            return False
+        if isinstance(a, list) and isinstance(b, list):
+            if len(a) != len(b):
+                return True
+            return json.dumps(a, sort_keys=True) != json.dumps(b, sort_keys=True)
+        if isinstance(a, dict) and isinstance(b, dict):
+            return json.dumps(a, sort_keys=True) != json.dumps(b, sort_keys=True)
+        sa = str(a).replace("\r\n", "\n").strip() if a is not None else ""
+        sb = str(b).replace("\r\n", "\n").strip() if b is not None else ""
+        return sa != sb
 
     editor = (data.editor_email or "operator@opatrip.com").strip()
     now_str = time.strftime("%b %d, %Y, %I:%M %p")
 
     history_entries = p.setdefault("history", [])
     old_vals = {}
+    actual_edits = {}
     for field, new_val in data.edits.items():
         old_val = p.get(field)
+        if not _is_diff(old_val, new_val):
+            continue
         old_vals[field] = old_val
+        actual_edits[field] = new_val
         p[field] = new_val
         history_entries.insert(0, {
             "date": now_str,
@@ -1190,7 +1223,7 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
             prow = con.execute("""SELECT id, account_id, title, status FROM products
                                   WHERE (product_code=? OR tour_id=? OR id=?) AND platform_id=?
                                   LIMIT 1""", (tid, num_tid, num_tid, plat_id)).fetchone()
-            if prow:
+            if prow and actual_edits:
                 pid = prow["id"]
                 acct_id = prow["account_id"]
                 now_ts = db.now()
@@ -1199,7 +1232,7 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
                 if not s:
                     s = con.execute("SELECT id FROM syncs ORDER BY id DESC LIMIT 1").fetchone()
                 sync_id = s["id"] if s else 1
-                for field, new_val in data.edits.items():
+                for field, new_val in actual_edits.items():
                     old_v = old_vals.get(field)
                     con.execute("""INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value, detected_at, account_id, operator_email, source)
                                    VALUES (?,?,?,?,?,?,?,?,?)""",
