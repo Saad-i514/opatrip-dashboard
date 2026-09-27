@@ -126,15 +126,8 @@ function renderDrawerContent(scrim, p, closeDrawer) {
           </div>
         </div>
 
-        <div style="display:flex; align-items:center; gap:14px;">
-          <div style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <div style="width:30px; height:30px; border-radius:50%; background:#111827; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">
-              M
-            </div>
-            <span style="font-size:14px; font-weight:600; color:#111827;">Muhammad</span>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </div>
-          <button class="gyg-close-drawer-btn" id="gygBackBtn" title="Close" aria-label="Close" style="margin-left:8px;">✕</button>
+        <div style="display:flex; align-items:center;">
+          <button class="gyg-close-drawer-btn" id="gygBackBtn" title="Close" aria-label="Close">✕</button>
         </div>
       </div>
 
@@ -171,10 +164,6 @@ function renderDrawerContent(scrim, p, closeDrawer) {
         <div style="display:flex; gap:10px; align-items:center;">
           <button class="btn sm" id="gygTopEditBtn" style="background:#FFF0ED; color:#FF5533; border:1px solid #FFD5CC; font-weight:600; cursor:pointer;">
             Edit
-          </button>
-          <button class="gyg-actions-btn" id="gygActionsBtn">
-            Actions
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
         </div>
       </div>
