@@ -290,8 +290,8 @@ export async function viewProducts(){
     <span class="pill">${d.products.length} shown</span>
     <button class="btn ghost sm" id="pclear">Clear</button>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-      <button class="btn ghost sm" id="btnExportCities" style="padding:6px 14px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;border:1px solid var(--rim);color:var(--ink)" title="Export comprehensive Cities Catalog Excel report based on latest data">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <button class="btn sm" id="btnExportCities" style="padding:6px 14px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;border:1.5px solid #000000;color:#000000;background:#ffffff;border-radius:6px;transition:all 0.15s ease;" onmouseenter="this.style.background='#F3F4F6'" onmouseleave="this.style.background='#FFFFFF'" title="Export comprehensive Cities Catalog Excel report based on latest data">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>Export Cities</span>
       </button>
       <button class="btn primary sm" id="btnAddProductBtn" style="padding:6px 14px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer">

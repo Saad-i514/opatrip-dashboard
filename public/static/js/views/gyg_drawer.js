@@ -557,44 +557,15 @@ function renderDrawerContent(scrim, p, closeDrawer) {
       </div>
 
       <!-- History Section -->
-      <div class="gyg-history-wrap">
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">History</h2>
-        <div style="background:#fff; border: 1px solid #E5E7EB; border-radius: 12px; overflow:hidden;">
-          <table class="gyg-history-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Section</th>
-                <th>Before</th>
-                <th>After</th>
-                <th>Editor</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(p.history && p.history.length) ? p.history.map(h => `
-                <tr>
-                  <td class="mono" style="font-size:12px;">${esc(h.date || '—')}</td>
-                  <td>
-                    <span class="gyg-status-pill bookable" style="padding: 2px 7px; font-size:11px;">
-                      ${esc(h.status || 'Bookable')}
-                    </span>
-                  </td>
-                  <td style="font-weight:600;">${esc(h.section || '—')}</td>
-                  <td class="hint" style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(h.before || '—')}</td>
-                  <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#059669; font-weight:500;">${esc(h.after || '—')}</td>
-                  <td class="mono" style="font-size:12px;">${esc(h.editor || 'operator')}</td>
-                </tr>
-              `).join('') : `
-                <tr>
-                  <td colspan="6" style="text-align: center; color: #9CA3AF; padding: 24px;">
-                    No edits have been made to this product yet.
-                  </td>
-                </tr>
-              `}
-            </tbody>
-          </table>
+      <div class="gyg-history-wrap" style="margin-top: 28px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <h2 style="font-size: 19px; font-weight: 700; margin:0; color:#111827;">
+            Change History
+            ${(p.history && p.history.length) ? `<span style="font-size:13px; font-weight:500; color:#6B7280; margin-left:6px;">(${p.history.length} change${p.history.length===1?'':'s'} recorded)</span>` : ''}
+          </h2>
+          ${(p.history && p.history.length) ? `<span class="badge b-stub" style="background:#F3F4F6; color:#4B5563; font-size:11px; padding:3px 8px; border-radius:4px;">Tracked by change detection engine</span>` : ''}
         </div>
+        ${renderGygHistoryCards(p.history, p.status)}
       </div>
     </div>
   `;
@@ -897,21 +868,103 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
   };
 }
 
+function normalizeChange(item, currentStatus) {
+  const who = item.operator_email || item.editor || item.who || 'operator@opatrip.com';
+  let path = item.field_path || item.section || item.field || 'Field';
+  if (path.startsWith('gyg.')) path = path.slice(4);
+  if (path.startsWith('gyg_history.')) path = path.slice(12);
+  const fieldName = item.field && item.field !== path ? item.field : '';
+  const beforeVal = (item.before !== undefined && item.before !== null) ? item.before : (item.old_value !== undefined ? item.old_value : '—');
+  const afterVal = (item.after !== undefined && item.after !== null) ? item.after : (item.new_value !== undefined ? item.new_value : '—');
+  const dateStr = item.date || item.detected_at || item.at || 'Recently';
+  const statusVal = item.status || currentStatus || 'Bookable';
+  const sourceBadge = (item.source === 'dashboard' || item.editor) ? 'edited here' : 'changed on GetYourGuide';
+  return { who, path, fieldName, before: beforeVal, after: afterVal, at: dateStr, status: statusVal, source: sourceBadge };
+}
+
+function renderGygHistoryCards(historyList, currentStatus) {
+  if (!historyList || !historyList.length) {
+    return `
+      <div style="background:#fff; border:1px solid #E5E7EB; border-radius:12px; padding:32px 20px; text-align:center;">
+        <div style="width:38px; height:38px; border-radius:50%; background:#F3F4F6; color:#9CA3AF; display:grid; place-items:center; margin:0 auto 10px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div style="font-size:14.5px; font-weight:600; color:#374151;">No changes recorded yet</div>
+        <div style="font-size:13px; color:#9CA3AF; margin-top:4px;">Changes and edits made to this product will be tracked and displayed here with before and after comparisons.</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="ehist" style="display:grid; gap:12px;">
+      ${historyList.map(item => {
+        const h = normalizeChange(item, currentStatus);
+        const initial = (h.who[0] || 'O').toUpperCase();
+        return `
+          <div class="eh" style="display:grid; grid-template-columns:36px 1fr; gap:14px; padding:16px; background:#fff; border:1px solid #E5E7EB; border-radius:10px; transition:border-color 0.15s ease;">
+            <div class="eh-av" style="width:36px; height:36px; border-radius:50%; background:#EEF2FF; color:#4F46E5; display:grid; place-items:center; font-weight:700; font-size:14px;" title="${esc(h.who)}">
+              ${esc(initial)}
+            </div>
+            <div style="min-width:0;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                <div class="eh-what" style="font-size:14px; font-weight:700; color:#111827; margin:0;">
+                  ${esc(h.path)}${h.fieldName ? ` <span class="eh-sub" style="color:#6B7280; font-weight:500;">› ${esc(h.fieldName)}</span>` : ''}
+                </div>
+                <span class="gyg-status-pill bookable" style="font-size:11px; padding:2px 8px;">
+                  ${esc(h.status)}
+                </span>
+              </div>
+              <div class="eh-rep" style="display:grid; grid-template-columns:1fr 28px 1fr; gap:10px; align-items:stretch;">
+                <div class="eh-side" style="min-width:0; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:9px 12px;">
+                  <span class="eh-lbl" style="display:block; font-size:11px; font-weight:700; color:#6B7280; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:4px;">Before</span>
+                  <div style="font-size:13px; color:#4B5563; word-break:break-word; max-height:120px; overflow-y:auto; line-height:1.45;">
+                    ${esc(String(h.before || '—'))}
+                  </div>
+                </div>
+                <div class="eh-arrow" style="align-self:center; text-align:center; color:#9CA3AF; font-size:16px;" aria-hidden="true">→</div>
+                <div class="eh-side after" style="min-width:0; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:9px 12px;">
+                  <span class="eh-lbl" style="display:block; font-size:11px; font-weight:700; color:#166534; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:4px;">After</span>
+                  <div style="font-size:13px; color:#15803D; font-weight:600; word-break:break-word; max-height:120px; overflow-y:auto; line-height:1.45;">
+                    ${esc(String(h.after || '—'))}
+                  </div>
+                </div>
+              </div>
+              <div class="eh-foot" style="display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:12px; font-size:12.5px;">
+                <b style="color:#374151;">${esc(h.who)}</b>
+                <span class="eh-when" style="color:#9CA3AF;">${esc(h.at)}</span>
+                <span class="badge b-stub" style="background:#EEF2FF; color:#4F46E5; font-size:11px; padding:2px 7px; border-radius:4px;">
+                  ${esc(h.source)}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
 function applyLocalEdits(p, sectionName, edits, who) {
-  Object.assign(p, edits);
   const historyList = p.history || (p.history = []);
   const nowStr = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true });
   Object.keys(edits).forEach(k => {
+    const oldVal = p[k];
+    const newVal = edits[k];
     historyList.unshift({
       date: nowStr,
       status: p.status || 'Bookable',
       section: sectionName,
       field: k,
-      before: '—',
-      after: String(edits[k]),
-      editor: who
+      field_path: `${sectionName} › ${k}`,
+      before: oldVal !== undefined && oldVal !== null ? (typeof oldVal === 'object' ? JSON.stringify(oldVal) : String(oldVal)) : '—',
+      after: newVal !== undefined && newVal !== null ? (typeof newVal === 'object' ? JSON.stringify(newVal) : String(newVal)) : '—',
+      old_value: oldVal !== undefined && oldVal !== null ? (typeof oldVal === 'object' ? JSON.stringify(oldVal) : String(oldVal)) : '—',
+      new_value: newVal !== undefined && newVal !== null ? (typeof newVal === 'object' ? JSON.stringify(newVal) : String(newVal)) : '—',
+      editor: who,
+      operator_email: who,
+      source: 'dashboard'
     });
   });
+  Object.assign(p, edits);
 }
 
 // Global window hook for compatibility with products.js

@@ -1068,6 +1068,27 @@ def gyg_product_detail(code: str):
         changes = [dict(r) for r in con.execute(
             """SELECT field_path, old_value, new_value, detected_at, operator_email, source
                FROM changes WHERE product_id=? ORDER BY id DESC LIMIT 100""", (prow["id"],))]
+        cat_file = STATIC_DIR / "data" / "gyg_catalog.json"
+        if cat_file.is_file():
+            try:
+                cat = json.loads(cat_file.read_text(encoding="utf-8"))
+                cat_prod = cat.get(pcode) or (cat.get(str(prow.get("tour_id"))) if prow.get("tour_id") else None)
+                if cat_prod and cat_prod.get("history"):
+                    existing_keys = {(c.get("field_path"), str(c.get("new_value"))) for c in changes}
+                    for h in cat_prod["history"]:
+                        fp = f"{h.get('section', 'General')} › {h.get('field', 'field')}"
+                        nv = str(h.get("after") or "")
+                        if (fp, nv) not in existing_keys:
+                            changes.append({
+                                "field_path": fp,
+                                "old_value": str(h.get("before") or "—"),
+                                "new_value": nv,
+                                "detected_at": h.get("date") or "",
+                                "operator_email": h.get("editor") or "operator",
+                                "source": h.get("source") or "dashboard"
+                            })
+            except Exception:
+                pass
     return {"product": prow, "details": cur_snap, "changes": changes, "snapshots": snaps}
 
 
@@ -1112,16 +1133,35 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
                 _GYG_CATALOG_CACHE = {}
         else:
             _GYG_CATALOG_CACHE = {}
-    if not _GYG_CATALOG_CACHE or tid not in _GYG_CATALOG_CACHE:
+    p = None
+    if _GYG_CATALOG_CACHE:
+        if tid in _GYG_CATALOG_CACHE:
+            p = _GYG_CATALOG_CACHE[tid]
+        else:
+            for k, item in _GYG_CATALOG_CACHE.items():
+                if str(item.get("tour_id")) == tid or str(item.get("product_code")) == tid or str(k) == tid:
+                    p = item
+                    tid = str(k)
+                    break
+    if not p:
+        with db.session() as con:
+            plat_id = db.platform_id(con, "getyourguide") or 2
+            num_tid = int(tid) if tid.isdigit() else -1
+            row = con.execute("""SELECT * FROM products WHERE (product_code=? OR tour_id=? OR id=?) AND platform_id=? LIMIT 1""",
+                              (tid, num_tid, num_tid, plat_id)).fetchone()
+            if row:
+                p = dict(row)
+    if not p:
         raise HTTPException(404, f"GYG product '{tour_id}' not found")
 
-    p = _GYG_CATALOG_CACHE[tid]
     editor = (data.editor_email or "operator@opatrip.com").strip()
     now_str = time.strftime("%b %d, %Y, %I:%M %p")
 
     history_entries = p.setdefault("history", [])
+    old_vals = {}
     for field, new_val in data.edits.items():
         old_val = p.get(field)
+        old_vals[field] = old_val
         p[field] = new_val
         history_entries.insert(0, {
             "date": now_str,
@@ -1130,7 +1170,8 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
             "field": field,
             "before": str(old_val) if old_val is not None else "—",
             "after": str(new_val) if new_val is not None else "—",
-            "editor": editor
+            "editor": editor,
+            "source": "dashboard"
         })
 
     # Save to disk
@@ -1140,6 +1181,38 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
             cf.write_text(json.dumps(_GYG_CATALOG_CACHE, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception:
             pass
+
+    # Record into database change detection engine
+    try:
+        with db.session() as con:
+            plat_id = db.platform_id(con, "getyourguide") or 2
+            num_tid = int(tid) if tid.isdigit() else -1
+            prow = con.execute("""SELECT id, account_id, title, status FROM products
+                                  WHERE (product_code=? OR tour_id=? OR id=?) AND platform_id=?
+                                  LIMIT 1""", (tid, num_tid, num_tid, plat_id)).fetchone()
+            if prow:
+                pid = prow["id"]
+                acct_id = prow["account_id"]
+                now_ts = db.now()
+                sec_name = data.section or "Main Information"
+                s = con.execute("SELECT id FROM syncs WHERE account_id=? ORDER BY id DESC LIMIT 1", (acct_id,)).fetchone()
+                if not s:
+                    s = con.execute("SELECT id FROM syncs ORDER BY id DESC LIMIT 1").fetchone()
+                sync_id = s["id"] if s else 1
+                for field, new_val in data.edits.items():
+                    old_v = old_vals.get(field)
+                    con.execute("""INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value, detected_at, account_id, operator_email, source)
+                                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                                (pid, sync_id, f"{sec_name} › {field}", str(old_v) if old_v is not None else "—",
+                                 str(new_val) if new_val is not None else "—", now_ts, acct_id, editor, "dashboard"))
+                    if field == "title" and new_val:
+                        con.execute("UPDATE products SET title=? WHERE id=?", (str(new_val), pid))
+                    elif field == "status" and new_val:
+                        canon = db.canonical_status(con, plat_id, str(new_val))
+                        con.execute("UPDATE products SET status=?, status_canonical=? WHERE id=?", (str(new_val), canon, pid))
+                con.commit()
+    except Exception as e:
+        print(f"Error persisting GYG change to db: {e}")
 
     return {"ok": True, "product": p}
 
