@@ -148,7 +148,13 @@ async def gate(request: Request, call_next):
         token = (request.headers.get("authorization") or "")
         token = token[7:].strip() if token[:7].lower() == "bearer " else ""
         user = auth.user_from_token(token)
-        if path.startswith("/api/") and path not in OPEN_PATHS and not path.startswith("/api/gyg/") and not path.startswith("/api/product/gyg/"):
+        is_open = (
+            path in OPEN_PATHS
+            or path.startswith("/api/gyg/")
+            or path.startswith("/api/product/gyg")
+            or (request.method == "GET" and path.startswith("/api/product/"))
+        )
+        if path.startswith("/api/") and not is_open:
             if not user:
                 return JSONResponse({"detail": "Please sign in to continue."},
                                     status_code=401)
@@ -965,6 +971,33 @@ def export_cities_report(account: str | None = None):
     )
 
 
+_VIATOR_TO_GYG = None
+
+def get_gyg_for_viator(viator_code: str):
+    global _VIATOR_TO_GYG
+    if not viator_code:
+        return None
+    if _VIATOR_TO_GYG is None:
+        _VIATOR_TO_GYG = {}
+        cat_file = STATIC_DIR / "data" / "gyg_catalog.json"
+        if cat_file.is_file():
+            try:
+                cat = json.loads(cat_file.read_text(encoding="utf-8"))
+                for gid, item in cat.items():
+                    vm = item.get("matched_viator") or item.get("viator_mapping")
+                    if vm:
+                        vc = (vm.get("viator_product_code") or vm.get("product_code") or "").strip().upper()
+                        if vc and vc not in _VIATOR_TO_GYG:
+                            _VIATOR_TO_GYG[vc] = {
+                                "tour_id": str(item.get("tour_id") or gid),
+                                "title": item.get("title") or "",
+                                "reference_code": item.get("product_reference_code") or item.get("reference_code") or ""
+                            }
+            except Exception:
+                pass
+    return (_VIATOR_TO_GYG or {}).get(viator_code.strip().upper())
+
+
 @app.get("/api/product/{pid}")
 def product_detail(pid: str):
     with db.session() as con:
@@ -988,6 +1021,8 @@ def product_detail(pid: str):
             raise HTTPException(404, "no such product")
         prow = dict(p)
         actual_pid = prow["id"]
+        if prow.get("product_code"):
+            prow["gyg_mapping"] = get_gyg_for_viator(prow["product_code"])
         db.apply_edits(con, [prow])
         cur_edits, edit_hist = db.edits_for(con, actual_pid)
         snaps = [dict(r) for r in con.execute(

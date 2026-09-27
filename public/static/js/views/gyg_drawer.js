@@ -8,19 +8,24 @@ let gygCatalogCache = null;
 async function loadGygProduct(tourId, productId = null, viatorTourId = null, viatorProductCode = null) {
   const tid = tourId ? String(tourId).trim() : '';
   const pid = productId ? String(productId).trim() : '';
+  const targetCode = viatorProductCode ? String(viatorProductCode).trim().toUpperCase() : '';
 
   // 1. Try /api/product/gyg/{code}
   const codeToTry = tid || pid;
   if (codeToTry) {
     try {
       const data = await api(`/api/product/gyg/${encodeURIComponent(codeToTry)}`);
-      if (data && data.details && Object.keys(data.details).length) {
-        const combined = { ...data.details, ...data.product };
+      if (data && (data.details || data.product)) {
+        const details = data.details || {};
+        const prod = data.product || {};
+        const combined = { ...details, ...prod };
         combined.tour_id = combined.tour_id || combined.product_code || tid;
-        combined.title = combined.title || (data.product && data.product.title);
-        combined.status = combined.status || (data.product && data.product.status);
+        combined.title = combined.title || prod.title;
+        combined.status = combined.status || prod.status;
         if (data.changes) combined.history = data.changes;
-        return combined;
+        if (Object.keys(details).length > 0 || combined.title) {
+          return combined;
+        }
       }
     } catch (e) {}
   }
@@ -39,10 +44,17 @@ async function loadGygProduct(tourId, productId = null, viatorTourId = null, via
     if (tid && gygCatalogCache[tid]) {
       return gygCatalogCache[tid];
     }
-    // Fallback search by viatorProductCode
-    if (viatorProductCode) {
-      const targetCode = String(viatorProductCode).trim().toUpperCase();
-      for (const [id, item] of Object.entries(gygCatalogCache)) {
+    const tLower = tid.toLowerCase();
+    for (const [id, item] of Object.entries(gygCatalogCache)) {
+      if (tid && (id === tid || String(item.tour_id) === tid || String(item.product_code) === tid ||
+          (item.reference_code && String(item.reference_code).toLowerCase() === tLower) ||
+          (item.product_reference_code && String(item.product_reference_code).toLowerCase() === tLower))) {
+        return item;
+      }
+      if (pid && (String(item.id) === pid || String(item.product_id) === pid)) {
+        return item;
+      }
+      if (targetCode) {
         const vm = item.matched_viator || item.viator_mapping;
         if (vm) {
           const c = (vm.viator_product_code || vm.product_code || '').trim().toUpperCase();
@@ -97,25 +109,40 @@ export async function openGygDrawer(tourId, productId = null, viatorTourId = nul
     if (e.target === scrim) closeDrawer();
   };
 
-  const p = await loadGygProduct(tourId, productId, viatorTourId, viatorProductCode);
+  try {
+    const p = await loadGygProduct(tourId, productId, viatorTourId, viatorProductCode);
 
-  if (!p) {
+    if (!p) {
+      scrim.innerHTML = `
+        <div class="gyg-portal-container" style="padding: 40px; text-align: center;">
+          <h2 style="color: #DC2626; margin-bottom: 8px; font-size:18px;">GetYourGuide Data Not Found</h2>
+          <p style="color: #6B7280; margin-bottom: 20px; font-size:13.5px;">
+            No GetYourGuide product was found matching ID <span class="mono">${esc(String(tourId || viatorProductCode || '—'))}</span>.
+          </p>
+          <button class="btn primary" id="gygCloseErrBtn">Close</button>
+        </div>
+      `;
+      const b = scrim.querySelector('#gygCloseErrBtn');
+      if (b) b.onclick = closeDrawer;
+      return;
+    }
+
+    if (!p.history) p.history = [];
+    renderDrawerContent(scrim, p, closeDrawer);
+  } catch (err) {
+    console.error('Failed to open GYG drawer:', err);
     scrim.innerHTML = `
       <div class="gyg-portal-container" style="padding: 40px; text-align: center;">
-        <h2 style="color: #DC2626; margin-bottom: 8px; font-size:18px;">GetYourGuide Data Not Found</h2>
+        <h2 style="color: #DC2626; margin-bottom: 8px; font-size:18px;">Error Loading Product</h2>
         <p style="color: #6B7280; margin-bottom: 20px; font-size:13.5px;">
-          No GetYourGuide product was found matching ID <span class="mono">${esc(String(tourId || viatorProductCode || '—'))}</span>.
+          ${esc(err.message || 'An unexpected error occurred while loading this product.')}
         </p>
         <button class="btn primary" id="gygCloseErrBtn">Close</button>
       </div>
     `;
     const b = scrim.querySelector('#gygCloseErrBtn');
     if (b) b.onclick = closeDrawer;
-    return;
   }
-
-  if (!p.history) p.history = [];
-  renderDrawerContent(scrim, p, closeDrawer);
 }
 
 function renderDrawerContent(scrim, p, closeDrawer) {
@@ -617,7 +644,8 @@ function renderDrawerContent(scrim, p, closeDrawer) {
   const viewViatorBtn = scrim.querySelector('#btnViewViatorMapping');
   if (viewViatorBtn) {
     viewViatorBtn.onclick = () => {
-      const viatorCode = (p.matched_viator && p.matched_viator.viator_product_code) || (p.viator_mapping && p.viator_mapping.product_code);
+      const viatorCode = (p.matched_viator && (p.matched_viator.viator_product_code || p.matched_viator.product_code)) ||
+                         (p.viator_mapping && (p.viator_mapping.product_code || p.viator_mapping.viator_product_code));
       closeDrawer();
       if (openDrawer && viatorCode) {
         openDrawer(viatorCode);

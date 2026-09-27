@@ -9,6 +9,8 @@ import { secs } from '../progress.js';
 import { toast } from '../toast.js';
 import { openGygDrawer } from './gyg_drawer.js';
 
+export function when(t){ return String(t||'').replace('T',' ').replace('+00:00','').slice(0,16); }
+
 /* ======================= drawer ======================= */
 export async function openDrawer(pid){
   PATH_LABELS.clear();   // this product's page is about to (re)write its own labels
@@ -18,32 +20,23 @@ export async function openDrawer(pid){
     `${S.source ? ' from ' + esc(S.source) : ''}…</div>` +
     `<div class="card pad">${skLines(8)}</div>` +
     '</div></div>';
-  let d;
   try {
-    d = await cachedApi('/api/product/'+encodeURIComponent(pid));
-  } catch (err) {
-    host.innerHTML = '<div class="scrim"></div><div class="drawer"><div class="dbody">' +
-      `<div class="card empty"><p>Could not load product <b>${esc(String(pid))}</b>: ${esc(err.message || '')}</p>` +
-      `<button class="btn sm" onclick="document.getElementById('drawerHost').innerHTML=''">Close</button></div>` +
-      '</div></div>';
-    host.querySelector('.scrim').onclick = closeDrawer;
-    return;
-  }
-  const p = d.product, cur = d.current;
-  const isGyg = p && (
-    p.platform_id === 2 ||
-    p.platform_code === 'getyourguide' ||
-    (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
-    (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
-    (/^\d{6,8}$/.test(String(p.product_code || '')))
-  ) && (p.platform_id !== 1 && p.platform_code !== 'viator');
-  if (isGyg) {
-    host.innerHTML = '';
-    return openGygDrawer(p.product_code, p.id, p.tour_id);
-  }
-  host.innerHTML='';
-  const scrim = el('div','scrim'); scrim.onclick = closeDrawer; host.appendChild(scrim);
-  const dr = el('div','drawer');
+    const d = await cachedApi('/api/product/'+encodeURIComponent(pid));
+    const p = d.product, cur = d.current;
+    const isGyg = p && (
+      p.platform_id === 2 ||
+      p.platform_code === 'getyourguide' ||
+      (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
+      (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
+      (/^\d{6,8}$/.test(String(p.product_code || '')))
+    ) && (p.platform_id !== 1 && p.platform_code !== 'viator');
+    if (isGyg) {
+      host.innerHTML = '';
+      return openGygDrawer(p.product_code, p.id, p.tour_id);
+    }
+    host.innerHTML='';
+    const scrim = el('div','scrim'); scrim.onclick = closeDrawer; host.appendChild(scrim);
+    const dr = el('div','drawer');
 
   // Laid out the way the portal's own product page opens: the title, then the status and
   // the product code on one quiet line beneath it. The thumbnail that used to sit here is
@@ -103,6 +96,31 @@ export async function openDrawer(pid){
     body.appendChild(el('div','banner',
       'This is a <b>draft</b>. By design only its name, code, location and connection '+
       'state are recorded — no tab data is fetched for drafts.'));
+  }
+
+  if (p.gyg_mapping) {
+    const gm = p.gyg_mapping;
+    const gygBanner = el('div', 'banner', `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="badge" style="background:#4F46E5;color:#fff;font-weight:700;font-size:11px;padding:3px 8px;border-radius:4px;letter-spacing:0.5px;">GETYOURGUIDE MAPPED</span>
+          <span style="font-size:13px;color:#1E1B4B;"><b>GYG Product:</b> <span class="mono">${esc(gm.tour_id)}</span> — ${esc(gm.title)}</span>
+        </div>
+        <button class="btn sm" id="btnViewGygMapping" style="background:#4F46E5;color:#fff;font-weight:600;cursor:pointer;white-space:nowrap;padding:4px 12px;border:none;border-radius:5px;">
+          View in GetYourGuide Drawer &rarr;
+        </button>
+      </div>
+    `);
+    gygBanner.style.background = '#EEF2FF';
+    gygBanner.style.borderColor = '#C7D2FE';
+    body.appendChild(gygBanner);
+    const gygBtn = gygBanner.querySelector('#btnViewGygMapping');
+    if (gygBtn) {
+      gygBtn.onclick = () => {
+        closeDrawer();
+        openGygDrawer(gm.tour_id, null, p.tour_id, p.product_code);
+      };
+    }
   }
 
   /* headline facts */
@@ -219,6 +237,15 @@ export async function openDrawer(pid){
 
   dr.appendChild(body); host.appendChild(dr);
   head.querySelector('#xClose').onclick = closeDrawer;
+  } catch (err) {
+    console.error('Failed to open product drawer:', err);
+    host.innerHTML = '<div class="scrim"></div><div class="drawer"><div class="dbody">' +
+      `<div class="card empty"><p>Could not load product <b>${esc(String(pid))}</b>: ${esc(err.message || '')}</p>` +
+      `<button class="btn sm" onclick="document.getElementById('drawerHost').innerHTML=''">Close</button></div>` +
+      '</div></div>';
+    const sc = host.querySelector('.scrim');
+    if (sc) sc.onclick = closeDrawer;
+  }
 }
 /* One box per FIELD, not per change.
 
@@ -522,7 +549,7 @@ export const trunc = s => { s = (s===null||s===undefined)?'(none)':String(s);
     s = Array.isArray(p)?`${p.length} item(s)`:Object.keys(p).slice(0,3).join(', ');
   }catch(e){}
   return s.length>72 ? s.slice(0,72)+'…' : s; };
-export const when = t => String(t||'').replace('T',' ').replace('+00:00','').slice(0,16);
+
 /* "product.voucher.ticketType" -> "Tickets › Ticket format" */
 /* Section names match the portal's tabs, so a field path resolves to the place someone
    would go looking for it in Viator itself. */
