@@ -200,7 +200,6 @@ function renderDrawerContent(scrim, p, closeDrawer) {
             <span class="gyg-trace-badge">VIATOR MAPPED</span>
             <div class="gyg-trace-details">
               <b>Viator Product:</b> <span class="mono">${esc((p.matched_viator && p.matched_viator.viator_product_code) || (p.viator_mapping && p.viator_mapping.product_code))}</span> — ${esc((p.matched_viator && p.matched_viator.viator_title) || (p.viator_mapping && p.viator_mapping.title))}
-              <span style="opacity:0.75; margin-left:8px;">(${(p.matched_viator && p.matched_viator.match_type) || (p.viator_mapping && p.viator_mapping.confidence) || 'Matched'})</span>
             </div>
           </div>
           <button class="btn sm primary" id="btnViewViatorMapping" style="cursor:pointer; white-space:nowrap;">

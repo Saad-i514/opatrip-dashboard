@@ -455,13 +455,13 @@ export async function viewProducts(){
       </div>
       <div class="pplat">${platformGrid(p, opts0.platforms)}</div>`;
     row.onclick = () => {
-      const isGyg = p.platform_id === 2 ||
-                    p.platform_code === 'getyourguide' ||
-                    (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
-                    (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
-                    (S.acct && String(S.acct).toLowerCase().includes('gyg')) ||
-                    (S.pf && S.pf.platform === 'getyourguide') ||
-                    (/^\d{6,8}$/.test(String(p.product_code || '')));
+      const isGyg = (
+        p.platform_id === 2 ||
+        p.platform_code === 'getyourguide' ||
+        (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
+        (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
+        (/^\d{6,8}$/.test(String(p.product_code || '')))
+      ) && (p.platform_id !== 1 && p.platform_code !== 'viator');
       if (isGyg) {
         openGygDrawer(p.product_code, p.id, p.tour_id);
         return;

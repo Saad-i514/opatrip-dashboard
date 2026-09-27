@@ -966,39 +966,45 @@ def export_cities_report(account: str | None = None):
 
 
 @app.get("/api/product/{pid}")
-def product_detail(pid: int):
+def product_detail(pid: str):
     with db.session() as con:
-        p = con.execute("""SELECT p.*, a.viator_account_id, a.name AS account_name
-                           FROM products p JOIN accounts a ON a.id=p.account_id
-                           WHERE p.id=?""", (pid,)).fetchone()
-        # 404 rather than 403 when it belongs to an account this user can't see: telling
-        # them it exists but is forbidden is itself information.
+        p = None
+        pid_str = str(pid).strip()
+        if pid_str.isdigit():
+            p = con.execute("""SELECT p.*, a.viator_account_id, a.name AS account_name
+                               FROM products p JOIN accounts a ON a.id=p.account_id
+                               WHERE p.id=?""", (int(pid_str),)).fetchone()
+        if not p:
+            p = con.execute("""SELECT p.*, a.viator_account_id, a.name AS account_name
+                               FROM products p JOIN accounts a ON a.id=p.account_id
+                               WHERE p.product_code=?
+                               LIMIT 1""", (pid_str,)).fetchone()
+        if not p and pid_str.isdigit():
+            p = con.execute("""SELECT p.*, a.viator_account_id, a.name AS account_name
+                               FROM products p JOIN accounts a ON a.id=p.account_id
+                               WHERE p.tour_id=?
+                               LIMIT 1""", (int(pid_str),)).fetchone()
         if not p or not may_see_account(p["viator_account_id"]):
             raise HTTPException(404, "no such product")
         prow = dict(p)
+        actual_pid = prow["id"]
         db.apply_edits(con, [prow])
-        cur_edits, edit_hist = db.edits_for(con, pid)
-        # last_confirmed_at / confirmations: a snapshot is only written when the content
-        # changed, so these say "and we checked again on these later runs and it was
-        # identical" — otherwise an unchanged product would look uncaptured.
+        cur_edits, edit_hist = db.edits_for(con, actual_pid)
         snaps = [dict(r) for r in con.execute(
             """SELECT id, sync_id, captured_at, last_confirmed_at, confirmations
-               FROM snapshots WHERE product_id=? ORDER BY id DESC""", (pid,))]
+               FROM snapshots WHERE product_id=? ORDER BY id DESC""", (actual_pid,))]
         cur = con.execute("""SELECT normalized_json FROM snapshots WHERE product_id=?
-                             ORDER BY id DESC LIMIT 1""", (pid,)).fetchone()
+                             ORDER BY id DESC LIMIT 1""", (actual_pid,)).fetchone()
         imgs = [dict(r) for r in con.execute(
-            """SELECT * FROM product_images WHERE product_id=? ORDER BY position""", (pid,))]
+            """SELECT * FROM product_images WHERE product_id=? ORDER BY position""", (actual_pid,))]
         ch = [dict(r) for r in con.execute(
             """SELECT c.*, s.operator_email AS sync_operator FROM changes c
                LEFT JOIN syncs s ON s.id=c.sync_id
-               WHERE c.product_id=? ORDER BY c.id DESC LIMIT 500""", (pid,))]
+               WHERE c.product_id=? ORDER BY c.id DESC LIMIT 500""", (actual_pid,))]
     return {"product": prow, "edits": cur_edits, "edit_history": edit_hist,
             "editable": db.EDITABLE_META,
             "snapshots": snaps, "images": imgs, "changes": ch,
-            # `or "{}"` matches /api/snapshot: a snapshot row with a NULL payload would
-            # otherwise make json.loads raise and 500 the whole product page.
             "current": json.loads(cur["normalized_json"] or "{}") if cur else None}
-
 
 @app.get("/api/product/gyg/{code}")
 def gyg_product_detail(code: str):

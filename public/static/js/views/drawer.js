@@ -18,18 +18,25 @@ export async function openDrawer(pid){
     `${S.source ? ' from ' + esc(S.source) : ''}…</div>` +
     `<div class="card pad">${skLines(8)}</div>` +
     '</div></div>';
-  host.querySelector('.scrim').onclick = closeDrawer;
-  const d = await cachedApi('/api/product/'+pid);
+  let d;
+  try {
+    d = await cachedApi('/api/product/'+encodeURIComponent(pid));
+  } catch (err) {
+    host.innerHTML = '<div class="scrim"></div><div class="drawer"><div class="dbody">' +
+      `<div class="card empty"><p>Could not load product <b>${esc(String(pid))}</b>: ${esc(err.message || '')}</p>` +
+      `<button class="btn sm" onclick="document.getElementById('drawerHost').innerHTML=''">Close</button></div>` +
+      '</div></div>';
+    host.querySelector('.scrim').onclick = closeDrawer;
+    return;
+  }
   const p = d.product, cur = d.current;
   const isGyg = p && (
     p.platform_id === 2 ||
     p.platform_code === 'getyourguide' ||
     (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
     (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
-    (S.acct && String(S.acct).toLowerCase().includes('gyg')) ||
-    (S.pf && S.pf.platform === 'getyourguide') ||
     (/^\d{6,8}$/.test(String(p.product_code || '')))
-  );
+  ) && (p.platform_id !== 1 && p.platform_code !== 'viator');
   if (isGyg) {
     host.innerHTML = '';
     return openGygDrawer(p.product_code, p.id, p.tour_id);
