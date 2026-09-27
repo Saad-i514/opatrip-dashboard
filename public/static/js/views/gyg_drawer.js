@@ -878,7 +878,7 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
           note: note
         });
         if (res && res.product) {
-          Object.assign(p, res.product);
+          Object.assign(p, edits, res.product);
         } else {
           applyLocalEdits(p, sectionName, edits, who);
         }
@@ -886,8 +886,12 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
         applyLocalEdits(p, sectionName, edits, who);
       }
 
-      if (gygCatalogCache && gygCatalogCache[p.tour_id]) {
-        Object.assign(gygCatalogCache[p.tour_id], p);
+      if (gygCatalogCache) {
+        for (const k of [p.tour_id, p.product_code]) {
+          if (k && gygCatalogCache[k]) {
+            Object.assign(gygCatalogCache[k], edits, p);
+          }
+        }
       }
 
       close();

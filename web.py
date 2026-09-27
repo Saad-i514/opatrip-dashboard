@@ -1073,20 +1073,24 @@ def gyg_product_detail(code: str):
             try:
                 cat = json.loads(cat_file.read_text(encoding="utf-8"))
                 cat_prod = cat.get(pcode) or (cat.get(str(prow.get("tour_id"))) if prow.get("tour_id") else None)
-                if cat_prod and cat_prod.get("history"):
-                    existing_keys = {(c.get("field_path"), str(c.get("new_value"))) for c in changes}
-                    for h in cat_prod["history"]:
-                        fp = f"{h.get('section', 'General')} › {h.get('field', 'field')}"
-                        nv = str(h.get("after") or "")
-                        if (fp, nv) not in existing_keys:
-                            changes.append({
-                                "field_path": fp,
-                                "old_value": str(h.get("before") or "—"),
-                                "new_value": nv,
-                                "detected_at": h.get("date") or "",
-                                "operator_email": h.get("editor") or "operator",
-                                "source": h.get("source") or "dashboard"
-                            })
+                if cat_prod:
+                    merged = dict(cat_prod)
+                    merged.update({k: v for k, v in cur_snap.items() if v is not None})
+                    cur_snap = merged
+                    if cat_prod.get("history"):
+                        existing_keys = {(c.get("field_path"), str(c.get("new_value"))) for c in changes}
+                        for h in cat_prod["history"]:
+                            fp = f"{h.get('section', 'General')} › {h.get('field', 'field')}"
+                            nv = str(h.get("after") or "")
+                            if (fp, nv) not in existing_keys:
+                                changes.append({
+                                    "field_path": fp,
+                                    "old_value": str(h.get("before") or "—"),
+                                    "new_value": nv,
+                                    "detected_at": h.get("date") or "",
+                                    "operator_email": h.get("editor") or "operator",
+                                    "source": h.get("source") or "dashboard"
+                                })
             except Exception:
                 pass
     return {"product": prow, "details": cur_snap, "changes": changes, "snapshots": snaps}
@@ -1207,15 +1211,30 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
             "source": "dashboard"
         })
 
-    # Save to disk
-    cf = STATIC_DIR / "data" / "gyg_catalog.json"
-    if cf.is_file():
-        try:
-            cf.write_text(json.dumps(_GYG_CATALOG_CACHE, indent=2, ensure_ascii=False), encoding="utf-8")
-        except Exception:
-            pass
+    # Update in-memory catalog cache
+    if _GYG_CATALOG_CACHE:
+        for k in [tid, str(p.get("tour_id")), str(p.get("product_code"))]:
+            if k and k in _GYG_CATALOG_CACHE:
+                _GYG_CATALOG_CACHE[k].update(actual_edits)
 
-    # Record into database change detection engine
+    # Save to disk across static paths
+    for base_dir in [STATIC_DIR,
+                     Path(__file__).resolve().parent / "static",
+                     Path(__file__).resolve().parent / "public" / "static",
+                     Path(__file__).resolve().parent.parent / "dashboard_vercel" / "public" / "static",
+                     Path(__file__).resolve().parent.parent / "audit" / "static"]:
+        cf = base_dir / "data" / "gyg_catalog.json"
+        if cf.is_file():
+            try:
+                full_cat = json.loads(cf.read_text(encoding="utf-8"))
+                for k in [tid, str(p.get("tour_id")), str(p.get("product_code"))]:
+                    if k and k in full_cat:
+                        full_cat[k].update(actual_edits)
+                cf.write_text(json.dumps(full_cat, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
+
+    # Record into database change detection engine AND update product snapshot
     try:
         with db.session() as con:
             plat_id = db.platform_id(con, "getyourguide") or 2
@@ -1243,6 +1262,21 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
                     elif field == "status" and new_val:
                         canon = db.canonical_status(con, plat_id, str(new_val))
                         con.execute("UPDATE products SET status=?, status_canonical=? WHERE id=?", (str(new_val), canon, pid))
+
+                # Update snapshot in database so full_description, short_description, etc. persist permanently
+                cur_snap_row = con.execute("""SELECT id, normalized_json FROM snapshots
+                                              WHERE product_id=? ORDER BY id DESC LIMIT 1""", (pid,)).fetchone()
+                if cur_snap_row:
+                    snap_data = json.loads(cur_snap_row["normalized_json"] or "{}")
+                    snap_data.update(actual_edits)
+                    con.execute("UPDATE snapshots SET normalized_json=? WHERE id=?",
+                                (json.dumps(snap_data, ensure_ascii=False), cur_snap_row["id"]))
+                else:
+                    s_data = dict(p)
+                    s_data.update(actual_edits)
+                    con.execute("""INSERT INTO snapshots (product_id, sync_id, captured_at, normalized_json)
+                                   VALUES (?,?,?,?)""",
+                                (pid, sync_id, now_ts, json.dumps(s_data, ensure_ascii=False)))
                 con.commit()
     except Exception as e:
         print(f"Error persisting GYG change to db: {e}")
