@@ -878,14 +878,34 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
           editor_email: who,
           note: note
         });
-        if (res && res.product) {
-          Object.assign(p, edits, res.product);
+        if (res && res.changes && res.changes.length) {
+          p.history = res.changes;
+        } else if (res && res.product && res.product.history && res.product.history.length >= (p.history || []).length) {
+          p.history = res.product.history;
         } else {
           applyLocalEdits(p, sectionName, edits, who);
+        }
+        if (res && res.product) {
+          const { history, ...restProd } = res.product;
+          Object.assign(p, edits, restProd);
+        } else {
+          Object.assign(p, edits);
         }
       } catch (err) {
         applyLocalEdits(p, sectionName, edits, who);
       }
+
+      // Reload fresh product state & full change history from server
+      try {
+        const fresh = await loadGygProduct(p.tour_id, p.product_id, p.viator_tour_id, p.viator_product_code);
+        if (fresh) {
+          if (fresh.history && fresh.history.length) {
+            p.history = fresh.history;
+          }
+          const { history, ...restFresh } = fresh;
+          Object.assign(p, restFresh);
+        }
+      } catch (err) {}
 
       if (gygCatalogCache) {
         for (const k of [p.tour_id, p.product_code]) {

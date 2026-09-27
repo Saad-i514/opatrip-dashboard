@@ -1278,10 +1278,18 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
                                    VALUES (?,?,?,?)""",
                                 (pid, sync_id, now_ts, json.dumps(s_data, ensure_ascii=False)))
                 con.commit()
+                all_changes = [dict(r) for r in con.execute(
+                    """SELECT field_path, old_value, new_value, detected_at, operator_email, source
+                       FROM changes WHERE product_id=? ORDER BY id DESC LIMIT 100""", (pid,))]
+                p["history"] = all_changes
+                if _GYG_CATALOG_CACHE:
+                    for k in [tid, str(p.get("tour_id")), str(p.get("product_code"))]:
+                        if k and k in _GYG_CATALOG_CACHE:
+                            _GYG_CATALOG_CACHE[k]["history"] = all_changes
     except Exception as e:
         print(f"Error persisting GYG change to db: {e}")
 
-    return {"ok": True, "product": p}
+    return {"ok": True, "product": p, "changes": p.get("history") or []}
 
 
 class GygCaptureIn(BaseModel):
