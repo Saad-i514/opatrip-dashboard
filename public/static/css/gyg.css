@@ -1,0 +1,705 @@
+/* GetYourGuide Portal Interface Replica Styles
+   Matches GYG\captures\capture_20260925_101538\capture.png exactly */
+
+:root {
+  --gyg-orange: #FF5533;
+  --gyg-orange-hover: #E04424;
+  --gyg-navy: #172B4D;
+  --gyg-green-bg: #E6F8EF;
+  --gyg-green-text: #0A8543;
+  --gyg-red-bg: #FEE2E2;
+  --gyg-red-text: #DC2626;
+  --gyg-amber-bg: #FEF3C7;
+  --gyg-amber-text: #D97706;
+  --gyg-blue-bg: #EBF3FC;
+  --gyg-blue-text: #1E40AF;
+  --gyg-pill-bg: #F3F4F6;
+  --gyg-pill-text: #374151;
+  --gyg-card-border: #E5E7EB;
+  --gyg-text-dark: #111827;
+  --gyg-text-muted: #6B7280;
+}
+
+/* Modal / Drawer Wrapper */
+.gyg-portal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1050;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px 16px;
+  animation: gygFadeIn 0.2s ease-out;
+}
+
+@keyframes gygFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.gyg-portal-container {
+  background: #FFFFFF;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 1240px;
+  min-height: 90vh;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 40px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--gyg-text-dark);
+}
+
+/* Portal Top Header Bar */
+.gyg-top-nav {
+  height: 60px;
+  border-bottom: 1px solid var(--gyg-card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #FFFFFF;
+}
+
+.gyg-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--gyg-orange);
+  letter-spacing: -0.02em;
+}
+
+.gyg-logo-icon {
+  width: 28px;
+  height: 28px;
+  background: var(--gyg-orange);
+  color: #fff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.gyg-top-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13.5px;
+  color: #4B5563;
+}
+
+.gyg-badge-new {
+  background: #EEF2FF;
+  color: #4F46E5;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  margin-left: 4px;
+}
+
+.gyg-user-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--gyg-text-dark);
+  cursor: pointer;
+}
+
+.gyg-user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #111827;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Breadcrumb & Navigation */
+.gyg-back-bar {
+  padding: 16px 28px 8px;
+}
+
+.gyg-btn-back {
+  background: none;
+  border: none;
+  color: #2563EB;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+
+.gyg-btn-back:hover {
+  text-decoration: underline;
+}
+
+/* Product Header */
+.gyg-product-header {
+  padding: 12px 28px 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.gyg-product-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.gyg-product-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--gyg-text-dark);
+  letter-spacing: -0.02em;
+}
+
+/* Status Badges */
+.gyg-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.gyg-status-pill.bookable {
+  background: var(--gyg-green-bg);
+  color: var(--gyg-green-text);
+}
+
+.gyg-status-pill.rejected {
+  background: var(--gyg-red-bg);
+  color: var(--gyg-red-text);
+}
+
+.gyg-status-pill.draft, .gyg-status-pill.not-submitted {
+  background: var(--gyg-amber-bg);
+  color: var(--gyg-amber-text);
+}
+
+.gyg-status-pill.new {
+  background: #E0F2FE;
+  color: #0369A1;
+}
+
+.gyg-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Header Metadata Line */
+.gyg-meta-line {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13.5px;
+  color: var(--gyg-text-muted);
+}
+
+.gyg-meta-line b {
+  color: var(--gyg-text-dark);
+  font-weight: 600;
+}
+
+.gyg-stars {
+  color: #F59E0B;
+  letter-spacing: 1px;
+}
+
+.gyg-preview-link {
+  color: #2563EB;
+  text-decoration: none;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gyg-preview-link:hover {
+  text-decoration: underline;
+}
+
+.gyg-actions-btn {
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  border-radius: 20px;
+  padding: 7px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: all 0.15s;
+}
+
+.gyg-actions-btn:hover {
+  background: #F9FAFB;
+  border-color: #9CA3AF;
+}
+
+/* Photo Gallery Strip */
+.gyg-gallery-grid {
+  margin: 0 28px 24px;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+  height: 340px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #F3F4F6;
+}
+
+.gyg-gallery-main {
+  height: 100%;
+  position: relative;
+}
+
+.gyg-gallery-main img, .gyg-gallery-col img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gyg-gallery-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.gyg-gallery-col-stack {
+  position: relative;
+  flex: 1;
+  height: calc(50% - 4px);
+  overflow: hidden;
+}
+
+.gyg-gallery-overlay {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.gyg-gallery-badge {
+  background: rgba(17, 24, 39, 0.8);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+/* Main Content 2-Column Grid */
+.gyg-content-grid {
+  margin: 0 28px 32px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* Cards */
+.gyg-card {
+  background: #FFFFFF;
+  border: 1px solid var(--gyg-card-border);
+  border-radius: 12px;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.gyg-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.gyg-card-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gyg-text-dark);
+}
+
+.gyg-card-edit-btn {
+  background: none;
+  border: none;
+  color: #374151;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.gyg-card-edit-btn:hover {
+  color: #111827;
+}
+
+/* Field Groups */
+.gyg-field-group {
+  margin-bottom: 16px;
+}
+
+.gyg-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gyg-text-muted);
+  margin-bottom: 6px;
+  text-transform: none;
+}
+
+.gyg-field-value {
+  font-size: 14px;
+  color: var(--gyg-text-dark);
+  line-height: 1.55;
+}
+
+.gyg-field-desc {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.gyg-btn-see-more {
+  background: none;
+  border: none;
+  color: #2563EB;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Lists */
+.gyg-bullets {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.gyg-bullets li {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+/* Inclusions & Exclusions */
+.gyg-checklist {
+  list-style: none;
+  margin: 8px 0 16px;
+  padding: 0;
+}
+
+.gyg-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: #374151;
+  margin-bottom: 10px;
+  line-height: 1.45;
+}
+
+.gyg-icon-check {
+  color: #10B981;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.gyg-icon-cross {
+  color: #EF4444;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* Important Info Pills */
+.gyg-pill-box {
+  background: var(--gyg-blue-bg);
+  color: var(--gyg-blue-text);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: block;
+}
+
+.gyg-tag-pill {
+  background: var(--gyg-pill-bg);
+  color: var(--gyg-pill-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  display: inline-block;
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+
+/* Itinerary Timeline */
+.gyg-timeline {
+  position: relative;
+  padding-left: 28px;
+  margin-top: 14px;
+}
+
+.gyg-timeline::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 24px;
+  left: 11px;
+  width: 2px;
+  background: #E5E7EB;
+}
+
+.gyg-timeline-item {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.gyg-timeline-marker {
+  position: absolute;
+  left: -28px;
+  top: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 11px;
+  z-index: 1;
+}
+
+.gyg-timeline-marker.start {
+  background: var(--gyg-orange);
+}
+
+.gyg-timeline-marker.stop {
+  background: var(--gyg-navy);
+}
+
+.gyg-timeline-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--gyg-text-dark);
+}
+
+.gyg-timeline-sub {
+  font-size: 13px;
+  color: var(--gyg-text-muted);
+  margin-top: 3px;
+}
+
+/* Options Card */
+.gyg-options-wrap {
+  margin: 0 28px 24px;
+}
+
+.gyg-options-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.gyg-options-card {
+  border: 1px solid var(--gyg-card-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  background: #FFFFFF;
+}
+
+.gyg-options-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.gyg-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  font-size: 13.5px;
+}
+
+.gyg-opt-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gyg-opt-label {
+  font-size: 12.5px;
+  color: var(--gyg-text-muted);
+}
+
+.gyg-opt-val {
+  font-weight: 500;
+  color: var(--gyg-text-dark);
+}
+
+/* History Section */
+.gyg-history-wrap {
+  margin: 0 28px 36px;
+}
+
+.gyg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  border: 1px solid var(--gyg-card-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.gyg-table th {
+  background: #F9FAFB;
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: #4B5563;
+  border-bottom: 1px solid var(--gyg-card-border);
+}
+
+.gyg-table td {
+  padding: 16px;
+  color: var(--gyg-text-dark);
+  border-bottom: 1px solid var(--gyg-card-border);
+}
+
+/* Traceability Banner */
+.gyg-trace-banner {
+  margin: 0 28px 24px;
+  background: #F5F3FF;
+  border: 1px solid #DDD6FE;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.gyg-trace-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.gyg-trace-badge {
+  background: #7C3AED;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.gyg-trace-details {
+  font-size: 13.5px;
+  color: #4C1D95;
+}
+
+/* Catalog View in Dashboard */
+.gyg-catalog-wrap {
+  padding: 20px 0;
+}
+
+.gyg-catalog-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.gyg-search-input {
+  flex: 1;
+  min-width: 280px;
+  max-width: 480px;
+  padding: 10px 16px;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #FFFFFF;
+}
+
+.gyg-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gyg-chip {
+  background: #F3F4F6;
+  border: 1px solid transparent;
+  color: #4B5563;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.gyg-chip:hover {
+  background: #E5E7EB;
+}
+
+.gyg-chip.active {
+  background: #FF5533;
+  color: #FFFFFF;
+}

@@ -886,6 +886,8 @@ def products(account: str | None = None, q: str | None = None,
     if platform:
         sql += " AND pl.code=?"
         args.append(platform)
+    else:
+        sql += " AND (pl.code='viator' OR pl.code IS NULL)"
     if connection:
         sql += " AND p.connection_state=?"
         args.append(connection)
@@ -924,13 +926,15 @@ def products(account: str | None = None, q: str | None = None,
         by_tour = {}
         lw, largs = account_where()
         for r in con.execute(f"""SELECT p.tour_id AS t, pl.code AS code,
-                                        p.product_code AS pc, p.status_canonical AS st
+                                        p.product_code AS pc, p.status_canonical AS st,
+                                        p.status AS raw_st, p.id AS pid
                                  FROM products p JOIN platforms pl ON pl.id=p.platform_id
                                  JOIN accounts a ON a.id=p.account_id
                                  {lw} {'AND' if lw else 'WHERE'} p.tour_id IS NOT NULL""",
                              largs):
             by_tour.setdefault(r["t"], []).append(
-                {"platform": r["code"], "code": r["pc"], "status": r["st"] or "PENDING"})
+                {"platform": r["code"], "code": r["pc"], "status": r["st"] or "PENDING",
+                 "raw_status": r["raw_st"] or r["st"] or "PENDING", "product_id": r["pid"]})
         for r in rows:
             # The platform NAME is not sent: the browser already holds the platform list
             # from /api/filters and looks the name up there. Repeating it on every listing
@@ -976,6 +980,109 @@ def product_detail(pid: int):
             # `or "{}"` matches /api/snapshot: a snapshot row with a NULL payload would
             # otherwise make json.loads raise and 500 the whole product page.
             "current": json.loads(cur["normalized_json"] or "{}") if cur else None}
+
+
+@app.get("/api/product/gyg/{code}")
+def gyg_product_detail(code: str):
+    with db.session() as con:
+        plat_id = db.platform_id(con, "getyourguide") or 2
+        pcode = str(code).strip()
+        num_code = int(pcode) if pcode.isdigit() else -1
+        row = con.execute("""SELECT p.*, a.name AS account_name, a.viator_account_id
+                             FROM products p JOIN accounts a ON a.id=p.account_id
+                             WHERE (p.product_code=? OR p.id=? OR p.tour_id=?) AND p.platform_id=?
+                             LIMIT 1""",
+                          (pcode, num_code, num_code, plat_id)).fetchone()
+        if not row and num_code > 0:
+            row = con.execute("""SELECT p.*, a.name AS account_name, a.viator_account_id
+                                 FROM products p JOIN accounts a ON a.id=p.account_id
+                                 WHERE p.tour_id=? AND p.platform_id=?
+                                 LIMIT 1""",
+                              (num_code, plat_id)).fetchone()
+        if not row:
+            raise HTTPException(404, f"GetYourGuide product '{code}' not found")
+        prow = dict(row)
+        snaps = [dict(r) for r in con.execute(
+            """SELECT id, sync_id, captured_at, normalized_json
+               FROM snapshots WHERE product_id=? ORDER BY id DESC LIMIT 5""", (prow["id"],))]
+        cur_snap = json.loads(snaps[0]["normalized_json"]) if snaps and snaps[0].get("normalized_json") else {}
+        changes = [dict(r) for r in con.execute(
+            """SELECT field_path, old_value, new_value, detected_at, operator_email, source
+               FROM changes WHERE product_id=? ORDER BY id DESC LIMIT 100""", (prow["id"],))]
+    return {"product": prow, "details": cur_snap, "changes": changes, "snapshots": snaps}
+
+
+class GygCaptureIn(BaseModel):
+    sync_id: int | None = None
+    account_pk: int | None = None
+    tour_id: str | int | None = None
+    data: dict
+    operator_email: str
+
+
+@app.post("/api/ext/gyg/product/capture")
+def gyg_product_capture(c: GygCaptureIn):
+    details = c.data or {}
+    tour_code = str(c.tour_id or details.get("tourId") or details.get("product_code") or "").strip()
+    title = str(details.get("title") or f"Tour {tour_code}").strip()
+    raw_status = str(details.get("category") or details.get("status") or "Bookable").strip()
+    ref_code = str(details.get("referenceCode") or details.get("refCode") or "").strip()
+
+    with db.session() as con:
+        plat_id = db.platform_id(con, "getyourguide") or 2
+        account_pk = c.account_pk
+        if not account_pk:
+            acc = con.execute("SELECT id FROM accounts WHERE viator_account_id LIKE 'gyg_%'").fetchone()
+            if acc:
+                account_pk = acc["id"]
+            else:
+                con.execute("INSERT INTO accounts (viator_account_id, name, signin_email, platform_id) VALUES ('gyg_opatrip', 'Opatrip.com (GYG)', ?, ?)",
+                            (c.operator_email, plat_id))
+                con.commit()
+                account_pk = con.execute("SELECT id FROM accounts WHERE viator_account_id='gyg_opatrip'").fetchone()["id"]
+
+        # Map to same tour as Viator product
+        tour_id = db.match_or_upsert_tour(con, title, ref_code)
+        canon = db.canonical_status(con, plat_id, raw_status)
+
+        pid = db.upsert_product(
+            con, account_pk, tour_code,
+            title=title, status=raw_status,
+            location=details.get("location"),
+            is_draft_stub=1 if canon == "DRAFT" else 0,
+            platform_id=plat_id, tour_id=tour_id, status_canonical=canon
+        )
+
+        # Save snapshot + diff
+        sync_id = c.sync_id
+        if not sync_id:
+            sync_id = db.start_sync(con, account_pk, c.operator_email, host="vercel")
+
+        n = db.save_snapshot(con, pid, sync_id, account_pk, c.operator_email, details)
+
+        # Portal history records
+        portal_hist = details.get("portalHistory") or []
+        if isinstance(portal_hist, list) and len(portal_hist):
+            for h in portal_hist:
+                try:
+                    h_date = h.get("date") or db.now()
+                    h_sec = h.get("section") or "Portal History"
+                    h_after = str(h.get("after") or "")
+                    h_before = str(h.get("before") or "")
+                    exists = con.execute("""SELECT id FROM changes WHERE product_id=? AND field_path=? AND new_value=?""",
+                                         (pid, f"gyg_history.{h_sec}", h_after)).fetchone()
+                    if not exists and (h_before or h_after):
+                        con.execute("""INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value, detected_at, account_id, operator_email, source)
+                                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                                    (pid, sync_id, f"gyg_history.{h_sec}", h_before, h_after, h_date, account_pk, c.operator_email, "gyg_portal"))
+                except Exception:
+                    pass
+
+        db.bump_sync(con, sync_id, seen=1, changed=n)
+        db.mark_done(con, sync_id, tour_code)
+        con.execute("UPDATE accounts SET last_sync_at=? WHERE id=?", (db.now(), account_pk))
+        con.commit()
+    return {"ok": True, "product_id": pid, "tour_id": tour_id, "changes": n}
 
 
 @app.get("/api/editable")

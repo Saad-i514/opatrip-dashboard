@@ -32,8 +32,13 @@ function platformGrid(p, platforms){
     // this product's own listing, never a namesake's from another account
     const l = ls.find(x => x.code === p.product_code) || ls[0];
     const isOwn = l && l.code === p.product_code;
-    const st = isOwn ? (p.status || l.status) : (l ? l.status : null);
-    return `<div class="pp-row"><span class="pp-n">${esc(pl.name)}</span>${
+    const st = isOwn ? (p.status || l.status) : (l ? (l.raw_status || l.status) : null);
+    const isGyg = pl.code === 'getyourguide';
+    const clickAttr = isGyg
+      ? `onclick="event.stopPropagation(); window.openGygDrawer && window.openGygDrawer('${esc(l ? l.code : '')}', ${l && l.product_id ? l.product_id : 'null'}, ${p.tour_id || 'null'}, '${esc(p.product_code || '')}')" style="cursor:pointer;" title="Click to view GetYourGuide product details"`
+      : '';
+    const hoverCls = isGyg ? ' pp-row-interactive' : '';
+    return `<div class="pp-row${hoverCls}" ${clickAttr}><span class="pp-n">${esc(pl.name)}</span>${
       st ? statusBadge(st)
         : '<span class="badge b-notlisted">Not uploaded</span>'}</div>`;
   }).join('')}</div>`;

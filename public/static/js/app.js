@@ -9,6 +9,7 @@ import { installReadOnly, openAddAccountModal, setOwner } from './readonly.js';
 import { ensureSignedIn, renderWhoAmI, showLogin } from './login.js';
 import { viewStats } from './views/stats.js';
 import { viewProducts } from './views/products.js';
+import { openGygDrawer } from './views/gyg_drawer.js';
 import { when } from './views/drawer.js';
 // Activity is the live log of a capture run, and this deployment cannot capture.
 import { viewCategories, viewSyncs } from './views/misc.js';

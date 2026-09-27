@@ -625,3 +625,453 @@ document.addEventListener('keydown', e=>{
   closeDrawer();
 });
 
+/* ======================= GetYourGuide Drawer ======================= */
+export async function openGygDrawer(code, pid, tourId) {
+  const host = $('#drawerHost');
+  host.innerHTML = '<div class="scrim"></div><div class="drawer gyg-drawer"><div class="dbody">' +
+    `<div class="loading-note">${spinMark}Loading GetYourGuide product…</div>` +
+    `<div class="card pad">${skLines(8)}</div>` +
+    '</div></div>';
+  host.querySelector('.scrim').onclick = closeDrawer;
+
+  let d = null;
+  const targetCode = code || (pid ? String(pid) : (tourId ? String(tourId) : ''));
+  if (targetCode) {
+    try {
+      d = await cachedApi('/api/product/gyg/' + encodeURIComponent(targetCode));
+    } catch (e) {
+      try {
+        const resp = await fetch('/api/product/gyg/' + encodeURIComponent(targetCode));
+        if (resp.ok) d = await resp.json();
+      } catch (e2) {}
+    }
+  }
+  if (!d && pid) {
+    try {
+      const resp = await fetch('/api/product/gyg/' + encodeURIComponent(pid));
+      if (resp.ok) d = await resp.json();
+    } catch (e) {}
+  }
+  if (!d && tourId) {
+    try {
+      const resp = await fetch('/api/product/gyg/' + encodeURIComponent(tourId));
+      if (resp.ok) d = await resp.json();
+    } catch (e) {}
+  }
+
+  host.innerHTML = '';
+  const scrim = el('div', 'scrim');
+  scrim.onclick = closeDrawer;
+  host.appendChild(scrim);
+
+  const dr = el('div', 'drawer gyg-drawer');
+  dr.style.width = 'min(1120px, 98vw)';
+
+  const product = (d && d.product) ? d.product : {};
+  const details = (d && d.details) ? d.details : {};
+  const changes = (d && d.changes) ? d.changes : [];
+  const portalHistory = Array.isArray(details.portalHistory) ? details.portalHistory : [];
+
+  const rawStatus = details.status || product.status || 'Not uploaded';
+  const statusLower = rawStatus.toLowerCase();
+  let tagClass = 'gyg-tag-info';
+  if (statusLower.includes('bookable') || statusLower.includes('active') || statusLower.includes('live')) {
+    tagClass = 'gyg-tag-success';
+  } else if (statusLower.includes('reject') || statusLower.includes('no avail') || statusLower.includes('no active') || statusLower.includes('not bookable')) {
+    tagClass = 'gyg-tag-danger';
+  } else if (statusLower.includes('needs action') || statusLower.includes('expir') || statusLower.includes('action')) {
+    tagClass = 'gyg-tag-warning';
+  } else if (statusLower.includes('review') || statusLower.includes('approval') || statusLower.includes('pending')) {
+    tagClass = 'gyg-tag-info';
+  } else if (statusLower.includes('draft') || statusLower.includes('not submitted') || statusLower.includes('not yet')) {
+    tagClass = 'gyg-tag-draft';
+  }
+
+  const pTitle = details.title || product.title || (code ? `Tour ${code}` : 'Tour Listing');
+  const pId = details.tourId || product.product_code || code || '—';
+  const refCode = details.refCode || '—';
+  const ratingText = details.rating || 'Not rated';
+
+  const gHead = el('div', 'gyg-dhead');
+  gHead.innerHTML = `
+    <div class="gyg-nav-bar">
+      <div class="gyg-breadcrumbs">
+        <button class="vback" id="gygBackBtn" style="margin-right:12px;">&lsaquo; Back</button>
+        <span class="gyg-bc-link">Manage products</span>
+        <span class="gyg-bc-sep">/</span>
+        <span class="gyg-bc-cur">Edit</span>
+        <span class="gyg-portal-pill"><span class="gyg-portal-dot"></span>GetYourGuide Portal</span>
+      </div>
+      <button class="gyg-close-btn" id="gygCloseBtn" title="Close">&times;</button>
+    </div>
+
+    <div class="gyg-product-head">
+      <div class="gyg-title-row">
+        <h2 class="gyg-product-title">${esc(pTitle)}</h2>
+        <span class="gyg-tag ${tagClass}">
+          <svg class="gyg-tag-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          ${esc(rawStatus)}
+        </span>
+      </div>
+      <div class="gyg-meta-row">
+        <div class="gyg-meta-item"><span class="gyg-meta-key">Product Id:</span> <span class="mono">${esc(pId)}</span></div>
+        <div class="gyg-meta-item"><span class="gyg-meta-key">Product Reference Code:</span> <span class="mono">${esc(refCode)}</span></div>
+        <div class="gyg-meta-item">
+          <span class="gyg-meta-key">Rating:</span>
+          <div class="gyg-rating-stars">
+            ${[1, 2, 3, 4, 5].map(() => '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>').join('')}
+            <span class="gyg-rating-label">${esc(ratingText)}</span>
+          </div>
+        </div>
+        <div class="gyg-meta-item">
+          <a class="gyg-link-preview" href="https://supplier.getyourguide.com/products/details?tour_id=${encodeURIComponent(pId)}" target="_blank" rel="noopener">
+            <span>Preview on website</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </a>
+        </div>
+        <div class="gyg-meta-actions">
+          <button class="gyg-btn-outlined" id="gygActionsBtn">Actions &blacktriangledown;</button>
+        </div>
+      </div>
+    </div>
+  `;
+  dr.appendChild(gHead);
+
+  gHead.querySelector('#gygBackBtn').onclick = closeDrawer;
+  gHead.querySelector('#gygCloseBtn').onclick = closeDrawer;
+
+  const body = el('div', 'dbody gyg-body');
+
+  if (!d || (!details.title && !details.shortDescription && !details.fullDescription && !details.options?.length)) {
+    body.innerHTML = `
+      <div class="card pad" style="margin-bottom:20px; border-left:4px solid var(--accent); background:rgba(173,104,226,0.06);">
+        <h3 style="margin:0 0 6px 0; font-size:16px;">Product Mapped & Ready for Capture</h3>
+        <p style="margin:0 0 8px 0; font-size:13px; color:var(--ink-2);">
+          This tour is mapped to <b>Tour ID ${esc(tourId || code || '—')}</b>.
+          To populate the exact live GetYourGuide details, open the <b>Opatrip GYG Trace</b> browser extension on the GetYourGuide portal and capture this product or click "Fetch All on Page".
+        </p>
+        <span class="badge b-pending">Awaiting Sync</span>
+      </div>
+    `;
+  }
+
+  // Two-column grid layout
+  const grid = el('div', 'gyg-grid');
+  const mainCol = el('div', 'gyg-main-col');
+  const sideCol = el('div', 'gyg-side-col');
+
+  // --- CARD 1: Main Information ---
+  const mainCard = el('div', 'p-card p-component card gyg-card');
+  const highlights = Array.isArray(details.highlights) ? details.highlights : [];
+  const hlHtml = highlights.length
+    ? `<ul class="gyg-bullet-list">${highlights.map(h => `<li>${esc(h)}</li>`).join('')}</ul>`
+    : '<span class="gyg-empty-val">No highlights specified</span>';
+
+  mainCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Main Information</h3>
+      <button class="gyg-edit-btn" title="Edit Main Information">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field">
+        <label class="gyg-field-label">Title</label>
+        <div class="gyg-field-val">${esc(details.title || pTitle)}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">Short description</label>
+        <div class="gyg-field-val">${esc(details.shortDescription || '—')}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">Full description</label>
+        <div class="gyg-field-val gyg-desc-text" id="gygFullDesc">
+          ${esc(details.fullDescription || '—')}
+        </div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">Highlights</label>
+        <div class="gyg-field-val">${hlHtml}</div>
+      </div>
+    </div>
+  `;
+  mainCol.appendChild(mainCard);
+
+  // --- CARD 2: Inclusions & Exclusions ---
+  const incCard = el('div', 'p-card p-component card gyg-card');
+  const inclusions = Array.isArray(details.inclusions) ? details.inclusions : [];
+  const exclusions = Array.isArray(details.exclusions) ? details.exclusions : [];
+
+  const incList = inclusions.length
+    ? `<ul class="gyg-bullet-list">${inclusions.map(i => `<li class="gyg-inc-item"><span class="gyg-bullet-dot">&bull;</span> ${esc(i)}</li>`).join('')}</ul>`
+    : '<span class="gyg-empty-val">No inclusions specified</span>';
+  const excList = exclusions.length
+    ? `<ul class="gyg-bullet-list">${exclusions.map(e => `<li class="gyg-exc-item"><span class="gyg-bullet-dot">&bull;</span> ${esc(e)}</li>`).join('')}</ul>`
+    : '<span class="gyg-empty-val">No exclusions specified</span>';
+
+  incCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Inclusions &amp; Exclusions</h3>
+      <button class="gyg-edit-btn" title="Edit Inclusions & Exclusions">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field">
+        <label class="gyg-field-label">Inclusions</label>
+        <div class="gyg-field-val">${incList}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">Exclusions</label>
+        <div class="gyg-field-val">${excList}</div>
+      </div>
+    </div>
+  `;
+  mainCol.appendChild(incCard);
+
+  // --- CARD 3: Important Information (All 7 Questions) ---
+  const imp = details.importantInfo || {};
+  const impCard = el('div', 'p-card p-component card gyg-card');
+  impCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Important information</h3>
+      <button class="gyg-edit-btn" title="Edit Important Information">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field">
+        <label class="gyg-field-label">Who is this activity not suitable for?</label>
+        <div class="gyg-field-val">${esc(imp.notSuitableFor || 'No restrictions specified')}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">What's not allowed?</label>
+        <div class="gyg-field-val">${esc(imp.notAllowed || 'No restrictions specified')}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">Pet policy</label>
+        <div class="gyg-field-val">${esc(imp.petPolicy || "This activity doesn't allow pets")}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">What mandatory items must the customer bring with them?</label>
+        <div class="gyg-field-val">
+          ${imp.mandatoryItems ? `<div class="gyg-chips-wrap">${imp.mandatoryItems.split(',').map(item => `<span class="gyg-chip">${esc(item.trim())}</span>`).join('')}</div>` : '<span class="gyg-empty-val">None specified</span>'}
+        </div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">Know before you go</label>
+        <div class="gyg-field-val">${esc(imp.knowBeforeYouGo || '—')}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">Emergency contact number</label>
+        <div class="gyg-field-val mono">${esc(imp.emergencyContact || '+370 2099268262')}</div>
+      </div>
+      <div class="gyg-field">
+        <label class="gyg-field-label">What information needs to appear on the ticket/voucher?</label>
+        <div class="gyg-field-val">${esc(imp.ticketVoucherInfo || '—')}</div>
+      </div>
+    </div>
+  `;
+  mainCol.appendChild(impCard);
+
+  // --- CARD 4: Itinerary ---
+  const itinCard = el('div', 'p-card p-component card gyg-card');
+  itinCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Itinerary</h3>
+      <button class="gyg-edit-btn" title="Edit Itinerary">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field-val" style="color:var(--ink-3);">No Itinerary for this tour</div>
+    </div>
+  `;
+  mainCol.appendChild(itinCard);
+
+  // --- CARD 5: Options ---
+  const options = Array.isArray(details.options) ? details.options : [];
+  const optCard = el('div', 'p-card p-component card gyg-card');
+  const optItemsHtml = options.length ? options.map(opt => `
+    <div class="gyg-option-box">
+      <div class="gyg-option-title-row">
+        <h4 class="gyg-option-title">${esc(opt.title || pTitle)}</h4>
+        <span class="gyg-tag ${String(opt.status || '').toLowerCase().includes('avail') ? 'gyg-tag-danger' : 'gyg-tag-success'}">${esc(opt.status || 'Active')}</span>
+      </div>
+      <div class="gyg-option-grid">
+        <div><span class="gyg-subkey">Reference code:</span> <b class="mono">${esc(opt.refCode || refCode)}</b></div>
+        <div><span class="gyg-subkey">Option ID:</span> <b class="mono">${esc(opt.optionId || '—')}</b></div>
+        <div><span class="gyg-subkey">Type:</span> <span>${esc(opt.type || 'Private')}</span></div>
+        <div><span class="gyg-subkey">Cut-off time:</span> <span>${esc(opt.cutOffTime || '10 hours')}</span></div>
+        <div><span class="gyg-subkey">Booking Engine:</span> <span>Automatically accept new bookings</span></div>
+        <div><span class="gyg-subkey">Connectivity Settings:</span> <span class="hint">Not connected.</span></div>
+      </div>
+      <div class="gyg-option-actions">
+        <button class="gyg-btn-sm-outlined">Edit option</button>
+        <button class="gyg-btn-sm-ghost">Show schedules</button>
+      </div>
+    </div>
+  `).join('') : `
+    <div class="gyg-option-box">
+      <div class="gyg-option-title-row">
+        <h4 class="gyg-option-title">${esc(pTitle)}</h4>
+        <span class="gyg-tag gyg-tag-success">Active</span>
+      </div>
+      <div class="gyg-option-grid">
+        <div><span class="gyg-subkey">Reference code:</span> <b class="mono">${esc(refCode)}</b></div>
+        <div><span class="gyg-subkey">Option ID:</span> <b class="mono">${esc(pId)}</b></div>
+        <div><span class="gyg-subkey">Type:</span> <span>Private</span></div>
+        <div><span class="gyg-subkey">Cut-off time:</span> <span>10 hours</span></div>
+        <div><span class="gyg-subkey">Booking Engine:</span> <span>Automatically accept new bookings</span></div>
+        <div><span class="gyg-subkey">Connectivity Settings:</span> <span class="hint">Not connected.</span></div>
+      </div>
+    </div>
+  `;
+
+  optCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Options</h3>
+      <button class="btn primary sm" style="font-size:12px; font-weight:600;">+ Create new option</button>
+    </div>
+    <div class="gyg-card-body">
+      ${optItemsHtml}
+    </div>
+  `;
+  mainCol.appendChild(optCard);
+
+  // --- CARD 6: Change History Table ---
+  const allHistory = [...portalHistory];
+  changes.forEach(ch => {
+    if (!allHistory.some(h => (h.after === ch.new_value && h.section === ch.field_path))) {
+      allHistory.push({
+        date: ch.detected_at || 'Recent',
+        status: 'Recorded Sync',
+        section: (ch.field_path || '').replace(/^gyg_history\./, ''),
+        before: ch.old_value || '—',
+        after: ch.new_value || '—',
+        editor: ch.operator_email || 'SUPPLIER'
+      });
+    }
+  });
+
+  const histCard = el('div', 'p-card p-component card gyg-card');
+  const histRowsHtml = allHistory.length ? allHistory.map(h => `
+    <tr>
+      <td style="width: 14%;"><div class="gyg-date-cell">${esc(h.date || '')}</div></td>
+      <td style="width: 16%;"><span class="gyg-tag gyg-tag-pending">${esc(h.status || 'Approval')}</span></td>
+      <td style="width: 18%;"><b>${esc(h.section || '')}</b></td>
+      <td style="width: 24%; font-size:12px; color:var(--ink-2);"><div class="gyg-cell-scroll">${esc(h.before || '—')}</div></td>
+      <td style="width: 20%; font-size:12px; color:var(--ink-1);"><div class="gyg-cell-scroll">${esc(h.after || '—')}</div></td>
+      <td style="width: 8%;"><span class="badge b-active" style="font-size:11px;">${esc(h.editor || 'SUPPLIER')}</span></td>
+    </tr>
+  `).join('') : `
+    <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--ink-3);">No change history recorded yet for this product.</td></tr>
+  `;
+
+  histCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">History</h3>
+      <span class="badge b-stub">${allHistory.length} event${allHistory.length === 1 ? '' : 's'}</span>
+    </div>
+    <div class="gyg-card-body" style="padding:0; overflow:hidden;">
+      <div class="gyg-table-wrap">
+        <table class="gyg-datatable">
+          <thead>
+            <tr>
+              <th style="width: 14%;">Date</th>
+              <th style="width: 16%;">Status</th>
+              <th style="width: 18%;">Section</th>
+              <th style="width: 24%;">Before</th>
+              <th style="width: 20%;">After</th>
+              <th style="width: 8%;">Editor</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${histRowsHtml}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  mainCol.appendChild(histCard);
+
+  // --- RIGHT SIDEBAR CARDS ---
+  // Food & Drinks
+  const foodCard = el('div', 'p-card p-component card gyg-card');
+  foodCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Food &amp; Drinks</h3>
+      <button class="gyg-edit-btn" title="Edit Food & Drinks">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field-val" style="color:var(--ink-3);">No food or drinks included in this product</div>
+    </div>
+  `;
+  sideCol.appendChild(foodCard);
+
+  // Keywords
+  const keyCard = el('div', 'p-card p-component card gyg-card');
+  const keywords = ['Archaeology', 'Unesco', 'History', 'Family friendly', 'Walking Tour', 'Ancient History', 'Ancient', 'Sightseeing'];
+  keyCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Keywords</h3>
+      <button class="gyg-edit-btn" title="Edit Keywords">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-chips-wrap">
+        ${keywords.map(kw => `<span class="gyg-chip">${esc(kw)}</span>`).join('')}
+      </div>
+      <div style="margin-top:10px;"><a href="#" class="gyg-link-more" onclick="event.preventDefault();">See all ${keywords.length} keywords</a></div>
+    </div>
+  `;
+  sideCol.appendChild(keyCard);
+
+  // Guide Information
+  const guideCard = el('div', 'p-card p-component card gyg-card');
+  guideCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Guide Information</h3>
+      <button class="gyg-edit-btn" title="Edit Guide Info">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field-val">Tour guide</div>
+    </div>
+  `;
+  sideCol.appendChild(guideCard);
+
+  // Transportation
+  const transCard = el('div', 'p-card p-component card gyg-card');
+  transCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Transportation</h3>
+      <button class="gyg-edit-btn" title="Edit Transportation">&#9998; Edit</button>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field-val" style="color:var(--ink-3);">No transportation provided for this product</div>
+    </div>
+  `;
+  sideCol.appendChild(transCard);
+
+  // Refund Policy
+  const refCard = el('div', 'p-card p-component card gyg-card');
+  refCard.innerHTML = `
+    <div class="gyg-card-header">
+      <h3 class="text-title-2">Refund policy</h3>
+    </div>
+    <div class="gyg-card-body">
+      <div class="gyg-field-val" style="font-size:13px; color:var(--ink-2); line-height:1.4;">
+        This activity has a <b>Standard (24-hour)</b> refund policy. Read the FAQ to learn more about refund policies.
+      </div>
+    </div>
+  `;
+  sideCol.appendChild(refCard);
+
+  grid.appendChild(mainCol);
+  grid.appendChild(sideCol);
+  body.appendChild(grid);
+  dr.appendChild(body);
+  host.appendChild(dr);
+}
+
+// Global hook
+if (typeof window !== 'undefined') {
+  window.openGygDrawer = openGygDrawer;
+}
+
+

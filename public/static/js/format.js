@@ -415,6 +415,15 @@ export const STATUS_LABEL = {
   INACTIVE:                  ['Removed',           'b-removed'],
   REMOVED:                   ['Removed',           'b-removed'],
   NOT_LISTED:                ['Not uploaded',      'b-draft'],
+  BOOKABLE:                  ['Bookable',          'b-active'],
+  'NEEDS ACTION':            ['Needs action',      'b-pending'],
+  'IN REVIEW':               ['In review',         'b-pending'],
+  'NOT SUBMITTED':           ['Not submitted',     'b-draft'],
+  'NOT YET SUBMITTED':       ['Not submitted',     'b-draft'],
+  'NO ACTIVE OPTIONS':       ['No active options', 'b-removed'],
+  'NO AVAILABILITY':         ['No availability',   'b-removed'],
+  'NOT BOOKABLE':            ['Not bookable',      'b-removed'],
+  'EXPIRING SOON':           ['Expiring soon',     'b-pending'],
 };
 export function statusBadge(s){
   const k = (s || '').toUpperCase();

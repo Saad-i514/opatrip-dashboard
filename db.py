@@ -289,7 +289,9 @@ def platform_id(con, code):
 def tour_key(title):
     """Normalised title used to recognise the same tour across platforms."""
     import re as _re
-    return _re.sub(r"[^a-z0-9]+", " ", (title or "").lower()).strip() or None
+    # Normalize '&' to 'and' so "Tour & Tasting" and "Tour and Tasting" match
+    t = _re.sub(r"\s*&\s*", " and ", (title or "").lower())
+    return _re.sub(r"[^a-z0-9]+", " ", t).strip() or None
 
 
 def upsert_tour(con, title, created_by=None):
@@ -310,21 +312,64 @@ def upsert_tour(con, title, created_by=None):
     return r["id"] if r else None
 
 
+def match_or_upsert_tour(con, title, ref_code=None):
+    """Matches an existing tour across platforms by reference code, normalised title, or exact title."""
+    if ref_code:
+        clean_ref = str(ref_code).strip()
+        pr = con.execute("SELECT tour_id FROM products WHERE product_code=? AND tour_id IS NOT NULL", (clean_ref,)).fetchone()
+        if pr:
+            tid = pr[0] if isinstance(pr, (list, tuple)) else pr["tour_id"]
+            if tid:
+                return tid
+    k = tour_key(title)
+    if not k:
+        return None
+    r = con.execute("SELECT id FROM tours WHERE tour_key=?", (k,)).fetchone()
+    if r:
+        return r[0] if isinstance(r, (list, tuple)) else r["id"]
+    # Check legacy key (where '&' was removed rather than replaced with 'and')
+    legacy_k = _re.sub(r"\s+", " ", _re.sub(r"[^a-z0-9]+", " ", (title or "").lower())).strip()
+    if legacy_k and legacy_k != k:
+        r2 = con.execute("SELECT id FROM tours WHERE tour_key=?", (legacy_k,)).fetchone()
+        if r2:
+            return r2[0] if isinstance(r2, (list, tuple)) else r2["id"]
+    # Check exact title match
+    if title:
+        r3 = con.execute("SELECT id FROM tours WHERE lower(title)=?", (title.lower().strip(),)).fetchone()
+        if r3:
+            return r3[0] if isinstance(r3, (list, tuple)) else r3["id"]
+    # Check with city prefix stripped (e.g., "Mykonos: Delos and the city..." -> "Delos and the city...")
+    if title and ":" in title:
+        stripped_title = _re.sub(r"^[^:]+:\s*", "", title)
+        k_stripped = tour_key(stripped_title)
+        if k_stripped:
+            r4 = con.execute("SELECT id FROM tours WHERE tour_key=?", (k_stripped,)).fetchone()
+            if r4:
+                return r4[0] if isinstance(r4, (list, tuple)) else r4["id"]
+        # Also try without "private" or "group" qualifier
+        k_clean = tour_key(_re.sub(r"\b(private|group)\s+", "", stripped_title, flags=_re.IGNORECASE))
+        if k_clean and k_clean != k_stripped:
+            r5 = con.execute("SELECT id FROM tours WHERE tour_key=?", (k_clean,)).fetchone()
+            if r5:
+                return r5[0] if isinstance(r5, (list, tuple)) else r5["id"]
+    return upsert_tour(con, title)
+
+
 def canonical_status(con, plat_id, raw):
     """Map a platform's own status word onto a canonical one. Unknown values become
     PENDING rather than vanishing, so a new platform status is visible immediately."""
     if not raw:
         return None
     raw_u = str(raw).upper().strip()
-    if raw_u in ("LIVE", "ACTIVE", "PUBLISHED", "ONLINE"):
+    if raw_u in ("LIVE", "ACTIVE", "PUBLISHED", "ONLINE", "BOOKABLE"):
         return "LIVE"
-    if raw_u in ("DRAFT", "NEW"):
+    if raw_u in ("DRAFT", "NEW", "NOT SUBMITTED", "NOT YET SUBMITTED", "FINISH PRODUCT"):
         return "DRAFT"
-    if raw_u in ("PENDING", "PENDING_REVIEW", "PENDING_FIRST_ACTIVATION", "UNDER_REVIEW", "IN_REVIEW"):
+    if raw_u in ("PENDING", "PENDING_REVIEW", "PENDING_FIRST_ACTIVATION", "UNDER_REVIEW", "IN_REVIEW", "NEEDS ACTION", "ACTION REQUIRED", "PENDING INTERNAL APPROVAL"):
         return "PENDING"
     if raw_u in ("REJECTED", "DECLINED"):
         return "REJECTED"
-    if raw_u in ("REMOVED", "INACTIVE", "DELETED", "OFFLINE", "ARCHIVED"):
+    if raw_u in ("REMOVED", "INACTIVE", "DELETED", "OFFLINE", "ARCHIVED", "NO ACTIVE OPTIONS", "NO AVAILABILITY", "NOT BOOKABLE", "EXPIRING SOON"):
         return "REMOVED"
     r = con.execute("""SELECT canonical FROM status_map WHERE platform_id=? AND raw=?""",
                     (plat_id, raw_u)).fetchone()
