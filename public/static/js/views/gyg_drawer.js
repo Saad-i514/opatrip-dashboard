@@ -1,20 +1,26 @@
-import { esc, $, post } from '../core.js';
+import { esc, $, post, api, cachedApi } from '../core.js';
 import { openDrawer } from './drawer.js';
 import { askEditor } from '../edit.js';
 import { toast } from '../toast.js';
 
 let gygCatalogCache = null;
 
-async function loadGygProduct(tourId, viatorTourId = null, viatorProductCode = null) {
+async function loadGygProduct(tourId, productId = null, viatorTourId = null, viatorProductCode = null) {
   const tid = tourId ? String(tourId).trim() : '';
+  const pid = productId ? String(productId).trim() : '';
 
-  // 1. Try API if tourId is provided
-  if (tid) {
+  // 1. Try /api/product/gyg/{code}
+  const codeToTry = tid || pid;
+  if (codeToTry) {
     try {
-      const res = await fetch(`/api/gyg/product/${encodeURIComponent(tid)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.tour_id) return data;
+      const data = await api(`/api/product/gyg/${encodeURIComponent(codeToTry)}`);
+      if (data && data.details && Object.keys(data.details).length) {
+        const combined = { ...data.details, ...data.product };
+        combined.tour_id = combined.tour_id || combined.product_code || tid;
+        combined.title = combined.title || (data.product && data.product.title);
+        combined.status = combined.status || (data.product && data.product.status);
+        if (data.changes) combined.history = data.changes;
+        return combined;
       }
     } catch (e) {}
   }
@@ -45,6 +51,25 @@ async function loadGygProduct(tourId, viatorTourId = null, viatorProductCode = n
       }
     }
   }
+
+  // 3. Try /api/product/{pid}
+  if (pid) {
+    try {
+      const data = await api(`/api/product/${encodeURIComponent(pid)}`);
+      if (data && data.current && Object.keys(data.current).length) {
+        return { ...data.current, ...data.product, tour_id: tid || (data.product && data.product.product_code) };
+      }
+    } catch (e) {}
+  }
+
+  // 4. Try /api/gyg/product/{tid}
+  if (tid) {
+    try {
+      const data = await api(`/api/gyg/product/${encodeURIComponent(tid)}`);
+      if (data && data.tour_id) return data;
+    } catch (e) {}
+  }
+
   return null;
 }
 
@@ -72,7 +97,7 @@ export async function openGygDrawer(tourId, productId = null, viatorTourId = nul
     if (e.target === scrim) closeDrawer();
   };
 
-  const p = await loadGygProduct(tourId, viatorTourId, viatorProductCode);
+  const p = await loadGygProduct(tourId, productId, viatorTourId, viatorProductCode);
 
   if (!p) {
     scrim.innerHTML = `

@@ -7,6 +7,7 @@ import { buildSections, commissionOf, totalDuration, tree } from '../sections.js
 import { editSection, editValue, openAddDataModal } from '../edit.js';
 import { secs } from '../progress.js';
 import { toast } from '../toast.js';
+import { openGygDrawer } from './gyg_drawer.js';
 
 /* ======================= drawer ======================= */
 export async function openDrawer(pid){
@@ -20,6 +21,19 @@ export async function openDrawer(pid){
   host.querySelector('.scrim').onclick = closeDrawer;
   const d = await cachedApi('/api/product/'+pid);
   const p = d.product, cur = d.current;
+  const isGyg = p && (
+    p.platform_id === 2 ||
+    p.platform_code === 'getyourguide' ||
+    (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
+    (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
+    (S.acct && String(S.acct).toLowerCase().includes('gyg')) ||
+    (S.pf && S.pf.platform === 'getyourguide') ||
+    (/^\d{6,8}$/.test(String(p.product_code || '')))
+  );
+  if (isGyg) {
+    host.innerHTML = '';
+    return openGygDrawer(p.product_code, p.id, p.tour_id);
+  }
   host.innerHTML='';
   const scrim = el('div','scrim'); scrim.onclick = closeDrawer; host.appendChild(scrim);
   const dr = el('div','drawer');
@@ -1067,11 +1081,6 @@ export async function openGygDrawer(code, pid, tourId) {
   body.appendChild(grid);
   dr.appendChild(body);
   host.appendChild(dr);
-}
-
-// Global hook
-if (typeof window !== 'undefined') {
-  window.openGygDrawer = openGygDrawer;
 }
 
 

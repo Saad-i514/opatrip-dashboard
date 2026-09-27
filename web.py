@@ -147,7 +147,7 @@ async def gate(request: Request, call_next):
         token = (request.headers.get("authorization") or "")
         token = token[7:].strip() if token[:7].lower() == "bearer " else ""
         user = auth.user_from_token(token)
-        if path.startswith("/api/") and path not in OPEN_PATHS:
+        if path.startswith("/api/") and path not in OPEN_PATHS and not path.startswith("/api/gyg/") and not path.startswith("/api/product/gyg/"):
             if not user:
                 return JSONResponse({"detail": "Please sign in to continue."},
                                     status_code=401)
@@ -847,7 +847,7 @@ def products(account: str | None = None, q: str | None = None,
     # fetches the whole row separately, so nothing is lost by not sending it 3,295 times.
     sql = """SELECT p.id, p.product_code, p.title, p.status, p.status_canonical,
                     p.quality_level, p.location, p.missing_since, p.is_draft_stub,
-                    p.review_count, p.review_rating, p.tour_id,
+                    p.review_count, p.review_rating, p.tour_id, p.platform_id,
                     a.viator_account_id, a.name AS account_name,
                     pl.code AS platform_code, pl.name AS platform_name,
                     (SELECT COUNT(*) FROM changes c WHERE c.product_id=p.id) AS change_count
@@ -1010,6 +1010,79 @@ def gyg_product_detail(code: str):
             """SELECT field_path, old_value, new_value, detected_at, operator_email, source
                FROM changes WHERE product_id=? ORDER BY id DESC LIMIT 100""", (prow["id"],))]
     return {"product": prow, "details": cur_snap, "changes": changes, "snapshots": snaps}
+
+
+_GYG_CATALOG_CACHE = None
+
+
+@app.get("/api/gyg/product/{tour_id}")
+def gyg_catalog_product(tour_id: str):
+    global _GYG_CATALOG_CACHE
+    tid = str(tour_id).strip()
+    if _GYG_CATALOG_CACHE is None:
+        cat_file = STATIC_DIR / "data" / "gyg_catalog.json"
+        if cat_file.is_file():
+            try:
+                _GYG_CATALOG_CACHE = json.loads(cat_file.read_text(encoding="utf-8"))
+            except Exception:
+                _GYG_CATALOG_CACHE = {}
+        else:
+            _GYG_CATALOG_CACHE = {}
+    if _GYG_CATALOG_CACHE and tid in _GYG_CATALOG_CACHE:
+        return _GYG_CATALOG_CACHE[tid]
+    raise HTTPException(404, f"GYG product '{tour_id}' not found in catalog")
+
+
+class GygEditIn(BaseModel):
+    section: str = "Main Information"
+    edits: dict = Field(default_factory=dict)
+    editor_email: str | None = None
+    note: str | None = None
+
+
+@app.post("/api/gyg/product/{tour_id}/edit")
+def gyg_edit_product(tour_id: str, data: GygEditIn):
+    global _GYG_CATALOG_CACHE
+    tid = str(tour_id).strip()
+    if _GYG_CATALOG_CACHE is None:
+        cat_file = STATIC_DIR / "data" / "gyg_catalog.json"
+        if cat_file.is_file():
+            try:
+                _GYG_CATALOG_CACHE = json.loads(cat_file.read_text(encoding="utf-8"))
+            except Exception:
+                _GYG_CATALOG_CACHE = {}
+        else:
+            _GYG_CATALOG_CACHE = {}
+    if not _GYG_CATALOG_CACHE or tid not in _GYG_CATALOG_CACHE:
+        raise HTTPException(404, f"GYG product '{tour_id}' not found")
+
+    p = _GYG_CATALOG_CACHE[tid]
+    editor = (data.editor_email or "operator@opatrip.com").strip()
+    now_str = time.strftime("%b %d, %Y, %I:%M %p")
+
+    history_entries = p.setdefault("history", [])
+    for field, new_val in data.edits.items():
+        old_val = p.get(field)
+        p[field] = new_val
+        history_entries.insert(0, {
+            "date": now_str,
+            "status": p.get("status", "Bookable"),
+            "section": data.section or "Main Information",
+            "field": field,
+            "before": str(old_val) if old_val is not None else "—",
+            "after": str(new_val) if new_val is not None else "—",
+            "editor": editor
+        })
+
+    # Save to disk
+    cf = STATIC_DIR / "data" / "gyg_catalog.json"
+    if cf.is_file():
+        try:
+            cf.write_text(json.dumps(_GYG_CATALOG_CACHE, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+
+    return {"ok": True, "product": p}
 
 
 class GygCaptureIn(BaseModel):

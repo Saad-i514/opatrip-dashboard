@@ -16,6 +16,10 @@ import { viewCategories, viewSyncs } from './views/misc.js';
 import { viewAccounts } from './views/accounts.js';
 import { viewAdmin } from './views/admin.js';
 
+if (typeof window !== 'undefined') {
+  window.openGygDrawer = openGygDrawer;
+}
+
 /* ======================= status polling ======================= */
 export async function poll(){
   try{
