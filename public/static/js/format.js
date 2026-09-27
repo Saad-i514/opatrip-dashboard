@@ -215,15 +215,17 @@ export function historyFor(d){
   out.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
   return out;
 }
-/* "June 29, 3:58 PM" — the way a person writes a time, not an ISO stamp. */
+/* "June 29, 2026, 3:58 PM" — standard human readable date/time. */
 export function whenLong(t){
   const d = parseTs(t);
   if (!d) return String(t || '');
   const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
-  const nowYear = (new Date()).getFullYear();
-  const yearStr = d.getFullYear() !== nowYear ? `, ${d.getFullYear()}` : '';
-  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}${yearStr}, `
-       + `${((h + 11) % 12) + 1}:${m} ${h < 12 ? 'AM' : 'PM'}`;
+  const month = MONTH_NAMES[d.getMonth()];
+  const day = d.getDate();
+  const year = d.getFullYear();
+  const hour12 = ((h + 11) % 12) + 1;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  return `${month} ${day}, ${year}, ${hour12}:${m} ${ampm}`;
 }
 /* A person's name from whatever we hold. An email is not a name, but "quality4" reads
    better than "quality4@opatrip.com" and is still recognisably them. */
@@ -236,7 +238,40 @@ export function personName(email, names){
   return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/* Format any value (including lists, stringified arrays, or json) cleanly without brackets or quotes */
+export function formatDisplayVal(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (Array.isArray(v)) {
+    const items = v.map(x => String(x || '').trim()).filter(Boolean);
+    if (!items.length) return '—';
+    if (items.length === 1) return items[0];
+    return items.map(x => `• ${x}`).join('\n');
+  }
+  let s = String(v).trim();
+  if (!s || s === '—' || s === '[]' || s === 'None') return '—';
 
+  // Check if string is a serialized array: ['item1'] or ["item1", "item2"]
+  if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('(') && s.endsWith(')'))) {
+    try {
+      const parsed = JSON.parse(s.replace(/'/g, '"'));
+      if (Array.isArray(parsed)) {
+        const items = parsed.map(x => String(x || '').trim()).filter(Boolean);
+        if (!items.length) return '—';
+        if (items.length === 1) return items[0];
+        return items.map(x => `• ${x}`).join('\n');
+      }
+    } catch (e) {
+      const inner = s.slice(1, -1).trim();
+      if (!inner) return '—';
+      const items = inner.split(/,\s*(?=['"])/).map(x => x.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+      if (items.length) {
+        if (items.length === 1) return items[0];
+        return items.map(x => `• ${x}`).join('\n');
+      }
+    }
+  }
+  return s;
+}
 
 /* readable(x) — the last resort for an object no renderer has a specific shape for.
    That fallback used to be JSON.stringify(x), which put this in front of someone who
@@ -270,8 +305,11 @@ export function readable(x){
 // changes table: catches exactly the genuine enum values and nothing else.
 const ENUM_SHAPE = /^[A-Z]+(_[A-Z]+)*$/;
 export function fullText(v){
+  if (Array.isArray(v)) return formatDisplayVal(v);
   let s = (v === null || v === undefined) ? '' : String(v);
-  // pretty-print JSON: a one-line blob is exactly the thing that most needs unpacking
+  if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('(') && s.endsWith(')'))) {
+    return formatDisplayVal(s);
+  }
   try { const p = JSON.parse(s);
         if (p && typeof p === 'object') s = JSON.stringify(p, null, 2); } catch(e){}
   if (s.length >= 4 && ENUM_SHAPE.test(s)) s = sentence(s);
@@ -478,10 +516,21 @@ export function parseTs(t){
     s = s.replace(' ', 'T') + 'Z';
   }
   let d = new Date(s);
-  if (!isNaN(d.getTime())) return d;
+  if (!isNaN(d.getTime())) {
+    if (!/\b\d{4}\b/.test(s) && d.getFullYear() === 2001) {
+      d.setFullYear((new Date()).getFullYear());
+    }
+    return d;
+  }
   if (!/(Z|[+-]\d{2}:?\d{2})$/.test(s)) s += 'Z';
   d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+  if (!isNaN(d.getTime())) {
+    if (!/\b\d{4}\b/.test(s) && d.getFullYear() === 2001) {
+      d.setFullYear((new Date()).getFullYear());
+    }
+    return d;
+  }
+  return null;
 }
 export function daysSince(t){
   const d = parseTs(t);

@@ -2,7 +2,7 @@ import { esc, $, post, api, cachedApi } from '../core.js';
 import { openDrawer } from './drawer.js';
 import { askEditor } from '../edit.js';
 import { toast } from '../toast.js';
-import { whenLong } from '../format.js';
+import { whenLong, formatDisplayVal } from '../format.js';
 
 let gygCatalogCache = null;
 
@@ -895,18 +895,6 @@ async function openGygEditModal(p, sectionName, fields, onSaved) {
         applyLocalEdits(p, sectionName, edits, who);
       }
 
-      // Reload fresh product state & full change history from server
-      try {
-        const fresh = await loadGygProduct(p.tour_id, p.product_id, p.viator_tour_id, p.viator_product_code);
-        if (fresh) {
-          if (fresh.history && fresh.history.length) {
-            p.history = fresh.history;
-          }
-          const { history, ...restFresh } = fresh;
-          Object.assign(p, restFresh);
-        }
-      } catch (err) {}
-
       if (gygCatalogCache) {
         for (const k of [p.tour_id, p.product_code]) {
           if (k && gygCatalogCache[k]) {
@@ -1015,15 +1003,15 @@ function renderGygHistoryCards(historyList, currentStatus) {
               <div class="eh-rep" style="display:grid; grid-template-columns:1fr 28px 1fr; gap:10px; align-items:stretch;">
                 <div class="eh-side" style="min-width:0; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:9px 12px;">
                   <span class="eh-lbl" style="display:block; font-size:11px; font-weight:700; color:#6B7280; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:4px;">Before</span>
-                  <div style="font-size:13px; color:#4B5563; word-break:break-word; max-height:120px; overflow-y:auto; line-height:1.45;">
-                    ${esc(String(latest.before || '—'))}
+                  <div style="font-size:13px; color:#4B5563; word-break:break-word; max-height:140px; overflow-y:auto; line-height:1.45; white-space:pre-wrap;">
+                    ${esc(formatDisplayVal(latest.before))}
                   </div>
                 </div>
                 <div class="eh-arrow" style="align-self:center; text-align:center; color:#9CA3AF; font-size:16px;" aria-hidden="true">→</div>
                 <div class="eh-side after" style="min-width:0; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:9px 12px;">
                   <span class="eh-lbl" style="display:block; font-size:11px; font-weight:700; color:#166534; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:4px;">After</span>
-                  <div style="font-size:13px; color:#15803D; font-weight:600; word-break:break-word; max-height:120px; overflow-y:auto; line-height:1.45;">
-                    ${esc(String(latest.after || '—'))}
+                  <div style="font-size:13px; color:#15803D; font-weight:600; word-break:break-word; max-height:140px; overflow-y:auto; line-height:1.45; white-space:pre-wrap;">
+                    ${esc(formatDisplayVal(latest.after))}
                   </div>
                 </div>
               </div>
@@ -1044,10 +1032,10 @@ function renderGygHistoryCards(historyList, currentStatus) {
                         <span><b>${esc(past.who)}</b></span>
                         <span>${esc(past.at ? whenLong(past.at) : 'Recently')}</span>
                       </div>
-                      <div style="color:#374151; word-break:break-word;">
-                        <span style="color:#6B7280;">Was:</span> ${esc(String(past.before || '—'))} 
+                      <div style="color:#374151; word-break:break-word; white-space:pre-wrap;">
+                        <span style="color:#6B7280;">Was:</span> ${esc(formatDisplayVal(past.before))} 
                         <span style="color:#9CA3AF; margin:0 4px;">→</span> 
-                        <span style="color:#15803D; font-weight:600;">${esc(String(past.after || '—'))}</span>
+                        <span style="color:#15803D; font-weight:600;">${esc(formatDisplayVal(past.after))}</span>
                       </div>
                     </div>
                   `).join('')}

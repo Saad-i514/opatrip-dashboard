@@ -1187,6 +1187,21 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
         sb = str(b).replace("\r\n", "\n").strip() if b is not None else ""
         return sa != sb
 
+    def _serialize_change_val(v):
+        if v is None:
+            return "—"
+        if isinstance(v, (list, tuple)):
+            items = [str(x).strip() for x in v if x is not None and str(x).strip()]
+            if not items:
+                return "—"
+            if len(items) == 1:
+                return items[0]
+            return "\n".join(f"• {x}" for x in items)
+        if isinstance(v, dict):
+            return json.dumps(v, indent=2, ensure_ascii=False)
+        s = str(v).strip()
+        return s if s else "—"
+
     editor = (data.editor_email or "operator@opatrip.com").strip()
     now_str = time.strftime("%b %d, %Y, %I:%M %p")
 
@@ -1205,34 +1220,33 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
             "status": p.get("status", "Bookable"),
             "section": data.section or "Main Information",
             "field": field,
-            "before": str(old_val) if old_val is not None else "—",
-            "after": str(new_val) if new_val is not None else "—",
+            "before": _serialize_change_val(old_val),
+            "after": _serialize_change_val(new_val),
             "editor": editor,
             "source": "dashboard"
         })
 
-    # Update in-memory catalog cache
+    # Update in-memory catalog cache instantly
     if _GYG_CATALOG_CACHE:
         for k in [tid, str(p.get("tour_id")), str(p.get("product_code"))]:
             if k and k in _GYG_CATALOG_CACHE:
                 _GYG_CATALOG_CACHE[k].update(actual_edits)
 
-    # Save to disk across static paths
-    for base_dir in [STATIC_DIR,
-                     Path(__file__).resolve().parent / "static",
-                     Path(__file__).resolve().parent / "public" / "static",
-                     Path(__file__).resolve().parent.parent / "dashboard_vercel" / "public" / "static",
-                     Path(__file__).resolve().parent.parent / "audit" / "static"]:
-        cf = base_dir / "data" / "gyg_catalog.json"
-        if cf.is_file():
-            try:
+    # Persist to disk in background thread so HTTP response is instant
+    def _save_catalog_bg():
+        try:
+            cf = STATIC_DIR / "data" / "gyg_catalog.json"
+            if cf.is_file():
                 full_cat = json.loads(cf.read_text(encoding="utf-8"))
                 for k in [tid, str(p.get("tour_id")), str(p.get("product_code"))]:
                     if k and k in full_cat:
                         full_cat[k].update(actual_edits)
-                cf.write_text(json.dumps(full_cat, indent=2, ensure_ascii=False), encoding="utf-8")
-            except Exception:
-                pass
+                cf.write_text(json.dumps(full_cat, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+
+    import threading
+    threading.Thread(target=_save_catalog_bg, daemon=True).start()
 
     # Record into database change detection engine AND update product snapshot
     try:
@@ -1255,8 +1269,8 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
                     old_v = old_vals.get(field)
                     con.execute("""INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value, detected_at, account_id, operator_email, source)
                                    VALUES (?,?,?,?,?,?,?,?,?)""",
-                                (pid, sync_id, f"{sec_name} › {field}", str(old_v) if old_v is not None else "—",
-                                 str(new_val) if new_val is not None else "—", now_ts, acct_id, editor, "dashboard"))
+                                (pid, sync_id, f"{sec_name} › {field}", _serialize_change_val(old_v),
+                                 _serialize_change_val(new_val), now_ts, acct_id, editor, "dashboard"))
                     if field == "title" and new_val:
                         con.execute("UPDATE products SET title=? WHERE id=?", (str(new_val), pid))
                     elif field == "status" and new_val:

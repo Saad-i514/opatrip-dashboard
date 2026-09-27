@@ -90,9 +90,7 @@ def pg_pool():
                     raise RuntimeError(
                         "SUPABASE_DB_URL is not set — add it to audit/.env")
                 from psycopg_pool import ConnectionPool
-                # min_size=0: an idle machine should hold nothing. With 17 of them, a
-                # floor of 1 each pinned 17 connections around the clock for no work.
-                _pool = ConnectionPool(dsn(), min_size=0, max_size=POOL_MAX, timeout=30,
+                _pool = ConnectionPool(dsn(), min_size=1, max_size=POOL_MAX, max_idle=300, timeout=30,
                                        kwargs={"autocommit": False}, open=True)
     return _pool
 
