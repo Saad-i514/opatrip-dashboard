@@ -25,13 +25,14 @@ from datetime import date
 from pathlib import Path
 import uuid
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import auth
+import cities_report
 import cloud
 import config as C
 import db
@@ -128,7 +129,7 @@ class TaskIn(BaseModel):
 CURRENT_USER = contextvars.ContextVar("current_user", default=None)
 
 # Everything a browser needs before anyone has signed in.
-OPEN_PATHS = {"/api/auth/login", "/api/auth/config", "/api/auth/refresh"}
+OPEN_PATHS = {"/api/export/cities", "/api/auth/login", "/api/auth/config", "/api/auth/refresh"}
 
 # With no Supabase keys the app runs open, exactly as it did before auth existed, so a
 # developer on a local SQLite copy still gets a working dashboard.
@@ -945,6 +946,23 @@ def products(account: str | None = None, q: str | None = None,
         # manual overrides win for display, and carry who made them
         db.apply_edits(con, rows)
     return {"products": rows}
+
+
+@app.get("/api/export/cities")
+def export_cities_report(account: str | None = None):
+    allowed = scope_accounts()
+    with db.session() as con:
+        excel_bytes = cities_report.build_cities_workbook_bytes(
+            con, account=account, allowed_accounts=allowed
+        )
+    import datetime
+    today_str = datetime.date.today().strftime('%Y%m%d')
+    filename = f"Viator_Cities_Catalog_{today_str}.xlsx"
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 @app.get("/api/product/{pid}")

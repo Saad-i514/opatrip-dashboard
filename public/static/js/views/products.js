@@ -1,10 +1,11 @@
 import { S } from '../state.js';
-import { $, cachedApi, el, esc, q } from '../core.js';
+import { $, cachedApi, el, esc, q, session } from '../core.js';
 import { monthName, qualBadge, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { openDrawer, when } from './drawer.js';
 import { openGygDrawer } from './gyg_drawer.js';
 import { openCreateProductModal } from '../edit.js';
+import { toast } from '../toast.js';
 
 /* ======================= products ======================= */
 
@@ -288,9 +289,15 @@ export async function viewProducts(){
       ${opts(CHANGED, S.pf.changed)}</select>
     <span class="pill">${d.products.length} shown</span>
     <button class="btn ghost sm" id="pclear">Clear</button>
-    <button class="btn primary sm" id="btnAddProductBtn" style="margin-left:auto;padding:6px 14px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer">
-      <span>+</span> Add Product
-    </button>`;
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <button class="btn ghost sm" id="btnExportCities" style="padding:6px 14px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;border:1px solid var(--rim);color:var(--ink)" title="Export comprehensive Cities Catalog Excel report based on latest data">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Export Cities</span>
+      </button>
+      <button class="btn primary sm" id="btnAddProductBtn" style="padding:6px 14px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer">
+        <span>+</span> Add Product
+      </button>
+    </div>`;
   v.appendChild(f);
   const set = (k, val) => { S.pf[k] = val; viewProducts(); };
   f.querySelector('#pq').oninput = e=>{S.pf.q=e.target.value; debounce(viewProducts);};
@@ -329,6 +336,42 @@ export async function viewProducts(){
                          country:'',city:''});
     viewProducts();
   };
+  const exportBtn = f.querySelector('#btnExportCities');
+  if (exportBtn) {
+    exportBtn.onclick = async () => {
+      const origHtml = exportBtn.innerHTML;
+      exportBtn.disabled = true;
+      exportBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+        <span>Exporting…</span>
+      `;
+      try {
+        const params = S.acct ? `?account=${encodeURIComponent(S.acct)}` : '';
+        const url = `/api/export/cities${params}`;
+        const headers = session.token ? { 'Authorization': 'Bearer ' + session.token } : {};
+        const resp = await fetch(url, { headers });
+        if (!resp.ok) {
+          throw new Error((await resp.text()) || 'Failed to generate cities report');
+        }
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        const dStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        a.download = `Viator_Cities_Catalog_${dStr}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        toast('Cities catalog exported successfully!');
+      } catch (err) {
+        toast('Export failed: ' + (err.message || 'Error generating workbook'), 'error');
+      } finally {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = origHtml;
+      }
+    };
+  }
   const addBtn = f.querySelector('#btnAddProductBtn');
   if (addBtn) addBtn.onclick = () => openCreateProductModal(S.acct, () => viewProducts());
   // Say what is being filtered in words. A count alone ("447 shown") leaves people

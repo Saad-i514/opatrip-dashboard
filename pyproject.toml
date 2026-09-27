@@ -15,6 +15,7 @@ dependencies = [
     "psycopg[binary]==3.3.4",
     "psycopg-pool==3.3.1",
     "boto3==1.43.60",
+    "openpyxl>=3.1.2",
 ]
 
 # Vercel's FastAPI support: point it straight at the ASGI app.
