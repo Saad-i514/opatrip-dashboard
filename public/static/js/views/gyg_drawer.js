@@ -392,32 +392,43 @@ function renderDrawerContent(scrim, p, closeDrawer) {
             </div>
 
             <div class="gyg-field-group" style="margin-bottom:0;">
-              <div class="gyg-itin-endpoint">
-                <span class="gyg-itin-dot"></span>
-                <span>Starting location: <b>${esc(p.starting_location || (p.itinerary && p.itinerary[0] && p.itinerary[0].title) || p.location || 'Meeting point')}</b></span>
-              </div>
+              ${(() => {
+                const itinList = (p.itinerary && p.itinerary.length) ? p.itinerary : ((p.stops && p.stops.length) ? p.stops : []);
+                const startLoc = p.starting_location || (itinList[0] && (itinList[0].title || itinList[0].name)) || p.location || 'Meeting point';
+                const endLoc = p.end_location || (itinList.length > 1 && (itinList[itinList.length - 1].title || itinList[itinList.length - 1].name)) || 'Same as starting point';
+                return `
+                  <div class="gyg-itin-endpoint">
+                    <span class="gyg-itin-dot"></span>
+                    <span>Starting location: <b>${esc(startLoc)}</b></span>
+                  </div>
 
-              ${(p.itinerary && p.itinerary.length) ? `
-                <div class="gyg-timeline">
-                  ${p.itinerary.map((stop, idx) => `
-                    <div class="gyg-timeline-item">
-                      <div class="gyg-timeline-num">${idx + 1}</div>
-                      <div class="gyg-timeline-content">
-                        <div class="gyg-timeline-title">${esc(stop.title || 'Stop')}</div>
-                        <div class="gyg-timeline-desc">${esc(stop.details || 'Sightseeing, Walk, Visit, Guided tour (30min)')}</div>
-                      </div>
+                  ${itinList.length ? `
+                    <div class="gyg-timeline">
+                      ${itinList.map((stop, idx) => {
+                        const title = stop.title || stop.name || `Stop ${idx + 1}`;
+                        const desc = stop.details || stop.subtitle || (stop.duration ? `Sightseeing, Walk, Visit, Guided tour (${stop.duration})` : 'Sightseeing, Walk, Visit, Guided tour');
+                        return `
+                          <div class="gyg-timeline-item">
+                            <div class="gyg-timeline-num">${idx + 1}</div>
+                            <div class="gyg-timeline-content">
+                              <div class="gyg-timeline-title">${esc(title)}</div>
+                              <div class="gyg-timeline-desc">${esc(desc)}</div>
+                            </div>
+                          </div>
+                        `;
+                      }).join('')}
                     </div>
-                  `).join('')}
-                </div>
-                <div class="gyg-itin-endpoint" style="margin-top:12px;">
-                  <span class="gyg-itin-dot" style="background:#EF4444;"></span>
-                  <span>End location: <b>${esc(p.end_location || (p.itinerary[p.itinerary.length - 1] && p.itinerary[p.itinerary.length - 1].title) || 'Same as starting point')}</b></span>
-                </div>
-              ` : `
-                <div class="gyg-field-desc hint" style="padding:12px 0;">
-                  No intermediate stops recorded for this itinerary.
-                </div>
-              `}
+                    <div class="gyg-itin-endpoint" style="margin-top:12px;">
+                      <span class="gyg-itin-dot" style="background:#EF4444;"></span>
+                      <span>End location: <b>${esc(endLoc)}</b></span>
+                    </div>
+                  ` : `
+                    <div class="gyg-field-desc hint" style="padding:12px 0;">
+                      No intermediate stops recorded for this itinerary.
+                    </div>
+                  `}
+                `;
+              })()}
             </div>
           </div>
         </div>
@@ -683,19 +694,32 @@ function renderDrawerContent(scrim, p, closeDrawer) {
   // Itinerary Edit
   const editItinBtn = scrim.querySelector('#gygEditItinBtn');
   if (editItinBtn) {
-    editItinBtn.onclick = () => openGygEditModal(p, 'Itinerary', [
-      { key: 'starting_location', label: 'Starting location', value: p.starting_location || (p.itinerary && p.itinerary[0] && p.itinerary[0].title) || p.location || '' },
-      { key: 'itinerary', label: 'Itinerary Stops (Stop Name — Details, one per line)',
-        value: (p.itinerary || []).map(it => `${it.title || ''}${it.details ? ' — ' + it.details : ''}`).join('\n'),
-        type: 'textarea', rows: 6,
-        hint: 'Format: Stop Name — Details (e.g. Templo Mayor Museum — Guided tour, 30min)',
-        parser: v => v.split('\n').map(x => x.trim()).filter(Boolean).map(line => {
-          const parts = line.split('—');
-          return { title: parts[0].trim(), details: parts[1] ? parts[1].trim() : 'Sightseeing, Walk, Visit, Guided tour (30min)' };
-        })
-      },
-      { key: 'end_location', label: 'End location', value: p.end_location || '' }
-    ], refreshMe);
+    editItinBtn.onclick = () => {
+      const itinList = (p.itinerary && p.itinerary.length) ? p.itinerary : ((p.stops && p.stops.length) ? p.stops : []);
+      const startLoc = p.starting_location || (itinList[0] && (itinList[0].title || itinList[0].name)) || p.location || '';
+      const endLoc = p.end_location || (itinList.length > 1 && (itinList[itinList.length - 1].title || itinList[itinList.length - 1].name)) || '';
+      const itinVal = itinList.map(it => {
+        const t = it.title || it.name || '';
+        const d = it.details || it.subtitle || (it.duration ? `Guided tour (${it.duration})` : '');
+        return `${t}${d ? ' — ' + d : ''}`;
+      }).join('\n');
+
+      openGygEditModal(p, 'Itinerary', [
+        { key: 'starting_location', label: 'Starting location', value: startLoc },
+        { key: 'itinerary', label: 'Itinerary Stops (Stop Name — Details, one per line)',
+          value: itinVal,
+          type: 'textarea', rows: 6,
+          hint: 'Format: Stop Name — Details (e.g. Templo Mayor Museum — Guided tour, 30min)',
+          parser: v => v.split('\n').map(x => x.trim()).filter(Boolean).map(line => {
+            const parts = line.split(/[—–-]/);
+            const t = parts[0].trim();
+            const d = parts.slice(1).join('—').trim() || 'Sightseeing, Walk, Visit, Guided tour';
+            return { title: t, details: d };
+          })
+        },
+        { key: 'end_location', label: 'End location', value: endLoc }
+      ], refreshMe);
+    };
   }
 
   // Food & Drinks Edit

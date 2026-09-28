@@ -1226,6 +1226,15 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
             "source": "dashboard"
         })
 
+    if "itinerary" in actual_edits:
+        itin = actual_edits["itinerary"]
+        if isinstance(itin, list):
+            actual_edits["stops"] = [{"name": s.get("title", ""), "duration": "", "subtitle": s.get("details", "")} for s in itin if isinstance(s, dict)]
+    elif "stops" in actual_edits:
+        st = actual_edits["stops"]
+        if isinstance(st, list):
+            actual_edits["itinerary"] = [{"title": s.get("name", ""), "details": s.get("subtitle", "")} for s in st if isinstance(s, dict)]
+
     # Update in-memory catalog cache instantly
     if _GYG_CATALOG_CACHE:
         for k in [tid, str(p.get("tour_id")), str(p.get("product_code"))]:
