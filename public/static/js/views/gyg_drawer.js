@@ -352,7 +352,7 @@ function renderDrawerContent(scrim, p, closeDrawer) {
 
             <div class="gyg-field-group">
               <div class="gyg-field-label">What's not allowed?</div>
-              <div class="gyg-field-desc">${esc(p.not_allowed || 'No restrictions specified')}</div>
+              <div class="gyg-field-desc">${esc(p.not_allowed || p.whats_not_allowed || 'No restrictions specified')}</div>
             </div>
 
             <div class="gyg-field-group">
@@ -377,7 +377,7 @@ function renderDrawerContent(scrim, p, closeDrawer) {
 
             <div class="gyg-field-group" style="margin-bottom:0;">
               <div class="gyg-field-label">What information needs to appear on the ticket/voucher?</div>
-              <div class="gyg-field-desc">${esc(p.ticket_info || 'Ticket/voucher info')}</div>
+              <div class="gyg-field-desc">${esc(p.ticket_info || p.ticket_instructions || 'Ticket/voucher info')}</div>
             </div>
           </div>
 
@@ -508,67 +508,71 @@ function renderDrawerContent(scrim, p, closeDrawer) {
       <!-- Options Section -->
       <div class="gyg-options-wrap">
         <div class="gyg-options-header">
-          <h2 style="font-size: 20px; font-weight: 700; margin:0;">Options</h2>
+          <h2 style="font-size: 20px; font-weight: 700; margin:0;">
+            Options ${(p.options && p.options.length > 1) ? `(${p.options.length})` : ''}
+          </h2>
           <button class="btn ghost sm" id="gygCreateOptBtn" style="color:#2563EB; font-weight:600; cursor:pointer;">
             + Create new option
           </button>
         </div>
 
-        <div class="gyg-options-card">
-          <div class="gyg-options-top">
-            <div>
-              <div style="font-size: 16px; font-weight: 700; color:#111827;">
-                ${esc(primaryOption.title || p.title)}
+        ${((p.options && p.options.length) ? p.options : [primaryOption]).map((opt, oIdx) => `
+          <div class="gyg-options-card" style="${oIdx > 0 ? 'margin-top:16px;' : ''}">
+            <div class="gyg-options-top">
+              <div>
+                <div style="font-size: 16px; font-weight: 700; color:#111827;">
+                  ${esc(opt.title || p.title || 'Standard Tour')}
+                </div>
+              </div>
+              <div>
+                <button class="btn sm ghost gyg-edit-opt-btn" data-opt-idx="${oIdx}" style="border: 1px solid #D1D5DB; border-radius: 20px; font-size: 13px; font-weight: 600; cursor:pointer;">
+                  Edit option
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
               </div>
             </div>
-            <div>
-              <button class="btn sm ghost" id="gygEditOptionBtn" style="border: 1px solid #D1D5DB; border-radius: 20px; font-size: 13px; font-weight: 600; cursor:pointer;">
-                Edit option
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-            </div>
-          </div>
 
-          <div class="gyg-options-grid">
-            <div>
-              <div class="gyg-opt-label">Reference code</div>
-              <div class="gyg-opt-val mono">${esc(primaryOption.ref_code || 'default')}</div>
-            </div>
-            <div>
-              <div class="gyg-opt-label">Option ID</div>
-              <div class="gyg-opt-val mono">${esc(primaryOption.id || '2272562')}</div>
-            </div>
-            <div>
-              <div class="gyg-opt-label">Status</div>
-              <div class="gyg-opt-val">
-                <span class="gyg-status-pill ${statusClass}" style="padding: 2px 8px; font-size:11.5px;">
-                  <span class="gyg-status-dot"></span>
-                  ${esc(primaryOption.status || p.status || 'Bookable')}
-                </span>
+            <div class="gyg-options-grid">
+              <div>
+                <div class="gyg-opt-label">Reference code</div>
+                <div class="gyg-opt-val mono">${esc(opt.ref_code || 'default')}</div>
+              </div>
+              <div>
+                <div class="gyg-opt-label">Option ID</div>
+                <div class="gyg-opt-val mono">${esc(opt.id || opt.option_id || '—')}</div>
+              </div>
+              <div>
+                <div class="gyg-opt-label">Status</div>
+                <div class="gyg-opt-val">
+                  <span class="gyg-status-pill ${statusClass}" style="padding: 2px 8px; font-size:11.5px;">
+                    <span class="gyg-status-dot"></span>
+                    ${esc(opt.status || p.status || 'Bookable')}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div class="gyg-opt-label">Booking Engine</div>
+                <div class="gyg-opt-val">${esc(opt.booking_engine || p.booking_engine || p.booking_engine_mode || 'Automatically accept new bookings')}</div>
+              </div>
+              <div>
+                <div class="gyg-opt-label">Cut-off time</div>
+                <div class="gyg-opt-val">${esc(opt.cutoff_time || p.cutoff_time || p.cut_off_time || '10 hours')}</div>
+              </div>
+              <div>
+                <div class="gyg-opt-label">Type</div>
+                <div class="gyg-opt-val">${esc(opt.type || opt.option_type || p.option_type || 'Standard')}</div>
+              </div>
+              <div>
+                <div class="gyg-opt-label">Connectivity Settings</div>
+                <div class="gyg-opt-val">${esc(opt.connectivity || p.connectivity || p.connectivity_settings || 'Not connected.')}</div>
+              </div>
+              <div>
+                <div class="gyg-opt-label">Available until</div>
+                <div class="gyg-opt-val">${esc(opt.available_until || p.available_until || 'Tuesday, January 25th, 2028')}</div>
               </div>
             </div>
-            <div>
-              <div class="gyg-opt-label">Booking Engine</div>
-              <div class="gyg-opt-val">${esc(primaryOption.booking_engine || 'Automatically accept new bookings')}</div>
-            </div>
-            <div>
-              <div class="gyg-opt-label">Cut-off time</div>
-              <div class="gyg-opt-val">${esc(primaryOption.cutoff_time || '10 hours')}</div>
-            </div>
-            <div>
-              <div class="gyg-opt-label">Type</div>
-              <div class="gyg-opt-val">${esc(primaryOption.type || 'Private')}</div>
-            </div>
-            <div>
-              <div class="gyg-opt-label">Connectivity Settings</div>
-              <div class="gyg-opt-val">${esc(primaryOption.connectivity || 'Not connected.')}</div>
-            </div>
-            <div>
-              <div class="gyg-opt-label">Available until</div>
-              <div class="gyg-opt-val">${esc(primaryOption.available_until || 'Tuesday, January 25th, 2028')}</div>
-            </div>
           </div>
-        </div>
+        `).join('')}
       </div>
 
       <!-- History Section -->
@@ -683,11 +687,12 @@ function renderDrawerContent(scrim, p, closeDrawer) {
   if (editInfoBtn) {
     editInfoBtn.onclick = () => openGygEditModal(p, 'Important information', [
       { key: 'not_suitable_for', label: 'Who is this activity not suitable for?', value: p.not_suitable_for || 'No restrictions specified' },
-      { key: 'not_allowed', label: "What's not allowed?", value: p.not_allowed || 'No restrictions specified' },
+      { key: 'not_allowed', label: "What's not allowed?", value: p.not_allowed || p.whats_not_allowed || 'No restrictions specified' },
       { key: 'pet_policy', label: 'Pet policy', value: p.pet_policy || "This activity doesn't allow pets" },
       { key: 'mandatory_items', label: 'Mandatory items to bring', value: p.mandatory_items || 'No items provided' },
-      { key: 'know_before_you_go', label: 'Know before you go', value: p.know_before_you_go || 'No extra information provided' },
-      { key: 'emergency_contact', label: 'Emergency contact number', value: p.emergency_contact || '+1 2099268262' }
+      { key: 'know_before_you_go', label: 'Know before you go', value: p.know_before_you_go || 'No extra information provided', type: 'textarea', rows: 3 },
+      { key: 'emergency_contact', label: 'Emergency contact number', value: p.emergency_contact || '+1 2099268262' },
+      { key: 'ticket_info', label: 'What information needs to appear on the ticket/voucher?', value: p.ticket_info || p.ticket_instructions || '', type: 'textarea', rows: 3 }
     ], refreshMe);
   }
 
@@ -764,28 +769,33 @@ function renderDrawerContent(scrim, p, closeDrawer) {
     ], refreshMe);
   }
 
-  // Option Edit
-  const editOptionBtn = scrim.querySelector('#gygEditOptionBtn');
-  if (editOptionBtn) {
-    editOptionBtn.onclick = () => openGygEditModal(p, 'Option Details', [
-      { key: 'option_title', label: 'Option Title', value: primaryOption.title || p.title },
-      { key: 'cutoff_time', label: 'Cut-off time', value: primaryOption.cutoff_time || '10 hours' },
-      { key: 'type', label: 'Type (Private / Group)', value: primaryOption.type || 'Private' },
-      { key: 'available_until', label: 'Available until', value: primaryOption.available_until || 'Tuesday, January 25th, 2028' },
-      { key: 'booking_engine', label: 'Booking engine mode', value: primaryOption.booking_engine || 'Automatically accept new bookings' }
-    ], () => {
-      if (!p.options) p.options = [{}];
-      p.options[0] = {
-        ...p.options[0],
-        title: p.option_title || p.title,
-        cutoff_time: p.cutoff_time || '10 hours',
-        type: p.type || 'Private',
-        available_until: p.available_until || 'Tuesday, January 25th, 2028',
-        booking_engine: p.booking_engine || 'Automatically accept new bookings'
-      };
-      refreshMe();
-    });
-  }
+  // Option Edit handlers
+  scrim.querySelectorAll('.gyg-edit-opt-btn').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.getAttribute('data-opt-idx') || '0', 10);
+      const opts = (p.options && p.options.length) ? p.options : [primaryOption];
+      const targetOpt = opts[idx] || primaryOption;
+      openGygEditModal(p, `Option: ${targetOpt.title || 'Option Details'}`, [
+        { key: 'option_title', label: 'Option Title', value: targetOpt.title || p.title },
+        { key: 'cutoff_time', label: 'Cut-off time', value: targetOpt.cutoff_time || p.cutoff_time || '10 hours' },
+        { key: 'type', label: 'Type (Standard / Wheelchair Accessible / Private)', value: targetOpt.type || targetOpt.option_type || 'Standard' },
+        { key: 'available_until', label: 'Available until', value: targetOpt.available_until || p.available_until || 'Tuesday, January 25th, 2028' },
+        { key: 'booking_engine', label: 'Booking engine mode', value: targetOpt.booking_engine || p.booking_engine || 'Automatically accept new bookings' }
+      ], () => {
+        if (!p.options) p.options = [targetOpt];
+        p.options[idx] = {
+          ...targetOpt,
+          title: p.option_title || targetOpt.title,
+          cutoff_time: p.cutoff_time || targetOpt.cutoff_time,
+          type: p.type || targetOpt.type,
+          option_type: p.type || targetOpt.option_type,
+          available_until: p.available_until || targetOpt.available_until,
+          booking_engine: p.booking_engine || targetOpt.booking_engine
+        };
+        refreshMe();
+      });
+    };
+  });
 }
 
 function isSameValue(a, b) {

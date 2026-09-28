@@ -1235,6 +1235,41 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
         if isinstance(st, list):
             actual_edits["itinerary"] = [{"title": s.get("name", ""), "details": s.get("subtitle", "")} for s in st if isinstance(s, dict)]
 
+    if "not_allowed" in actual_edits:
+        actual_edits["whats_not_allowed"] = actual_edits["not_allowed"]
+    elif "whats_not_allowed" in actual_edits:
+        actual_edits["not_allowed"] = actual_edits["whats_not_allowed"]
+
+    if "ticket_info" in actual_edits:
+        actual_edits["ticket_instructions"] = actual_edits["ticket_info"]
+    elif "ticket_instructions" in actual_edits:
+        actual_edits["ticket_info"] = actual_edits["ticket_instructions"]
+
+    if "booking_engine" in actual_edits:
+        actual_edits["booking_engine_mode"] = actual_edits["booking_engine"]
+    elif "booking_engine_mode" in actual_edits:
+        actual_edits["booking_engine"] = actual_edits["booking_engine_mode"]
+
+    if "cutoff_time" in actual_edits:
+        actual_edits["cut_off_time"] = actual_edits["cutoff_time"]
+    elif "cut_off_time" in actual_edits:
+        actual_edits["cutoff_time"] = actual_edits["cut_off_time"]
+
+    if "connectivity" in actual_edits:
+        actual_edits["connectivity_settings"] = actual_edits["connectivity"]
+    elif "connectivity_settings" in actual_edits:
+        actual_edits["connectivity"] = actual_edits["connectivity_settings"]
+
+    if "available_until" in actual_edits:
+        actual_edits["valid_until"] = actual_edits["available_until"]
+    elif "valid_until" in actual_edits:
+        actual_edits["available_until"] = actual_edits["valid_until"]
+
+    if "reference_code" in actual_edits:
+        actual_edits["product_reference_code"] = actual_edits["reference_code"]
+    elif "product_reference_code" in actual_edits:
+        actual_edits["reference_code"] = actual_edits["product_reference_code"]
+
     # Update in-memory catalog cache instantly
     if _GYG_CATALOG_CACHE:
         for k in [tid, str(p.get("tour_id")), str(p.get("product_code"))]:
