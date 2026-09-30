@@ -310,6 +310,24 @@ function renderDrawerContent(scrim, p, closeDrawer) {
         </div>
       ` : ''}
 
+      <!-- Photos Strip (Matching GetYourGuide Portal) -->
+      ${(p.photos && p.photos.length) ? `
+        <div class="gyg-photos-strip-wrap" style="margin: 0 28px 16px 28px;">
+          <div style="display:flex; gap:12px; height:180px; overflow-x:auto; border-radius:10px; position:relative;">
+            ${p.photos.slice(0, 4).map((img, idx) => `
+              <div style="flex:1; min-width:180px; height:100%; position:relative; overflow:hidden; border-radius:8px; background:#f1f5f9;">
+                <img src="${esc(img)}" alt="Tour Photo ${idx+1}" style="width:100%; height:100%; object-fit:cover;" />
+                ${idx === Math.min(p.photos.length, 4) - 1 ? `
+                  <button class="btn sm" id="gygEditPhotosBtn" style="position:absolute; bottom:12px; right:12px; background:rgba(0,0,0,0.75); color:#fff; border:none; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; cursor:pointer; backdrop-filter:blur(4px);">
+                    Edit
+                  </button>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Main Content 2-Column Grid -->
       <div class="gyg-content-grid" style="margin-top: 10px;">
         <!-- Left Column -->
@@ -443,12 +461,12 @@ function renderDrawerContent(scrim, p, closeDrawer) {
 
             <div class="gyg-field-group">
               <div class="gyg-field-label">Emergency contact number</div>
-              <div class="gyg-field-value mono">${esc(p.emergency_contact || '+1 2099268262')}</div>
+              <div class="${p.emergency_contact && p.emergency_contact !== 'No emergency contact number provided' && p.emergency_contact !== 'Not provided' ? 'gyg-field-value mono' : 'gyg-field-desc hint'}">${esc(p.emergency_contact || 'No emergency contact number provided')}</div>
             </div>
 
             <div class="gyg-field-group" style="margin-bottom:0;">
               <div class="gyg-field-label">What information needs to appear on the ticket/voucher?</div>
-              <div class="gyg-field-desc">${esc(p.ticket_info || p.ticket_instructions || 'Ticket/voucher info')}</div>
+              <div class="gyg-field-desc${!p.ticket_info && !p.ticket_instructions ? ' hint' : ''}">${esc(p.ticket_info || p.ticket_instructions || 'No information provided')}</div>
             </div>
           </div>
 
@@ -495,7 +513,7 @@ function renderDrawerContent(scrim, p, closeDrawer) {
                     </div>
                   ` : `
                     <div class="gyg-field-desc hint" style="padding:12px 0;">
-                      No intermediate stops recorded for this itinerary.
+                      No Itinerary for this tour
                     </div>
                   `}
                 `;
@@ -595,10 +613,13 @@ function renderDrawerContent(scrim, p, closeDrawer) {
                   ${esc(opt.title || p.title || 'Standard Tour')}
                 </div>
               </div>
-              <div>
+              <div style="display:flex; gap:8px;">
                 <button class="btn sm ghost gyg-edit-opt-btn" data-opt-idx="${oIdx}" style="border: 1px solid #D1D5DB; border-radius: 20px; font-size: 13px; font-weight: 600; cursor:pointer;">
                   Edit option
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <button class="btn sm ghost gyg-schedules-opt-btn" data-opt-idx="${oIdx}" style="border: 1px solid #D1D5DB; border-radius: 20px; font-size: 13px; font-weight: 600; cursor:pointer;">
+                  Show schedules
                 </button>
               </div>
             </div>
@@ -837,6 +858,16 @@ function renderDrawerContent(scrim, p, closeDrawer) {
   if (editRefundBtn) {
     editRefundBtn.onclick = () => openGygEditModal(p, 'Refund Policy', [
       { key: 'refund_policy', label: 'Refund policy text', value: p.refund_policy || 'This activity has a Standard (24-hour) refund policy. Read the FAQ to learn more about refund policies.', type: 'textarea', rows: 3 }
+    ], refreshMe);
+  }
+
+  // Photo Gallery Edit
+  const editPhotosBtn = scrim.querySelector('#gygEditPhotosBtn');
+  if (editPhotosBtn) {
+    editPhotosBtn.onclick = () => openGygEditModal(p, 'Tour Photos', [
+      { key: 'photos', label: 'Photo URLs (one per line or pipe-separated)', value: (p.photos || []).join('\n'), type: 'textarea', rows: 4,
+        hint: 'Enter photo URLs from GetYourGuide or CDN',
+        parser: v => v.split(/\r?\n|\|/).map(x => x.trim()).filter(Boolean) }
     ], refreshMe);
   }
 
