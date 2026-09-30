@@ -143,7 +143,7 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
 .gyg-ref-form{display:inline-flex;align-items:center;gap:4px;background:var(--bg-card,#fff);border:1.5px solid #000000;border-radius:6px;padding:2px 4px;transition:all .15s ease}
 .gyg-ref-form:hover{border-color:#000000}
 .gyg-ref-form:focus-within{border-color:#000000 !important;box-shadow:0 0 0 2px rgba(0,0,0,.25) !important;outline:1px solid #000000}
-.gyg-ref-input{border:none !important;outline:none !important;box-shadow:none !important;-webkit-appearance:none;background:transparent;font-size:11.5px;color:var(--ink-1,#0f172a);width:145px;padding:2px 4px;font-family:inherit}
+.gyg-ref-input{border:none !important;outline:none !important;box-shadow:none !important;-webkit-appearance:none;background:transparent;font-size:11.5px;color:var(--ink-1,#0f172a);width:155px;padding:2px 4px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
 .gyg-ref-input:focus{outline:none !important;box-shadow:none !important;border:none !important}
 .gyg-ref-input::placeholder{color:var(--ink-3,#94a3b8);font-size:11px}
 .gyg-ref-save-btn{display:inline-flex;align-items:center;gap:3px;background:#ff5533;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer;transition:background .15s ease;line-height:1}

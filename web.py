@@ -950,12 +950,18 @@ def products(account: str | None = None, q: str | None = None,
             # went the same way when the "+N" marker was removed.
             r["tour_listings"] = sorted(by_tour.get(r.get("tour_id")) or [],
                                         key=lambda x: x["platform"])
-            # Fallback or enrich gyg_reference from gyg_catalog.json if not yet in DB
+            # Fallback or enrich gyg_reference from gyg_catalog.json or existing tour listings
             gyg_info = get_gyg_for_viator(r.get("product_code"))
-            if not r.get("gyg_reference") and gyg_info:
-                r["gyg_reference"] = gyg_info.get("reference_code") or gyg_info.get("tour_id")
+            gyg_listing = next((l for l in r["tour_listings"] if l.get("platform") == "getyourguide"), None)
+            if not r.get("gyg_reference"):
+                if gyg_info and (gyg_info.get("reference_code") or gyg_info.get("tour_id")):
+                    r["gyg_reference"] = gyg_info.get("reference_code") or gyg_info.get("tour_id")
+                elif gyg_listing and gyg_listing.get("code"):
+                    r["gyg_reference"] = gyg_listing.get("code")
             if gyg_info and not r.get("gyg_tour_id"):
                 r["gyg_tour_id"] = gyg_info.get("tour_id")
+            elif gyg_listing and not r.get("gyg_tour_id"):
+                r["gyg_tour_id"] = gyg_listing.get("code")
         # manual overrides win for display, and carry who made them
         db.apply_edits(con, rows)
     return {"products": rows}
@@ -980,25 +986,39 @@ def export_cities_report(account: str | None = None):
 
 _VIATOR_TO_GYG = None
 
+def _find_catalog_file():
+    candidates = [
+        STATIC_DIR / "data" / "gyg_catalog.json",
+        Path(__file__).resolve().parent / "public" / "static" / "data" / "gyg_catalog.json",
+        Path(__file__).resolve().parent / "static" / "data" / "gyg_catalog.json",
+        Path.cwd() / "public" / "static" / "data" / "gyg_catalog.json",
+        Path.cwd() / "dashboard_vercel" / "public" / "static" / "data" / "gyg_catalog.json",
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
 def get_gyg_for_viator(viator_code: str):
     global _VIATOR_TO_GYG
     if not viator_code:
         return None
     if _VIATOR_TO_GYG is None:
         _VIATOR_TO_GYG = {}
-        cat_file = STATIC_DIR / "data" / "gyg_catalog.json"
-        if cat_file.is_file():
+        cat_file = _find_catalog_file()
+        if cat_file and cat_file.is_file():
             try:
                 cat = json.loads(cat_file.read_text(encoding="utf-8"))
                 for gid, item in cat.items():
-                    vm = item.get("matched_viator") or item.get("viator_mapping")
+                    vm = item.get("matched_viator") or item.get("viator_mapping") or item.get("viator_match")
                     if vm:
                         vc = (vm.get("viator_product_code") or vm.get("product_code") or "").strip().upper()
                         if vc and vc not in _VIATOR_TO_GYG:
+                            ref = item.get("product_reference_code") or item.get("reference_code") or str(item.get("tour_id") or gid)
                             _VIATOR_TO_GYG[vc] = {
                                 "tour_id": str(item.get("tour_id") or gid),
                                 "title": item.get("title") or "",
-                                "reference_code": item.get("product_reference_code") or item.get("reference_code") or ""
+                                "reference_code": ref
                             }
             except Exception:
                 pass
