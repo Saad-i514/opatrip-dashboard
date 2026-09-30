@@ -89,6 +89,77 @@ async function loadGygProduct(tourId, productId = null, viatorTourId = null, via
   return null;
 }
 
+function renderDrawerFoodAndDrinks(foodVal) {
+  if (!foodVal || foodVal.includes("No food or drinks")) {
+    return `<div class="gyg-pill-box">${esc(foodVal || 'No food or drinks included in this product')}</div>`;
+  }
+
+  const FORMAT_MAP = {
+    food_tasting: "Food Tasting",
+    food_walking_tour: "Food Walking Tour",
+    restaurant_style: "Restaurant Style",
+    buffet: "Buffet",
+    bbq: "BBQ",
+    cooking_class: "Cooking Class",
+    packed_meal: "Packed Meal",
+    picnic: "Picnic",
+    drinks_only: "Drinks Only",
+    snack: "Snack",
+    walking_tour: "Walking Tour"
+  };
+
+  const rows = [];
+  const parts = String(foodVal).split(";").map(p => p.trim()).filter(Boolean);
+
+  for (const part of parts) {
+    let meal = "";
+    let format = "";
+
+    if (part.includes("Meal:") || part.includes("Format:")) {
+      const mMeal = part.match(/Meal:\s*([^—–-]+)/i);
+      const mFormat = part.match(/Format:\s*(.+)$/i);
+      meal = mMeal ? mMeal[1].trim() : "";
+      format = mFormat ? mFormat[1].trim() : "";
+    } else {
+      const lower = part.toLowerCase().trim();
+      if (FORMAT_MAP[lower]) {
+        format = FORMAT_MAP[lower];
+      } else {
+        format = part;
+      }
+    }
+
+    if (meal || format) {
+      rows.push({ meal, format });
+    }
+  }
+
+  if (!rows.length) {
+    return `<div class="gyg-pill-box">${esc(foodVal)}</div>`;
+  }
+
+  return `
+    <div class="gyg-food-table-wrap" style="overflow-x:auto; margin-top:2px;">
+      <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--gyg-border, #e2e8f0); color:var(--gyg-text-muted, #64748b);">
+            <th style="padding:4px 12px 6px 0; font-weight:500; font-size:12px;">Meal</th>
+            <th style="padding:4px 0 6px 12px; font-weight:500; font-size:12px;">Format</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid var(--gyg-border-subtle, rgba(0,0,0,0.04));">
+              <td style="padding:8px 12px 8px 0; color:var(--gyg-text-primary, #0f172a); vertical-align:top; font-weight:400; line-height:1.4;">${esc(r.meal || "—")}</td>
+              <td style="padding:8px 0 8px 12px; color:var(--gyg-text-primary, #0f172a); vertical-align:top; font-weight:400; line-height:1.4;">${esc(r.format || "—")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 export async function openGygDrawer(tourId, productId = null, viatorTourId = null, viatorProductCode = null) {
   const host = $('#drawerHost') || document.body;
 
@@ -444,7 +515,7 @@ function renderDrawerContent(scrim, p, closeDrawer) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
               </button>
             </div>
-            <div class="gyg-pill-box">${esc(p.food_and_drinks || 'No food or drinks included in this product')}</div>
+            ${renderDrawerFoodAndDrinks(p.food_and_drinks)}
           </div>
 
           <!-- Keywords Card -->
