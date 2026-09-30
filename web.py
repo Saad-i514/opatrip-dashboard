@@ -855,6 +855,7 @@ def products(account: str | None = None, q: str | None = None,
     sql = """SELECT p.id, p.product_code, p.title, p.status, p.status_canonical,
                     p.quality_level, p.location, p.missing_since, p.is_draft_stub,
                     p.review_count, p.review_rating, p.tour_id, p.platform_id,
+                    p.gyg_reference,
                     a.viator_account_id, a.name AS account_name,
                     pl.code AS platform_code, pl.name AS platform_name,
                     (SELECT COUNT(*) FROM changes c WHERE c.product_id=p.id) AS change_count
@@ -949,6 +950,12 @@ def products(account: str | None = None, q: str | None = None,
             # went the same way when the "+N" marker was removed.
             r["tour_listings"] = sorted(by_tour.get(r.get("tour_id")) or [],
                                         key=lambda x: x["platform"])
+            # Fallback or enrich gyg_reference from gyg_catalog.json if not yet in DB
+            gyg_info = get_gyg_for_viator(r.get("product_code"))
+            if not r.get("gyg_reference") and gyg_info:
+                r["gyg_reference"] = gyg_info.get("reference_code") or gyg_info.get("tour_id")
+            if gyg_info and not r.get("gyg_tour_id"):
+                r["gyg_tour_id"] = gyg_info.get("tour_id")
         # manual overrides win for display, and carry who made them
         db.apply_edits(con, rows)
     return {"products": rows}
@@ -996,6 +1003,164 @@ def get_gyg_for_viator(viator_code: str):
             except Exception:
                 pass
     return (_VIATOR_TO_GYG or {}).get(viator_code.strip().upper())
+
+
+class MapGygIn(BaseModel):
+    product_id: int | None = None
+    product_code: str
+    gyg_ref: str = ""
+
+
+@app.post("/api/products/map-gyg")
+def map_gyg_product(req: MapGygIn):
+    p_code = (req.product_code or "").strip().upper()
+    gyg_ref = (req.gyg_ref or "").strip()
+    if not p_code:
+        raise HTTPException(400, "Missing product_code")
+
+    with db.session() as con:
+        # 1. Update products table and gyg_mappings
+        if gyg_ref:
+            con.execute("UPDATE products SET gyg_reference=? WHERE product_code=?", (gyg_ref, p_code))
+            try:
+                con.execute("""
+                    INSERT INTO gyg_mappings (viator_product_code, gyg_ref, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (viator_product_code) DO UPDATE SET
+                        gyg_ref = excluded.gyg_ref,
+                        updated_at = excluded.updated_at
+                """, (p_code, gyg_ref, db.now()))
+            except Exception:
+                con.execute("DELETE FROM gyg_mappings WHERE viator_product_code=?", (p_code,))
+                con.execute("INSERT INTO gyg_mappings (viator_product_code, gyg_ref, updated_at) VALUES (?, ?, ?)",
+                            (p_code, gyg_ref, db.now()))
+        else:
+            con.execute("UPDATE products SET gyg_reference=NULL WHERE product_code=?", (p_code,))
+            try:
+                con.execute("DELETE FROM gyg_mappings WHERE viator_product_code=?", (p_code,))
+            except Exception:
+                pass
+
+        # 2. Check if Viator product exists in DB
+        v_prod = con.execute("SELECT id, tour_id, title, location FROM products WHERE product_code=?", (p_code,)).fetchone()
+        v_tour_id = v_prod["tour_id"] if v_prod else None
+        if not v_tour_id and v_prod:
+            v_tour_id = db.match_or_upsert_tour(con, v_prod["title"])
+            con.execute("UPDATE products SET tour_id=? WHERE product_code=?", (v_tour_id, p_code))
+
+        # 3. Check for matching GYG product in catalog
+        matched_gyg = None
+        matched_tour_id = None
+        cat_file = STATIC_DIR / "data" / "gyg_catalog.json"
+        cat_data = {}
+        if cat_file.is_file():
+            try:
+                cat_data = json.loads(cat_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        if gyg_ref and cat_data:
+            gyg_ref_lower = gyg_ref.lower()
+            for gid, item in cat_data.items():
+                tid = str(item.get("tour_id") or gid).strip()
+                rc = str(item.get("product_reference_code") or item.get("reference_code") or "").strip().lower()
+                opts_refs = [str(o.get("ref_code") or o.get("id") or "").strip().lower() for o in (item.get("options") or [])]
+                
+                if tid.lower() == gyg_ref_lower or rc == gyg_ref_lower or gyg_ref_lower in opts_refs:
+                    matched_gyg = item
+                    matched_tour_id = tid
+                    item["matched_viator"] = {
+                        "viator_product_code": p_code,
+                        "title": v_prod["title"] if v_prod else "",
+                        "matched_at": db.now(),
+                        "match_method": "manual_reference_code"
+                    }
+                    break
+
+            if matched_gyg:
+                try:
+                    cat_file.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                    audit_cat = Path(__file__).resolve().parent.parent / "audit" / "static" / "data" / "gyg_catalog.json"
+                    if audit_cat.is_file():
+                        audit_cat.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception:
+                    pass
+
+        # 4. In database, link GYG product to v_tour_id
+        gyg_plat = db.platform_id(con, "getyourguide") or 2
+        if gyg_ref:
+            if matched_tour_id:
+                try:
+                    con.execute("UPDATE gyg_mappings SET gyg_tour_id=? WHERE viator_product_code=?", (matched_tour_id, p_code))
+                except Exception:
+                    pass
+
+            # Look for GYG product row in products table
+            target_codes = [c for c in [matched_tour_id, gyg_ref] if c]
+            placeholders = ",".join("?" for _ in target_codes)
+            g_prod = con.execute(f"SELECT id, tour_id FROM products WHERE platform_id=? AND product_code IN ({placeholders})", [gyg_plat] + target_codes).fetchone() if target_codes else None
+            
+            if g_prod and v_tour_id:
+                con.execute("UPDATE products SET tour_id=? WHERE id=?", (v_tour_id, g_prod["id"]))
+            elif matched_gyg and v_tour_id:
+                acc = con.execute("SELECT id FROM accounts WHERE viator_account_id LIKE 'gyg_%'").fetchone()
+                acc_id = acc["id"] if acc else 1
+                canon_st = db.canonical_status(con, gyg_plat, matched_gyg.get("status") or "Bookable")
+                db.upsert_product(
+                    con, acc_id, matched_tour_id or gyg_ref,
+                    title=matched_gyg.get("title") or (v_prod["title"] if v_prod else f"Tour {gyg_ref}"),
+                    status=matched_gyg.get("status") or "Bookable",
+                    location=matched_gyg.get("location") or matched_gyg.get("starting_location"),
+                    platform_id=gyg_plat,
+                    tour_id=v_tour_id,
+                    status_canonical=canon_st
+                )
+        else:
+            if cat_data:
+                for gid, item in cat_data.items():
+                    vm = item.get("matched_viator") or item.get("viator_mapping")
+                    if vm and (vm.get("viator_product_code") or "").strip().upper() == p_code:
+                        item["matched_viator"] = None
+                        try:
+                            cat_file.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                        except Exception:
+                            pass
+                        break
+
+        # 5. Refresh _VIATOR_TO_GYG
+        global _VIATOR_TO_GYG
+        if _VIATOR_TO_GYG is not None:
+            if gyg_ref and (matched_tour_id or matched_gyg):
+                _VIATOR_TO_GYG[p_code] = {
+                    "tour_id": matched_tour_id or gyg_ref,
+                    "title": matched_gyg.get("title") if matched_gyg else "",
+                    "reference_code": gyg_ref
+                }
+            elif not gyg_ref:
+                _VIATOR_TO_GYG.pop(p_code, None)
+
+        con.commit()
+
+        # 6. Fetch updated tour_listings for this tour
+        tour_listings = []
+        if v_tour_id:
+            for r in con.execute("""SELECT pl.code AS platform, p.product_code AS code,
+                                           p.status_canonical AS status, p.status AS raw_status,
+                                           p.id AS product_id
+                                    FROM products p
+                                    JOIN platforms pl ON pl.id=p.platform_id
+                                    WHERE p.tour_id=?""", (v_tour_id,)):
+                tour_listings.append(dict(r))
+
+    return {
+        "ok": True,
+        "mapped": bool(matched_gyg),
+        "gyg_ref": gyg_ref,
+        "gyg_tour_id": matched_tour_id,
+        "tour_id": v_tour_id,
+        "tour_listings": tour_listings,
+        "message": f"Successfully mapped {p_code} to GYG reference {gyg_ref}" if gyg_ref else f"Unlinked GYG reference for {p_code}"
+    }
 
 
 @app.get("/api/product/{pid}")

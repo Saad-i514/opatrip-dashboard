@@ -434,9 +434,160 @@ export async function viewProducts(){
     const rr = p.review_count ? `${p.review_count}${p.review_rating
           ? ` <span class="hint">★ ${Number(p.review_rating).toFixed(1)}</span>` : ''}`
       : '0';
+function renderGygRefWidget(p, onUpdate) {
+  const isGygRow = (
+    p.platform_id === 2 ||
+    p.platform_code === 'getyourguide' ||
+    (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
+    (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
+    (/^\d{6,8}$/.test(String(p.product_code || '')))
+  ) && (p.platform_id !== 1 && p.platform_code !== 'viator');
+
+  if (isGygRow) return null;
+
+  const wrap = el('div', 'p-gyg-ref-widget');
+  wrap.onclick = e => e.stopPropagation();
+
+  function showPill() {
+    wrap.innerHTML = `
+      <span class="gyg-ref-pill" title="GetYourGuide Reference Code: ${esc(p.gyg_reference)}">
+        <span class="gyg-ref-icon">GYG</span>
+        <span class="gyg-ref-val mono">${esc(p.gyg_reference)}</span>
+        <button type="button" class="gyg-ref-edit-btn" title="Edit or clear reference code">
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M11.5 2.5l2 2-9 9H2v-2.5l9.5-9.5z"/>
+          </svg>
+        </button>
+      </span>`;
+    const editBtn = wrap.querySelector('.gyg-ref-edit-btn');
+    if (editBtn) {
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        showForm(true);
+      };
+    }
+  }
+
+  function showForm(isEditing = false) {
+    wrap.innerHTML = `
+      <div class="gyg-ref-form">
+        <input type="text" class="gyg-ref-input mono" placeholder="Paste GYG ref code..." value="${esc(p.gyg_reference || '')}" spellcheck="false" autocomplete="off" />
+        <button type="button" class="gyg-ref-save-btn" title="Save GYG Reference Code">
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M3 8.5l3.5 3.5 6.5-7"/>
+          </svg>
+          <span>Save</span>
+        </button>
+        ${isEditing && p.gyg_reference ? `
+          <button type="button" class="gyg-ref-cancel-btn" title="Cancel">✕</button>
+          <button type="button" class="gyg-ref-unlink-btn" title="Clear/Unlink mapping">Unlink</button>
+        ` : ''}
+      </div>`;
+
+    const input = wrap.querySelector('.gyg-ref-input');
+    const saveBtn = wrap.querySelector('.gyg-ref-save-btn');
+    const cancelBtn = wrap.querySelector('.gyg-ref-cancel-btn');
+    const unlinkBtn = wrap.querySelector('.gyg-ref-unlink-btn');
+
+    if (input) {
+      input.onclick = e => e.stopPropagation();
+      input.onkeydown = e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          doSave(input.value.trim());
+        } else if (e.key === 'Escape' && isEditing) {
+          e.preventDefault();
+          e.stopPropagation();
+          showPill();
+        }
+      };
+      if (isEditing) {
+        setTimeout(() => input.focus(), 20);
+      }
+    }
+
+    if (saveBtn) {
+      saveBtn.onclick = (e) => {
+        e.stopPropagation();
+        doSave(input ? input.value.trim() : '');
+      };
+    }
+
+    if (cancelBtn) {
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        showPill();
+      };
+    }
+
+    if (unlinkBtn) {
+      unlinkBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (confirm(`Remove GYG mapping for ${p.product_code}?`)) {
+          doSave('');
+        }
+      };
+    }
+  }
+
+  async function doSave(newVal) {
+    const saveBtn = wrap.querySelector('.gyg-ref-save-btn');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `<span>Saving...</span>`;
+    }
+    try {
+      const res = await fetch('/api/products/map-gyg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: p.id,
+          product_code: p.product_code,
+          gyg_ref: newVal
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.detail || data.message || 'Failed to save');
+      }
+      p.gyg_reference = newVal || null;
+      if (data.gyg_tour_id) p.gyg_tour_id = data.gyg_tour_id;
+      if (data.tour_listings) p.tour_listings = data.tour_listings;
+      if (data.tour_id) p.tour_id = data.tour_id;
+
+      if (newVal) {
+        toast(data.mapped ? `Linked to GYG product (${data.gyg_tour_id || newVal})!` : `GYG reference code saved! Auto-mapping ready.`);
+        showPill();
+      } else {
+        toast(`GYG reference code unlinked.`);
+        showForm(false);
+      }
+      if (onUpdate) onUpdate(data);
+    } catch (err) {
+      toast(`Error: ${err.message}`, { type: 'error' });
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<span>Save</span>`;
+      }
+    }
+  }
+
+  if (p.gyg_reference) {
+    showPill();
+  } else {
+    showForm(false);
+  }
+
+  return wrap;
+}
+
     row.innerHTML = `
       <div class="pmain">
-        <div class="ptitle">${esc(p.title||'(untitled)')}</div>
+        <div class="ptitle-row">
+          <div class="ptitle" title="${esc(p.title||'')}">${esc(p.title||'(untitled)')}</div>
+          <div class="ptitle-gyg-slot"></div>
+        </div>
         <div class="pmeta">
           <span class="mono">${esc(p.product_code)}</span>
           ${p.location?'· '+esc(p.location):''}
@@ -454,6 +605,18 @@ export async function viewProducts(){
         </div>
       </div>
       <div class="pplat">${platformGrid(p, opts0.platforms)}</div>`;
+
+    const gygSlot = row.querySelector('.ptitle-gyg-slot');
+    if (gygSlot) {
+      const widget = renderGygRefWidget(p, () => {
+        const platEl = row.querySelector('.pplat');
+        if (platEl) {
+          platEl.innerHTML = platformGrid(p, opts0.platforms);
+        }
+      });
+      if (widget) gygSlot.appendChild(widget);
+    }
+
     row.onclick = () => {
       const isGyg = (
         p.platform_id === 2 ||

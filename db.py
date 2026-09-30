@@ -219,9 +219,19 @@ def init():
         have = store.table_columns(con, "products")
         for col, decl in (("missing_since", "TEXT"), ("platform_id", "INTEGER"),
                           ("tour_id", "INTEGER"), ("status_canonical", "TEXT"),
-                          ("review_count", "INTEGER"), ("review_rating", "REAL")):
+                          ("review_count", "INTEGER"), ("review_rating", "REAL"),
+                          ("gyg_reference", "TEXT")):
             if col not in have:
                 con.execute(f"ALTER TABLE products ADD COLUMN {col} {decl}")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS gyg_mappings (
+                viator_product_code TEXT PRIMARY KEY,
+                gyg_ref             TEXT,
+                gyg_tour_id         TEXT,
+                mapped_by           TEXT,
+                updated_at          TEXT
+            )
+        """)
         acc = store.table_columns(con, "accounts")
         if "platform_id" not in acc:
             con.execute("ALTER TABLE accounts ADD COLUMN platform_id INTEGER")
@@ -316,11 +326,35 @@ def match_or_upsert_tour(con, title, ref_code=None):
     """Matches an existing tour across platforms by reference code, normalised title, or exact title."""
     if ref_code:
         clean_ref = str(ref_code).strip()
+        # 1. Direct match on product_code
         pr = con.execute("SELECT tour_id FROM products WHERE product_code=? AND tour_id IS NOT NULL", (clean_ref,)).fetchone()
         if pr:
             tid = pr[0] if isinstance(pr, (list, tuple)) else pr["tour_id"]
             if tid:
                 return tid
+        # 2. Match on user-saved gyg_reference on product
+        try:
+            pr2 = con.execute("SELECT tour_id FROM products WHERE gyg_reference=? AND tour_id IS NOT NULL", (clean_ref,)).fetchone()
+            if pr2:
+                tid = pr2[0] if isinstance(pr2, (list, tuple)) else pr2["tour_id"]
+                if tid:
+                    return tid
+        except Exception:
+            pass
+        # 3. Match from gyg_mappings table
+        try:
+            gm = con.execute("""
+                SELECT p.tour_id 
+                FROM gyg_mappings m 
+                JOIN products p ON p.product_code = m.viator_product_code 
+                WHERE (m.gyg_ref = ? OR m.gyg_tour_id = ?) AND p.tour_id IS NOT NULL
+            """, (clean_ref, clean_ref)).fetchone()
+            if gm:
+                tid = gm[0] if isinstance(gm, (list, tuple)) else gm["tour_id"]
+                if tid:
+                    return tid
+        except Exception:
+            pass
     k = tour_key(title)
     if not k:
         return None

@@ -90,7 +90,15 @@ CREATE TABLE IF NOT EXISTS products (
   platform_id      BIGINT,
   tour_id          BIGINT,
   status_canonical TEXT,
+  gyg_reference    TEXT,
   UNIQUE(account_id, product_code)
+);
+CREATE TABLE IF NOT EXISTS gyg_mappings (
+  viator_product_code TEXT PRIMARY KEY,
+  gyg_ref             TEXT,
+  gyg_tour_id         TEXT,
+  mapped_by           TEXT,
+  updated_at          TEXT
 );
 CREATE TABLE IF NOT EXISTS product_images (
   id BIGSERIAL PRIMARY KEY,

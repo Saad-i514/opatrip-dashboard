@@ -135,8 +135,28 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
   content-visibility:auto;contain-intrinsic-size:auto 150px}
 .prow:hover{border-color:var(--accent-line);box-shadow:0 3px 14px rgba(124,58,237,.10)}
 .pmain{min-width:0}
+.ptitle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;margin-bottom:2px}
+.ptitle-row .ptitle{flex:1 1 auto;min-width:0;font-weight:600;font-size:15px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ptitle{font-weight:600;font-size:15px;line-height:1.35;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
+.p-gyg-ref-widget{flex:0 0 auto;display:inline-flex;align-items:center}
+.gyg-ref-form{display:inline-flex;align-items:center;gap:4px;background:var(--bg-card,#fff);border:1px solid var(--line,#e2e8f0);border-radius:6px;padding:2px 4px;transition:all .15s ease}
+.gyg-ref-form:focus-within{border-color:#ff5533;box-shadow:0 0 0 2px rgba(255,85,51,.15)}
+.gyg-ref-input{border:none;background:transparent;outline:none;font-size:11.5px;color:var(--ink-1,#0f172a);width:145px;padding:2px 4px;font-family:inherit}
+.gyg-ref-input::placeholder{color:var(--ink-3,#94a3b8);font-size:11px}
+.gyg-ref-save-btn{display:inline-flex;align-items:center;gap:3px;background:#ff5533;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer;transition:background .15s ease;line-height:1}
+.gyg-ref-save-btn:hover{background:#e04424}
+.gyg-ref-save-btn:disabled{opacity:.5;cursor:not-allowed}
+.gyg-ref-cancel-btn,.gyg-ref-unlink-btn{border:none;background:transparent;color:var(--ink-3,#64748b);cursor:pointer;font-size:11px;padding:2px 5px;border-radius:3px}
+.gyg-ref-cancel-btn:hover{background:var(--bg-subtle,#f1f5f9);color:var(--ink-1,#0f172a)}
+.gyg-ref-unlink-btn{color:#dc2626}
+.gyg-ref-unlink-btn:hover{background:#fee2e2;color:#b91c1c}
+.gyg-ref-pill{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;background:rgba(255,85,51,.08);border:1px solid rgba(255,85,51,.25);border-radius:12px;font-size:11.5px;color:#c2410c;transition:all .15s ease}
+.gyg-ref-pill:hover{background:rgba(255,85,51,.14);border-color:rgba(255,85,51,.4)}
+.gyg-ref-icon{font-size:9.5px;font-weight:800;background:#ff5533;color:#fff;padding:1px 4px;border-radius:3px;letter-spacing:.03em}
+.gyg-ref-val{font-weight:600;font-family:ui-monospace,monospace;font-size:11.5px}
+.gyg-ref-edit-btn{border:none;background:transparent;color:#c2410c;cursor:pointer;padding:1px 3px;display:inline-flex;align-items:center;opacity:.7;border-radius:3px}
+.gyg-ref-edit-btn:hover{opacity:1;background:rgba(255,85,51,.15)}
 .pmeta{color:var(--ink-3);font-size:12.5px;margin-top:4px;display:flex;gap:7px;
   flex-wrap:wrap}
 /* the fields, in FIXED columns so the same label sits at the same x on every row.
