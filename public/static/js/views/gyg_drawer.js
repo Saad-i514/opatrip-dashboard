@@ -289,11 +289,45 @@ function renderDrawerContent(scrim, p, closeDrawer) {
           </div>
         </div>
         <div style="display:flex; gap:10px; align-items:center;">
-          <button class="btn sm" id="gygTopEditBtn" style="background:#FFF0ED; color:#FF5533; border:1px solid #FFD5CC; font-weight:600; cursor:pointer;">
+          ${(statusClass === 'needs-action' || (p.status || '').toLowerCase().includes('action') || (p.status || '').toLowerCase().includes('recovery')) ? `
+            <button class="btn sm" id="gygTopResubmitBtn" style="background:#2563EB; color:#fff; border:none; font-weight:600; cursor:pointer; border-radius:20px; padding:6px 16px; font-size:13px;">
+              Resubmit
+            </button>
+          ` : ''}
+          <button class="btn sm" id="gygTopEditBtn" style="background:#FFF0ED; color:#FF5533; border:1px solid #FFD5CC; font-weight:600; cursor:pointer; border-radius:20px; padding:6px 14px; font-size:13px;">
             Edit
           </button>
+          <div style="position:relative;" id="gygActionsWrap">
+            <button class="btn sm" id="gygActionsBtn" style="border: 1px solid #D1D5DB; background:#fff; color:#374151; font-weight:600; cursor:pointer; border-radius:20px; padding:6px 14px; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+              Actions
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div id="gygActionsDropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #E5E7EB; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); min-width:180px; z-index:50; overflow:hidden;">
+              ${p.preview_url ? `<a href="${esc(p.preview_url)}" target="_blank" style="display:block; padding:10px 14px; font-size:13px; color:#374151; text-decoration:none; border-bottom:1px solid #F3F4F6;">Preview on website ↗</a>` : ''}
+              <button type="button" id="gygActionCopyId" style="width:100%; text-align:left; padding:10px 14px; font-size:13px; color:#374151; background:none; border:none; cursor:pointer; border-bottom:1px solid #F3F4F6;">Copy Product ID</button>
+              <button type="button" id="gygActionCopyRef" style="width:100%; text-align:left; padding:10px 14px; font-size:13px; color:#374151; background:none; border:none; cursor:pointer;">Copy Reference Code</button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- Native Status Alert Banners -->
+      ${(statusClass === 'needs-action' || (p.status || '').toLowerCase().includes('action') || (p.status || '').toLowerCase().includes('recovery')) ? `
+        <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:14px 18px; margin: 0 28px 16px 28px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:700; color:#1E40AF; font-size:14px;">You are ready to resubmit!</div>
+            <div style="color:#1E3A8A; font-size:13px; margin-top:2px;">Select the blue Resubmit button in the top-right corner to send your product to be rechecked.</div>
+          </div>
+          <button class="btn sm" id="gygBannerResubmitBtn" style="background:#2563EB; color:#fff; border:none; font-weight:600; cursor:pointer; border-radius:20px; padding:5px 14px; font-size:12px;">Resubmit</button>
+        </div>
+      ` : ''}
+
+      ${(statusClass === 'rejected' || (p.status || '').toLowerCase().includes('reject')) ? `
+        <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:14px 18px; margin: 0 28px 16px 28px;">
+          <div style="font-weight:700; color:#991B1B; font-size:14px;">This product was rejected by GetYourGuide</div>
+          <div style="color:#B91C1C; font-size:13px; margin-top:2px;">${esc(p.rejection_reason || p.rejectionReason || 'Activity rejected due to quality check guidelines.')}</div>
+        </div>
+      ` : ''}
 
       <!-- Viator Mapping Banner -->
       ${p.matched_viator || p.viator_mapping ? `
@@ -318,9 +352,17 @@ function renderDrawerContent(scrim, p, closeDrawer) {
               <div style="flex:1; min-width:180px; height:100%; position:relative; overflow:hidden; border-radius:8px; background:#f1f5f9;">
                 <img src="${esc(img)}" alt="Tour Photo ${idx+1}" style="width:100%; height:100%; object-fit:cover;" />
                 ${idx === Math.min(p.photos.length, 4) - 1 ? `
-                  <button class="btn sm" id="gygEditPhotosBtn" style="position:absolute; bottom:12px; right:12px; background:rgba(0,0,0,0.75); color:#fff; border:none; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; cursor:pointer; backdrop-filter:blur(4px);">
-                    Edit
-                  </button>
+                  <div style="position:absolute; bottom:12px; right:12px; display:flex; gap:8px;">
+                    <button class="btn sm" id="gygEditPhotosBtn" style="background:rgba(0,0,0,0.75); color:#fff; border:none; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; cursor:pointer; backdrop-filter:blur(4px);">
+                      Edit
+                    </button>
+                    ${p.photos.length > 4 ? `
+                      <button class="btn sm" id="gygMorePhotosBtn" style="background:rgba(0,0,0,0.75); color:#fff; border:none; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; cursor:pointer; backdrop-filter:blur(4px); display:inline-flex; align-items:center; gap:4px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        +${p.photos.length - 4}
+                      </button>
+                    ` : ''}
+                  </div>
                 ` : ''}
               </div>
             `).join('')}
@@ -589,6 +631,7 @@ function renderDrawerContent(scrim, p, closeDrawer) {
             </div>
             <div style="font-size:13.5px; color:#4B5563; line-height:1.55;">
               ${esc(p.refund_policy || 'This activity has a Standard (24-hour) refund policy. Read the FAQ to learn more about refund policies.')}
+              <a href="https://supplier.getyourguide.com/faq" target="_blank" rel="noopener noreferrer" style="color:#2563EB; text-decoration:none; margin-left:4px; font-weight:500;">Read the FAQ to learn more about refund policies.</a>
             </div>
           </div>
         </div>
@@ -662,6 +705,24 @@ function renderDrawerContent(scrim, p, closeDrawer) {
                 <div class="gyg-opt-label">Available until</div>
                 <div class="gyg-opt-val">${esc(opt.available_until || p.available_until || 'Tuesday, January 25th, 2028')}</div>
               </div>
+              ${(opt.meetingPoint || opt.meeting_point) ? `
+                <div>
+                  <div class="gyg-opt-label">Meeting Point</div>
+                  <div class="gyg-opt-val">${esc(opt.meetingPoint || opt.meeting_point)}</div>
+                </div>
+              ` : ''}
+              ${(opt.duration) ? `
+                <div>
+                  <div class="gyg-opt-label">Duration</div>
+                  <div class="gyg-opt-val">${esc(opt.duration)}</div>
+                </div>
+              ` : ''}
+              ${(opt.languages) ? `
+                <div>
+                  <div class="gyg-opt-label">Languages</div>
+                  <div class="gyg-opt-val">${esc(opt.languages)}</div>
+                </div>
+              ` : ''}
             </div>
           </div>
         `).join('')}
@@ -783,7 +844,7 @@ function renderDrawerContent(scrim, p, closeDrawer) {
       { key: 'pet_policy', label: 'Pet policy', value: p.pet_policy || "This activity doesn't allow pets" },
       { key: 'mandatory_items', label: 'Mandatory items to bring', value: p.mandatory_items || 'No items provided' },
       { key: 'know_before_you_go', label: 'Know before you go', value: p.know_before_you_go || 'No extra information provided', type: 'textarea', rows: 3 },
-      { key: 'emergency_contact', label: 'Emergency contact number', value: p.emergency_contact || '+1 2099268262' },
+      { key: 'emergency_contact', label: 'Emergency contact number', value: (p.emergency_contact && p.emergency_contact !== 'No emergency contact number provided' && p.emergency_contact !== 'Not provided') ? p.emergency_contact : '', hint: 'Default: No emergency contact number provided' },
       { key: 'ticket_info', label: 'What information needs to appear on the ticket/voucher?', value: p.ticket_info || p.ticket_instructions || '', type: 'textarea', rows: 3 }
     ], refreshMe);
   }
@@ -871,6 +932,83 @@ function renderDrawerContent(scrim, p, closeDrawer) {
     ], refreshMe);
   }
 
+  // Actions Menu Toggle & Copy actions
+  const actionsBtn = scrim.querySelector('#gygActionsBtn');
+  const actionsDropdown = scrim.querySelector('#gygActionsDropdown');
+  if (actionsBtn && actionsDropdown) {
+    actionsBtn.onclick = (e) => {
+      e.stopPropagation();
+      const isVisible = actionsDropdown.style.display === 'block';
+      actionsDropdown.style.display = isVisible ? 'none' : 'block';
+    };
+    document.addEventListener('click', () => {
+      if (actionsDropdown) actionsDropdown.style.display = 'none';
+    });
+  }
+
+  const copyIdBtn = scrim.querySelector('#gygActionCopyId');
+  if (copyIdBtn) {
+    copyIdBtn.onclick = () => {
+      navigator.clipboard.writeText(String(p.tour_id || ''));
+      copyIdBtn.textContent = 'Copied!';
+      setTimeout(() => { copyIdBtn.textContent = 'Copy Product ID'; }, 1500);
+    };
+  }
+
+  const copyRefBtn = scrim.querySelector('#gygActionCopyRef');
+  if (copyRefBtn) {
+    copyRefBtn.onclick = () => {
+      navigator.clipboard.writeText(String(p.reference_code || p.product_reference_code || ''));
+      copyRefBtn.textContent = 'Copied!';
+      setTimeout(() => { copyRefBtn.textContent = 'Copy Reference Code'; }, 1500);
+    };
+  }
+
+  // Resubmit button actions
+  const handleResubmit = () => {
+    openGygEditModal(p, 'Resubmit Product', [
+      { key: 'status', label: 'Update Status to', value: 'In review' }
+    ], () => {
+      p.status = 'In review';
+      refreshMe();
+    });
+  };
+  const topResubmitBtn = scrim.querySelector('#gygTopResubmitBtn');
+  if (topResubmitBtn) topResubmitBtn.onclick = handleResubmit;
+  const bannerResubmitBtn = scrim.querySelector('#gygBannerResubmitBtn');
+  if (bannerResubmitBtn) bannerResubmitBtn.onclick = handleResubmit;
+
+  // More Photos Modal
+  const morePhotosBtn = scrim.querySelector('#gygMorePhotosBtn');
+  if (morePhotosBtn) {
+    morePhotosBtn.onclick = () => {
+      const photoGrid = `
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; max-height:65vh; overflow-y:auto; padding:10px 0;">
+          ${(p.photos || []).map((img, idx) => `
+            <a href="${esc(img)}" target="_blank" style="display:block; border-radius:8px; overflow:hidden; border:1px solid #E5E7EB; background:#f8fafc; height:150px;">
+              <img src="${esc(img)}" alt="Photo ${idx+1}" style="width:100%; height:100%; object-fit:cover;" />
+            </a>
+          `).join('')}
+        </div>
+      `;
+      openGygCustomModal(`All Photos (${(p.photos || []).length})`, photoGrid);
+    };
+  }
+
+  // Option Show Schedules handlers
+  scrim.querySelectorAll('.gyg-schedules-opt-btn').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.getAttribute('data-opt-idx') || '0', 10);
+      const opts = (p.options && p.options.length) ? p.options : [primaryOption];
+      const targetOpt = opts[idx] || primaryOption;
+      openGygEditModal(p, `Schedules & Availability: ${targetOpt.title || 'Option'}`, [
+        { key: 'cutoff_time', label: 'Cut-off time (e.g. 10 hours)', value: targetOpt.cutoff_time || p.cutoff_time || '10 hours' },
+        { key: 'available_until', label: 'Available until (Validity date)', value: targetOpt.available_until || p.available_until || 'Tuesday, January 25th, 2028' },
+        { key: 'booking_engine', label: 'Booking engine mode', value: targetOpt.booking_engine || p.booking_engine || 'Automatically accept new bookings' }
+      ], refreshMe);
+    };
+  });
+
   // Option Edit handlers
   scrim.querySelectorAll('.gyg-edit-opt-btn').forEach(btn => {
     btn.onclick = () => {
@@ -916,6 +1054,29 @@ function isSameValue(a, b) {
   const sa = String(a ?? '').replace(/\r\n/g, '\n').trim();
   const sb = String(b ?? '').replace(/\r\n/g, '\n').trim();
   return sa === sb;
+}
+
+function openGygCustomModal(title, htmlContent) {
+  const host = $('#modalHost') || document.body;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="scrim" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10000;"></div>
+    <div class="modal card wide" style="max-width: 720px; z-index: 10001; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:12px; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); width:calc(100% - 32px);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:18px; margin:0; font-weight:700; color:#111827;">${esc(title)}</h2>
+        <button class="btn ghost sm" id="gygCustomModalClose" style="font-size:18px; cursor:pointer; border:none; background:none; color:#6B7280;">✕</button>
+      </div>
+      <div>${htmlContent}</div>
+      <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+        <button class="btn sm primary" id="gygCustomModalDone" style="cursor:pointer; border-radius:20px; padding:6px 18px;">Done</button>
+      </div>
+    </div>
+  `;
+  const close = () => { wrap.remove(); };
+  wrap.querySelector('.scrim').onclick = close;
+  wrap.querySelector('#gygCustomModalClose').onclick = close;
+  wrap.querySelector('#gygCustomModalDone').onclick = close;
+  host.appendChild(wrap);
 }
 
 async function openGygEditModal(p, sectionName, fields, onSaved) {
