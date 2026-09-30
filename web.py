@@ -895,7 +895,17 @@ def products(account: str | None = None, q: str | None = None,
         sql += " AND pl.code=?"
         args.append(platform)
     else:
-        sql += " AND (pl.code='viator' OR pl.code IS NULL)"
+        # Show all Viator products, plus standalone products from other platforms (e.g. GYG) that are not yet mapped to any Viator tour
+        sql += """ AND (
+            pl.code='viator'
+            OR pl.code IS NULL
+            OR p.tour_id IS NULL
+            OR NOT EXISTS (
+                SELECT 1 FROM products v
+                JOIN platforms vpl ON vpl.id=v.platform_id
+                WHERE v.tour_id=p.tour_id AND (vpl.code='viator' OR vpl.code IS NULL)
+            )
+        )"""
     if connection:
         sql += " AND p.connection_state=?"
         args.append(connection)
@@ -1071,13 +1081,16 @@ def map_gyg_product(req: MapGygIn):
         # 3. Check for matching GYG product in catalog
         matched_gyg = None
         matched_tour_id = None
-        cat_file = STATIC_DIR / "data" / "gyg_catalog.json"
+        cat_file = _find_catalog_file()
         cat_data = {}
-        if cat_file.is_file():
+        if cat_file and cat_file.is_file():
             try:
                 cat_data = json.loads(cat_file.read_text(encoding="utf-8"))
             except Exception:
                 pass
+
+        clean_digits = re.search(r'\d{4,9}', gyg_ref) if gyg_ref else None
+        clean_id = clean_digits.group(0) if clean_digits else None
 
         if gyg_ref and cat_data:
             gyg_ref_lower = gyg_ref.lower()
@@ -1086,7 +1099,10 @@ def map_gyg_product(req: MapGygIn):
                 rc = str(item.get("product_reference_code") or item.get("reference_code") or "").strip().lower()
                 opts_refs = [str(o.get("ref_code") or o.get("id") or "").strip().lower() for o in (item.get("options") or [])]
                 
-                if tid.lower() == gyg_ref_lower or rc == gyg_ref_lower or gyg_ref_lower in opts_refs:
+                if (tid.lower() == gyg_ref_lower or 
+                    (clean_id and tid == clean_id) or 
+                    (rc and rc == gyg_ref_lower) or 
+                    gyg_ref_lower in opts_refs):
                     matched_gyg = item
                     matched_tour_id = tid
                     item["matched_viator"] = {
@@ -1099,10 +1115,13 @@ def map_gyg_product(req: MapGygIn):
 
             if matched_gyg:
                 try:
-                    cat_file.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
-                    audit_cat = Path(__file__).resolve().parent.parent / "audit" / "static" / "data" / "gyg_catalog.json"
-                    if audit_cat.is_file():
-                        audit_cat.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                    for cf in [cat_file, 
+                               Path(__file__).resolve().parent / "public" / "static" / "data" / "gyg_catalog.json",
+                               Path(__file__).resolve().parent / "static" / "data" / "gyg_catalog.json",
+                               Path(__file__).resolve().parent.parent / "audit" / "static" / "data" / "gyg_catalog.json",
+                               Path(__file__).resolve().parent.parent / "dashboard_vercel" / "public" / "static" / "data" / "gyg_catalog.json"]:
+                        if cf and cf.is_file():
+                            cf.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
                 except Exception:
                     pass
 
@@ -1115,37 +1134,83 @@ def map_gyg_product(req: MapGygIn):
                 except Exception:
                     pass
 
-            # Look for GYG product row in products table
-            target_codes = [c for c in [matched_tour_id, gyg_ref] if c]
-            placeholders = ",".join("?" for _ in target_codes)
-            g_prod = con.execute(f"SELECT id, tour_id FROM products WHERE platform_id=? AND product_code IN ({placeholders})", [gyg_plat] + target_codes).fetchone() if target_codes else None
+            search_codes = list(dict.fromkeys([c for c in [matched_tour_id, gyg_ref, clean_id] if c]))
+            placeholders = ",".join("?" for _ in search_codes)
+            
+            # Find GYG product in products table (whether previously matched or standalone)
+            g_prod = con.execute(f"""
+                SELECT id, tour_id, title, product_code FROM products 
+                WHERE platform_id=? 
+                  AND (product_code IN ({placeholders}) OR gyg_reference IN ({placeholders}))
+                LIMIT 1
+            """, [gyg_plat] + search_codes + search_codes).fetchone() if search_codes else None
             
             if g_prod and v_tour_id:
-                con.execute("UPDATE products SET tour_id=? WHERE id=?", (v_tour_id, g_prod["id"]))
-            elif matched_gyg and v_tour_id:
+                old_tid = g_prod["tour_id"]
+                con.execute("UPDATE products SET tour_id=?, gyg_reference=COALESCE(gyg_reference, ?) WHERE id=?", 
+                            (v_tour_id, gyg_ref, g_prod["id"]))
+                # If old_tid was a standalone tour and is now empty, delete orphan tour so it merges into one row
+                if old_tid and old_tid != v_tour_id:
+                    rem = con.execute("SELECT 1 FROM products WHERE tour_id=?", (old_tid,)).fetchone()
+                    if not rem:
+                        try:
+                            con.execute("DELETE FROM tours WHERE id=?", (old_tid,))
+                        except Exception:
+                            pass
+            elif v_tour_id:
                 acc = con.execute("SELECT id FROM accounts WHERE viator_account_id LIKE 'gyg_%'").fetchone()
+                if not acc:
+                    try:
+                        con.execute("INSERT INTO accounts (viator_account_id, name, platform_id) VALUES ('gyg_opatrip', 'GetYourGuide (Opatrip)', ?)", (gyg_plat,))
+                        acc = con.execute("SELECT id FROM accounts WHERE viator_account_id='gyg_opatrip'").fetchone()
+                    except Exception:
+                        pass
                 acc_id = acc["id"] if acc else 1
-                canon_st = db.canonical_status(con, gyg_plat, matched_gyg.get("status") or "Bookable")
+                g_code = matched_tour_id or clean_id or gyg_ref
+                g_title = (matched_gyg.get("title") if matched_gyg else None) or (v_prod["title"] if v_prod else f"Tour {gyg_ref}")
+                g_status = (matched_gyg.get("status") if matched_gyg else None) or "Bookable"
+                g_loc = (matched_gyg.get("location") or matched_gyg.get("starting_location") if matched_gyg else None) or (v_prod["location"] if v_prod else None)
+                canon_st = db.canonical_status(con, gyg_plat, g_status)
+                
                 db.upsert_product(
-                    con, acc_id, matched_tour_id or gyg_ref,
-                    title=matched_gyg.get("title") or (v_prod["title"] if v_prod else f"Tour {gyg_ref}"),
-                    status=matched_gyg.get("status") or "Bookable",
-                    location=matched_gyg.get("location") or matched_gyg.get("starting_location"),
+                    con, acc_id, g_code,
+                    title=g_title,
+                    status=g_status,
+                    location=g_loc,
                     platform_id=gyg_plat,
                     tour_id=v_tour_id,
                     status_canonical=canon_st
                 )
+                try:
+                    con.execute("UPDATE products SET gyg_reference=? WHERE account_id=? AND product_code=?", (gyg_ref, acc_id, g_code))
+                except Exception:
+                    pass
         else:
+            # When unlinking:
+            # 1. Update catalog
             if cat_data:
                 for gid, item in cat_data.items():
                     vm = item.get("matched_viator") or item.get("viator_mapping")
                     if vm and (vm.get("viator_product_code") or "").strip().upper() == p_code:
                         item["matched_viator"] = None
                         try:
-                            cat_file.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                            if cat_file and cat_file.is_file():
+                                cat_file.write_text(json.dumps(cat_data, ensure_ascii=False, indent=2), encoding="utf-8")
                         except Exception:
                             pass
                         break
+            # 2. Decouple any GYG product currently mapped to this v_tour_id so it returns to being standalone
+            if v_tour_id:
+                g_prod = con.execute("SELECT id, title, product_code FROM products WHERE platform_id=? AND tour_id=?", 
+                                     (gyg_plat, v_tour_id)).fetchone()
+                if g_prod:
+                    import time
+                    k = f"gyg_standalone_{g_prod['product_code']}_{int(time.time())}"
+                    con.execute("INSERT INTO tours (tour_key, title) VALUES (?, ?)", (k, g_prod["title"]))
+                    r_t = con.execute("SELECT id FROM tours WHERE tour_key=?", (k,)).fetchone()
+                    new_tid = r_t["id"] if r_t else None
+                    if new_tid:
+                        con.execute("UPDATE products SET tour_id=? WHERE id=?", (new_tid, g_prod["id"]))
 
         # 5. Refresh _VIATOR_TO_GYG
         global _VIATOR_TO_GYG

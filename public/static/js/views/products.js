@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { $, cachedApi, el, esc, q, session } from '../core.js';
+import { $, cachedApi, el, esc, q, session, invalidate } from '../core.js';
 import { monthName, qualBadge, statusBadge } from '../format.js';
 import { skeleton } from '../ui.js';
 import { openDrawer, when } from './drawer.js';
@@ -607,10 +607,8 @@ export async function viewProducts(){
     const gygSlot = row.querySelector('.ptitle-gyg-slot');
     if (gygSlot) {
       const widget = renderGygRefWidget(p, () => {
-        const platEl = row.querySelector('.pplat');
-        if (platEl) {
-          platEl.innerHTML = platformGrid(p, opts0.platforms);
-        }
+        invalidate('/api/products');
+        viewProducts();
       });
       if (widget) gygSlot.appendChild(widget);
     }
