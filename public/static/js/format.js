@@ -501,9 +501,19 @@ export const QUALITY = {
 };
 export const qualBadge = q => {
   if (!q) return '';
-  const hit = QUALITY[String(q).toUpperCase()];
+  const hit = QUALITY[String(q).trim().toUpperCase()];
   return hit ? `<span class="badge ${hit[1]}">${hit[0]}</span>`
              : `<span class="badge b-draft">${esc(q)}</span>`;
+};
+export const qualLabel = q => {
+  if (!q || q === '—') return '—';
+  const k = String(q).trim().toUpperCase();
+  const hit = QUALITY[k];
+  if (hit) return hit[0];
+  if (k === 'UNACCEPTABLE') return 'Needs work';
+  if (k === 'GOOD') return 'Good quality';
+  if (k === 'EXCELLENT') return 'Excellent';
+  return String(q);
 };
 
 /* Timestamps are stored as ISO strings that ALREADY carry an offset ("…T03:59:03+00:00").

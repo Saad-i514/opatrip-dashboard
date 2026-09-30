@@ -1,5 +1,5 @@
 import { el, esc, q } from './core.js';
-import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, iconList, label, linkList, list, PATH_LABELS, readable, rows, section, sentence } from './format.js';
+import { chips, fmtDate, fmtDuration, fmtTime, fmtVal, iconList, label, linkList, list, PATH_LABELS, qualLabel, readable, rows, section, sentence } from './format.js';
 import { when } from './views/drawer.js';
 
 /* ======================= per-product readable sections ======================= */
@@ -769,7 +769,7 @@ export function secQuality(cur){
   const imp = (cur.improvements||{}).improvementItemList||[];
   const act = p.productActivationWebModel||{};
   f.appendChild(rows([
-    ['Quality', cur.quality_level ? (cur.quality_level==='GOOD'?'Good':'Needs work') : ((p.quality||{}).level ? sentence(p.quality.level) : null), 'quality_level'],
+    ['Quality', qualLabel(cur.quality_level || (p.quality||{}).level), 'quality_level'],
     ['Rating', rr.totalReviewCount ? `${rr.rating} from ${rr.totalReviewCount} reviews`
        : (p.review_rating ? `${p.review_rating} (${p.review_count||0} reviews)` : null), 'review_rating.rating'],
     ['Performance', perf.performanceStatus?sentence(perf.performanceStatus):null, 'performance.performanceStatus'],

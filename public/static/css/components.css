@@ -81,8 +81,9 @@ nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--a
   padding:16px 18px;box-shadow:var(--shadow)}
 .tile .l{color:var(--ink-3);font-size:12px;font-weight:600;text-transform:uppercase;
   letter-spacing:.05em}
-.tile .n{font-size:27px;font-weight:700;letter-spacing:-.025em;margin-top:5px;
-  font-variant-numeric:tabular-nums}
+.tile .n{font-size:26px;font-weight:700;letter-spacing:-.025em;margin-top:5px;
+  font-variant-numeric:tabular-nums;line-height:1.2;word-break:break-word}
+.tile.tile-quality .n{font-size:20px;letter-spacing:-.01em;line-height:1.25}
 .tile .s{color:var(--ink-3);font-size:12.5px;margin-top:2px}
 
 /* ---------- bars ---------- */

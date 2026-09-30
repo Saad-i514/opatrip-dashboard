@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { spinMark, $, cachedApi, el, esc, session } from '../core.js';
-import { getPath, historyFor, label, PATH_LABELS, personName, qualBadge, setEditContext,
+import { getPath, historyFor, label, PATH_LABELS, personName, qualBadge, qualLabel, QUALITY, setEditContext,
          statusBadge, valueBox, whenLong } from '../format.js';
 import { skLines } from '../ui.js';
 import { buildSections, commissionOf, totalDuration, tree } from '../sections.js';
@@ -130,7 +130,8 @@ export async function openDrawer(pid){
     const durVal = pp.duration || totalDuration(it) || '—';
     const commVal = (()=>{ const c = commissionOf(pp);
         return c!=null ? c+'%' : '—'; })();
-    const qualVal = (pp.quality||{}).level || p.quality_level || cur.quality_level || '—';
+    const rawQual = (pp.quality||{}).level || p.quality_level || cur.quality_level || '';
+    const qualVal = qualLabel(rawQual);
     const revCnt = (rr.totalReviewCount!=null ? rr.totalReviewCount : p.review_count) || 0;
     const revScore = rr.rating || p.review_rating;
 
@@ -143,8 +144,11 @@ export async function openDrawer(pid){
      ['Changes', d.changes.length, 'since first capture', '', '']]
      .forEach(([l,n,s,path,lbl])=>{
        if (path) PATH_LABELS.set(path, l);
-       const tile = el('div','tile',
-         `<div class="l">${l}</div><div class="n">${esc(n)}</div><div class="s">${esc(s)}</div>`);
+       const isQual = l === 'Quality';
+       const qualHit = isQual && rawQual ? QUALITY[String(rawQual).trim().toUpperCase()] : null;
+       const colorStyle = qualHit ? (qualHit[1] === 'b-bad' ? 'style="color:#dc2626"' : 'style="color:#16a34a"') : '';
+       const tile = el('div', 'tile' + (isQual ? ' tile-quality' : ''),
+         `<div class="l">${l}</div><div class="n" ${colorStyle}>${esc(n)}</div><div class="s">${esc(s)}</div>`);
        if (path){
          tile.dataset.jumpPath = path;
          tile.style.cursor = 'pointer';
