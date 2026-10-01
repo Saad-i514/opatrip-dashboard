@@ -26,6 +26,7 @@ from pathlib import Path
 import uuid
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse)
 from fastapi.staticfiles import StaticFiles
@@ -39,6 +40,13 @@ import db
 import store
 
 app = FastAPI(title="Opatrip Product Audit")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "public" / "static"
 
@@ -152,6 +160,7 @@ async def gate(request: Request, call_next):
             path in OPEN_PATHS
             or path.startswith("/api/gyg/")
             or path.startswith("/api/product/gyg")
+            or path.startswith("/api/ext/")
             or (request.method == "GET" and path.startswith("/api/product/"))
         )
         if path.startswith("/api/") and not is_open:
@@ -1364,6 +1373,20 @@ def gyg_catalog_product(tour_id: str):
             _GYG_CATALOG_CACHE = {}
     if _GYG_CATALOG_CACHE and tid in _GYG_CATALOG_CACHE:
         return _GYG_CATALOG_CACHE[tid]
+    # Fallback to direct database lookup from snapshots
+    with db.session() as con:
+        plat_id = db.platform_id(con, "getyourguide") or 2
+        r = con.execute("""
+            SELECT s.normalized_json FROM snapshots s
+            JOIN products p ON p.id = s.product_id
+            WHERE p.platform_id=? AND (p.product_code=? OR p.gyg_reference=?)
+            ORDER BY s.id DESC LIMIT 1
+        """, (plat_id, tid, tid)).fetchone()
+        if r and r["normalized_json"]:
+            try:
+                return json.loads(r["normalized_json"])
+            except Exception:
+                pass
     raise HTTPException(404, f"GYG product '{tour_id}' not found in catalog")
 
 
@@ -1605,72 +1628,114 @@ class GygCaptureIn(BaseModel):
     account_pk: int | None = None
     tour_id: str | int | None = None
     data: dict
-    operator_email: str
+    operator_email: str | None = None
 
 
-@app.post("/api/ext/gyg/product/capture")
-def gyg_product_capture(c: GygCaptureIn):
+class GygBatchCaptureIn(BaseModel):
+    items: list[GygCaptureIn]
+    operator_email: str | None = None
+
+
+def _process_gyg_capture(con, c: GygCaptureIn):
     details = c.data or {}
     tour_code = str(c.tour_id or details.get("tourId") or details.get("product_code") or "").strip()
     title = str(details.get("title") or f"Tour {tour_code}").strip()
     raw_status = str(details.get("category") or details.get("status") or "Bookable").strip()
     ref_code = str(details.get("referenceCode") or details.get("refCode") or "").strip()
+    location = details.get("startingLocation") or details.get("location")
+    op_email = c.operator_email or details.get("operator_email") or "operator@opatrip.com"
 
-    with db.session() as con:
-        plat_id = db.platform_id(con, "getyourguide") or 2
-        account_pk = c.account_pk
-        if not account_pk:
-            acc = con.execute("SELECT id FROM accounts WHERE viator_account_id LIKE 'gyg_%'").fetchone()
-            if acc:
-                account_pk = acc["id"]
-            else:
-                con.execute("INSERT INTO accounts (viator_account_id, name, signin_email, platform_id) VALUES ('gyg_opatrip', 'Opatrip.com (GYG)', ?, ?)",
-                            (c.operator_email, plat_id))
-                con.commit()
-                account_pk = con.execute("SELECT id FROM accounts WHERE viator_account_id='gyg_opatrip'").fetchone()["id"]
+    plat_id = db.platform_id(con, "getyourguide") or 2
+    account_pk = c.account_pk
+    if not account_pk:
+        acc = con.execute("SELECT id FROM accounts WHERE viator_account_id LIKE 'gyg_%'").fetchone()
+        if acc:
+            account_pk = acc["id"] if isinstance(acc, dict) or hasattr(acc, "__getitem__") else acc[0]
+        else:
+            con.execute("INSERT INTO accounts (viator_account_id, name, signin_email, platform_id) VALUES ('gyg_opatrip', 'Opatrip.com (GYG)', ?, ?)",
+                        (op_email, plat_id))
+            acc2 = con.execute("SELECT id FROM accounts WHERE viator_account_id='gyg_opatrip'").fetchone()
+            account_pk = acc2["id"] if isinstance(acc2, dict) or hasattr(acc2, "__getitem__") else acc2[0]
 
-        # Map to same tour as Viator product
-        tour_id = db.match_or_upsert_tour(con, title, ref_code)
-        canon = db.canonical_status(con, plat_id, raw_status)
+    # Map to same tour as Viator product if matched
+    tour_id = db.match_or_upsert_tour(con, title, ref_code or tour_code)
+    canon = db.canonical_status(con, plat_id, raw_status)
 
-        pid = db.upsert_product(
-            con, account_pk, tour_code,
-            title=title, status=raw_status,
-            location=details.get("location"),
-            is_draft_stub=1 if canon == "DRAFT" else 0,
-            platform_id=plat_id, tour_id=tour_id, status_canonical=canon
-        )
+    pid = db.upsert_product(
+        con, account_pk, tour_code,
+        title=title, status=raw_status,
+        location=location,
+        is_draft_stub=1 if canon == "DRAFT" else 0,
+        platform_id=plat_id, tour_id=tour_id, status_canonical=canon
+    )
 
-        # Save snapshot + diff
-        sync_id = c.sync_id
-        if not sync_id:
-            sync_id = db.start_sync(con, account_pk, c.operator_email, host="vercel")
+    if ref_code:
+        try:
+            con.execute("UPDATE products SET gyg_reference=? WHERE id=?", (ref_code, pid))
+        except Exception:
+            pass
 
-        n = db.save_snapshot(con, pid, sync_id, account_pk, c.operator_email, details)
+    # Save snapshot + diff
+    sync_id = c.sync_id
+    if not sync_id:
+        sync_id = db.start_sync(con, account_pk, op_email, host="extension")
 
-        # Portal history records
-        portal_hist = details.get("portalHistory") or []
-        if isinstance(portal_hist, list) and len(portal_hist):
-            for h in portal_hist:
-                try:
-                    h_date = h.get("date") or db.now()
-                    h_sec = h.get("section") or "Portal History"
-                    h_after = str(h.get("after") or "")
-                    h_before = str(h.get("before") or "")
-                    exists = con.execute("""SELECT id FROM changes WHERE product_id=? AND field_path=? AND new_value=?""",
-                                         (pid, f"gyg_history.{h_sec}", h_after)).fetchone()
-                    if not exists and (h_before or h_after):
-                        con.execute("""INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value, detected_at, account_id, operator_email, source)
-                                       VALUES (?,?,?,?,?,?,?,?,?)""",
-                                    (pid, sync_id, f"gyg_history.{h_sec}", h_before, h_after, h_date, account_pk, c.operator_email, "gyg_portal"))
-                except Exception:
-                    pass
+    n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, details)
 
-        db.bump_sync(con, sync_id, seen=1, changed=n)
-        db.mark_done(con, sync_id, tour_code)
+    # Portal history records
+    portal_hist = details.get("portalHistory") or details.get("history") or []
+    if isinstance(portal_hist, list) and len(portal_hist):
+        for h in portal_hist:
+            try:
+                h_date = h.get("date") or db.now()
+                h_sec = h.get("section") or "Portal History"
+                h_after = str(h.get("after") or "")
+                h_before = str(h.get("before") or "")
+                h_field = h.get("field") or "General"
+                field_path = f"gyg_history.{h_sec} › {h_field}" if h_sec != h_field else f"gyg_history.{h_sec}"
+                exists = con.execute("""SELECT id FROM changes WHERE product_id=? AND field_path=? AND new_value=?""",
+                                     (pid, field_path, h_after)).fetchone()
+                if not exists and (h_before or h_after):
+                    con.execute("""INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value, detected_at, account_id, operator_email, source)
+                                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                                (pid, sync_id, field_path, h_before, h_after, h_date, account_pk, op_email, "gyg_portal"))
+            except Exception:
+                pass
+
+    db.bump_sync(con, sync_id, seen=1, changed=n)
+    db.mark_done(con, sync_id, tour_code)
+    try:
         con.execute("UPDATE accounts SET last_sync_at=? WHERE id=?", (db.now(), account_pk))
-        con.commit()
+    except Exception:
+        pass
     return {"ok": True, "product_id": pid, "tour_id": tour_id, "changes": n}
+
+
+@app.get("/api/ext/status")
+def ext_status():
+    return {"ok": True, "service": "Opatrip Trace Backend", "timestamp": db.now()}
+
+
+@app.post("/api/ext/gyg/product/capture")
+def gyg_product_capture(c: GygCaptureIn):
+    with db.session() as con:
+        res = _process_gyg_capture(con, c)
+    return res
+
+
+@app.post("/api/ext/gyg/products/batch")
+def gyg_products_batch(b: GygBatchCaptureIn):
+    results = []
+    with db.session() as con:
+        for item in b.items:
+            if not item.operator_email and b.operator_email:
+                item.operator_email = b.operator_email
+            try:
+                r = _process_gyg_capture(con, item)
+                results.append(r)
+            except Exception as e:
+                results.append({"ok": False, "error": str(e), "tour_id": item.tour_id})
+    return {"ok": True, "processed": len(b.items), "success_count": sum(1 for r in results if r.get("ok"))}
 
 
 @app.get("/api/editable")
