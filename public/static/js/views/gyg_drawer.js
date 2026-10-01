@@ -151,6 +151,10 @@ function renderDrawerFoodAndDrinks(foodVal) {
       }
     }
 
+    if ((!meal || meal === "—") && format && format.toLowerCase().includes("food tasting")) {
+      meal = "Lunch Or Dinner, Depending On Starting Time";
+    }
+
     if (meal || format) {
       rows.push({ meal, format });
     }
