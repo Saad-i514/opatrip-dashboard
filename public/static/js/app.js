@@ -88,7 +88,7 @@ export function refresh(){
   // calling .catch on its undefined return threw.
   return Promise.resolve((VIEWS[S.tab]||viewStats)()).catch(e=>{
     const v=$('#v-'+S.tab);
-    if(v) v.innerHTML=`<div class="card empty">${esc(e.message)}</div>`; });
+    if(v) v.innerHTML=`<div class="card empty"><div class="big">Could not load ${esc(TITLES[S.tab]?.[0] || S.tab)}</div><div class="hint" style="margin-top:6px">${esc(e.message || 'Server or network error')}</div><button class="btn sm" onclick="window.location.reload()" style="margin-top:14px">Retry</button></div>`; });
 }
 export function go(tab){
   S.tab = tab;

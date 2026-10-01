@@ -308,7 +308,7 @@ export const apiRaw = async (p,o,retried) => {
     if (r.status === 404 && p.startsWith('/api/'))
       throw new Error(`${p} isn't available on the running server. It was started before `+
         `this feature existed — stop it and run "python app.py" again.`);
-    throw new Error(d || r.statusText);
+    throw new Error(d || r.statusText || `Request failed (${r.status})`);
   }
   return r.json();
 };
