@@ -120,12 +120,34 @@ function renderDrawerFoodAndDrinks(foodVal) {
       const mFormat = part.match(/Format:\s*(.+)$/i);
       meal = mMeal ? mMeal[1].trim() : "";
       format = mFormat ? mFormat[1].trim() : "";
+      if (!meal && part.includes("Format:")) {
+        const pre = part.split(/Format:/i)[0].replace(/[—–-]\s*$/, "").trim();
+        if (pre) meal = pre;
+      }
     } else {
-      const lower = part.toLowerCase().trim();
-      if (FORMAT_MAP[lower]) {
-        format = FORMAT_MAP[lower];
+      const dashParts = part.split(/\s+[—–-]\s+/);
+      if (dashParts.length >= 2) {
+        meal = dashParts[0].trim();
+        format = dashParts[1].trim();
       } else {
-        format = part;
+        const lower = part.toLowerCase().trim();
+        if (FORMAT_MAP[lower]) {
+          format = FORMAT_MAP[lower];
+        } else {
+          let matchedKf = null;
+          for (const kf of Object.values(FORMAT_MAP)) {
+            if (part.toLowerCase().endsWith(kf.toLowerCase())) {
+              matchedKf = kf;
+              break;
+            }
+          }
+          if (matchedKf) {
+            format = matchedKf;
+            meal = part.substring(0, part.length - matchedKf.length).replace(/[—–-]\s*$/, "").trim();
+          } else {
+            format = part;
+          }
+        }
       }
     }
 
