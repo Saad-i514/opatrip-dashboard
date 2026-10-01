@@ -6,6 +6,75 @@ import { whenLong, formatDisplayVal } from '../format.js';
 
 let gygCatalogCache = null;
 
+export function normalizeGygProductData(p) {
+  if (!p || typeof p !== 'object') return p;
+
+  // Title
+  p.title = p.title || p.name || '';
+
+  // Tour ID / Product Code
+  p.tour_id = p.tour_id || p.tourId || p.product_code || p.productId || p.id || '';
+
+  // Reference Code
+  const ref = p.reference_code || p.product_reference_code || p.refCode || p.ref_code || p.gyg_reference || p.supplierActivityCode || '';
+  p.reference_code = ref;
+  p.product_reference_code = ref;
+  p.refCode = ref;
+
+  // Short description
+  const sDesc = p.short_description || p.shortDescription || '';
+  p.short_description = sDesc;
+  p.shortDescription = sDesc;
+
+  // Full description
+  const fDesc = p.full_description || p.fullDescription || p.description || '';
+  p.full_description = fDesc;
+  p.fullDescription = fDesc;
+
+  // Highlights
+  if (!p.highlights && Array.isArray(p.highlight_list)) {
+    p.highlights = p.highlight_list;
+  }
+  if (!Array.isArray(p.highlights)) {
+    p.highlights = p.highlights ? [String(p.highlights)] : [];
+  }
+
+  // Food & Drinks
+  const food = p.food_and_drinks || p.foodAndDrinks || '';
+  p.food_and_drinks = food;
+  p.foodAndDrinks = food;
+
+  // Starting location / Meeting point
+  const loc = p.starting_location || p.startingLocation || p.meeting_point || p.meetingPoint || p.location || '';
+  p.starting_location = loc;
+  p.startingLocation = loc;
+
+  // Guide info
+  const guide = p.guide_info || p.guideInfo || '';
+  p.guide_info = guide;
+  p.guideInfo = guide;
+
+  // Important Information
+  const imp = (p.importantInfo && typeof p.importantInfo === 'object') ? p.importantInfo :
+              (p.important_information && typeof p.important_information === 'object') ? p.important_information : {};
+  p.not_suitable_for = p.not_suitable_for || p.notSuitableFor || imp.notSuitableFor || imp.not_suitable_for || '';
+  p.not_allowed = p.not_allowed || p.notAllowed || p.whats_not_allowed || imp.notAllowed || imp.not_allowed || '';
+  p.pet_policy = p.pet_policy || p.petPolicy || imp.petPolicy || imp.pet_policy || '';
+  p.mandatory_items = p.mandatory_items || p.mandatoryItems || imp.mandatoryItems || imp.mandatory_items || '';
+  p.know_before_you_go = p.know_before_you_go || p.knowBeforeYouGo || imp.knowBeforeYouGo || imp.know_before_you_go || '';
+  p.emergency_contact = p.emergency_contact || p.emergencyContact || imp.emergencyContact || imp.emergency_contact || '';
+  p.ticket_info = p.ticket_info || p.ticket_instructions || p.ticketVoucherInfo || imp.ticketVoucherInfo || imp.ticket_voucher_info || '';
+
+  // Inclusions & Exclusions
+  if (!Array.isArray(p.inclusions)) p.inclusions = p.inclusions ? [String(p.inclusions)] : [];
+  if (!Array.isArray(p.exclusions)) p.exclusions = p.exclusions ? [String(p.exclusions)] : [];
+
+  // Keywords
+  if (!p.keywords && Array.isArray(p.keyword_list)) p.keywords = p.keyword_list;
+
+  return p;
+}
+
 async function loadGygProduct(tourId, productId = null, viatorTourId = null, viatorProductCode = null) {
   const tid = tourId ? String(tourId).trim() : '';
   const pid = productId ? String(productId).trim() : '';
@@ -23,12 +92,9 @@ async function loadGygProduct(tourId, productId = null, viatorTourId = null, via
         combined.tour_id = prod.product_code || details.tour_id || details.product_code || combined.tour_id || tid;
         combined.title = prod.title || details.title || combined.title;
         combined.status = prod.status || details.status || combined.status;
-        if (details.short_description && !combined.short_description) combined.short_description = details.short_description;
-        if (details.full_description && !combined.full_description) combined.full_description = details.full_description;
-        if (details.highlights && (!combined.highlights || !combined.highlights.length)) combined.highlights = details.highlights;
         if (data.changes) combined.history = data.changes;
         if (Object.keys(details).length > 0 || combined.title) {
-          return combined;
+          return normalizeGygProductData(combined);
         }
       }
     } catch (e) {}
@@ -46,23 +112,23 @@ async function loadGygProduct(tourId, productId = null, viatorTourId = null, via
 
   if (gygCatalogCache) {
     if (tid && gygCatalogCache[tid]) {
-      return gygCatalogCache[tid];
+      return normalizeGygProductData(gygCatalogCache[tid]);
     }
     const tLower = tid.toLowerCase();
     for (const [id, item] of Object.entries(gygCatalogCache)) {
       if (tid && (id === tid || String(item.tour_id) === tid || String(item.product_code) === tid ||
           (item.reference_code && String(item.reference_code).toLowerCase() === tLower) ||
           (item.product_reference_code && String(item.product_reference_code).toLowerCase() === tLower))) {
-        return item;
+        return normalizeGygProductData(item);
       }
       if (pid && (String(item.id) === pid || String(item.product_id) === pid)) {
-        return item;
+        return normalizeGygProductData(item);
       }
       if (targetCode) {
         const vm = item.matched_viator || item.viator_mapping;
         if (vm) {
           const c = (vm.viator_product_code || vm.product_code || '').trim().toUpperCase();
-          if (c === targetCode) return item;
+          if (c === targetCode) return normalizeGygProductData(item);
         }
       }
     }
@@ -73,7 +139,7 @@ async function loadGygProduct(tourId, productId = null, viatorTourId = null, via
     try {
       const data = await api(`/api/product/${encodeURIComponent(pid)}`);
       if (data && data.current && Object.keys(data.current).length) {
-        return { ...data.current, ...data.product, tour_id: tid || (data.product && data.product.product_code) };
+        return normalizeGygProductData({ ...data.current, ...data.product, tour_id: tid || (data.product && data.product.product_code) });
       }
     } catch (e) {}
   }
@@ -82,7 +148,7 @@ async function loadGygProduct(tourId, productId = null, viatorTourId = null, via
   if (tid) {
     try {
       const data = await api(`/api/gyg/product/${encodeURIComponent(tid)}`);
-      if (data && data.tour_id) return data;
+      if (data && data.tour_id) return normalizeGygProductData(data);
     } catch (e) {}
   }
 
@@ -247,6 +313,7 @@ export async function openGygDrawer(tourId, productId = null, viatorTourId = nul
 }
 
 function renderDrawerContent(scrim, p, closeDrawer) {
+  p = normalizeGygProductData(p);
   const statusLower = (p.status || '').toLowerCase();
   let statusClass = 'bookable';
   if (statusLower.includes('reject')) statusClass = 'rejected';
@@ -304,7 +371,7 @@ function renderDrawerContent(scrim, p, closeDrawer) {
           </div>
           <div class="gyg-meta-line">
             <span>Product Id: <b>${esc(p.tour_id)}</b></span>
-            <span>Product Reference Code: <b>${esc(p.reference_code || p.product_reference_code || '—')}</b></span>
+            <span>Product Reference Code: <b>${esc(p.reference_code || p.product_reference_code || p.refCode || p.gyg_reference || '—')}</b></span>
             <span>Rating: <span class="gyg-stars">★★★★★</span> <b>${esc(p.rating || 'Not rated')}</b></span>
             ${p.preview_url ? `
               <a href="${esc(p.preview_url)}" target="_blank" rel="noopener noreferrer" class="gyg-preview-link">
@@ -395,16 +462,16 @@ function renderDrawerContent(scrim, p, closeDrawer) {
             <div class="gyg-field-group">
               <div class="gyg-field-label">Short description</div>
               <div class="gyg-field-desc">
-                ${esc(p.short_description || '—')}
+                ${esc(p.short_description || p.shortDescription || '—')}
               </div>
             </div>
 
             <div class="gyg-field-group">
               <div class="gyg-field-label">Full description</div>
               <div class="gyg-field-desc" id="gygFullDescBox" style="white-space: pre-line;">
-                ${esc(p.full_description ? p.full_description.slice(0, 480) : '—')}${p.full_description && p.full_description.length > 480 ? '…' : ''}
+                ${esc((p.full_description || p.fullDescription) ? (p.full_description || p.fullDescription).slice(0, 480) : '—')}${(p.full_description || p.fullDescription) && (p.full_description || p.fullDescription).length > 480 ? '…' : ''}
               </div>
-              ${p.full_description && p.full_description.length > 480 ? `
+              ${(p.full_description || p.fullDescription) && (p.full_description || p.fullDescription).length > 480 ? `
                 <button class="gyg-btn-see-more" id="gygSeeMoreBtn">
                   See more
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -754,14 +821,15 @@ function renderDrawerContent(scrim, p, closeDrawer) {
   const seeMoreBtn = scrim.querySelector('#gygSeeMoreBtn');
   if (seeMoreBtn) {
     let expanded = false;
+    const fullDescText = p.full_description || p.fullDescription || '';
     seeMoreBtn.onclick = () => {
       expanded = !expanded;
       const box = scrim.querySelector('#gygFullDescBox');
       if (expanded) {
-        box.textContent = p.full_description || '';
+        box.textContent = fullDescText;
         seeMoreBtn.innerHTML = `Show less <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>`;
       } else {
-        box.textContent = (p.full_description ? p.full_description.slice(0, 480) : '') + '…';
+        box.textContent = (fullDescText ? fullDescText.slice(0, 480) : '') + '…';
         seeMoreBtn.innerHTML = `See more <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>`;
       }
     };
@@ -815,8 +883,8 @@ function renderDrawerContent(scrim, p, closeDrawer) {
   if (editMainBtn) {
     editMainBtn.onclick = () => openGygEditModal(p, 'Main Information', [
       { key: 'title', label: 'Title', value: p.title },
-      { key: 'short_description', label: 'Short description', value: p.short_description, type: 'textarea', rows: 3 },
-      { key: 'full_description', label: 'Full description', value: p.full_description, type: 'textarea', rows: 7 },
+      { key: 'short_description', label: 'Short description', value: p.short_description || p.shortDescription || '', type: 'textarea', rows: 3 },
+      { key: 'full_description', label: 'Full description', value: p.full_description || p.fullDescription || '', type: 'textarea', rows: 7 },
       { key: 'highlights', label: 'Highlights (one per line)', value: (p.highlights || []).join('\n'), type: 'textarea', rows: 4,
         hint: 'Enter each bullet point on a new line',
         parser: v => v.split('\n').map(x => x.trim()).filter(Boolean) }

@@ -1352,6 +1352,33 @@ def gyg_product_detail(code: str):
                                 })
             except Exception:
                 pass
+
+        # Harmonize descriptions and reference codes across camelCase & snake_case
+        s_desc = cur_snap.get("short_description") or cur_snap.get("shortDescription")
+        if s_desc:
+            cur_snap["short_description"] = s_desc
+            cur_snap["shortDescription"] = s_desc
+
+        f_desc = cur_snap.get("full_description") or cur_snap.get("fullDescription") or cur_snap.get("description")
+        if f_desc:
+            cur_snap["full_description"] = f_desc
+            cur_snap["fullDescription"] = f_desc
+
+        fd = cur_snap.get("food_and_drinks") or cur_snap.get("foodAndDrinks")
+        if fd:
+            cur_snap["food_and_drinks"] = fd
+            cur_snap["foodAndDrinks"] = fd
+
+        ref = prow.get("gyg_reference") or cur_snap.get("reference_code") or cur_snap.get("product_reference_code") or cur_snap.get("refCode")
+        if ref:
+            cur_snap["reference_code"] = ref
+            cur_snap["product_reference_code"] = ref
+            cur_snap["refCode"] = ref
+            prow["reference_code"] = ref
+            prow["product_reference_code"] = ref
+            prow["refCode"] = ref
+            prow["gyg_reference"] = ref
+
     return {"product": prow, "details": cur_snap, "changes": changes, "snapshots": snaps}
 
 
@@ -1689,6 +1716,22 @@ def _process_gyg_capture(con, c: GygCaptureIn):
         snap_data["photos"] = str(raw_photos)
     snap_data.pop("images", None)
     snap_data.pop("gallery", None)
+
+    # Harmonize descriptions & reference codes across both camelCase and snake_case
+    s_desc = snap_data.get("short_description") or snap_data.get("shortDescription")
+    if s_desc:
+        snap_data["short_description"] = s_desc
+        snap_data["shortDescription"] = s_desc
+
+    f_desc = snap_data.get("full_description") or snap_data.get("fullDescription") or snap_data.get("description")
+    if f_desc:
+        snap_data["full_description"] = f_desc
+        snap_data["fullDescription"] = f_desc
+
+    if ref_code:
+        snap_data["refCode"] = ref_code
+        snap_data["reference_code"] = ref_code
+        snap_data["product_reference_code"] = ref_code
 
     n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, snap_data)
 
