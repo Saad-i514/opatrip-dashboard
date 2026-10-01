@@ -72,6 +72,71 @@ export function normalizeGygProductData(p) {
   // Keywords
   if (!p.keywords && Array.isArray(p.keyword_list)) p.keywords = p.keyword_list;
 
+  // Itinerary & Stops
+  let itinList = p.itinerary || p.stops || [];
+  if (typeof itinList === 'string' && itinList.trim()) {
+    const parts = itinList.split('->').map(s => s.trim()).filter(Boolean);
+    itinList = parts.map((pt, idx) => {
+      let poi = pt;
+      let dur = '';
+      let details = '';
+      const m = pt.match(/^(.*?)\s*\((.*?)\)$/);
+      if (m) {
+        poi = m[1].trim();
+        const inner = m[2].trim();
+        if (inner.toLowerCase().includes('meeting point')) {
+          details = 'Meeting Point';
+        } else if (inner.toLowerCase().includes('activity')) {
+          details = inner;
+          const durM = inner.match(/\(([^)]+)\)/);
+          if (durM) dur = durM[1];
+        } else if (/\b\d+\s*(?:m|min|mins|h|hours?)\b/i.test(inner)) {
+          dur = inner;
+          details = `Activity (${dur})`;
+        } else {
+          details = inner;
+        }
+      }
+      return {
+        poi: poi || `Stop ${idx + 1}`,
+        title: poi || `Stop ${idx + 1}`,
+        name: poi || `Stop ${idx + 1}`,
+        duration: dur,
+        details: details || 'Activity'
+      };
+    });
+  } else if (Array.isArray(itinList)) {
+    itinList = itinList.map((stop, idx) => {
+      if (typeof stop === 'string') {
+        return {
+          poi: stop,
+          title: stop,
+          name: stop,
+          duration: '',
+          details: 'Activity'
+        };
+      }
+      const poiName = stop.poi || stop.title || stop.name || (stop.location && (stop.location.name || stop.location)) || `Stop ${idx + 1}`;
+      const dur = stop.duration || stop.durStr || '';
+      const det = stop.details || stop.subtitle || stop.description || (dur ? `Activity (${dur})` : 'Activity');
+      return {
+        ...stop,
+        poi: poiName,
+        title: poiName,
+        name: poiName,
+        duration: dur,
+        details: det
+      };
+    });
+  }
+  p.itinerary = itinList;
+  p.stops = itinList;
+
+  // Change History
+  const hist = Array.isArray(p.history) ? p.history : (Array.isArray(p.portalHistory) ? p.portalHistory : []);
+  p.history = hist;
+  p.portalHistory = hist;
+
   return p;
 }
 
@@ -593,8 +658,8 @@ function renderDrawerContent(scrim, p, closeDrawer) {
             <div class="gyg-field-group" style="margin-bottom:0;">
               ${(() => {
                 const itinList = (p.itinerary && p.itinerary.length) ? p.itinerary : ((p.stops && p.stops.length) ? p.stops : []);
-                const startLoc = p.starting_location || (itinList[0] && (itinList[0].title || itinList[0].name)) || p.location || 'Meeting point';
-                const endLoc = p.end_location || (itinList.length > 1 && (itinList[itinList.length - 1].title || itinList[itinList.length - 1].name)) || 'Same as starting point';
+                const startLoc = p.starting_location || (itinList[0] && (itinList[0].poi || itinList[0].title || itinList[0].name)) || p.location || 'Meeting point';
+                const endLoc = p.end_location || (itinList.length > 1 && (itinList[itinList.length - 1].poi || itinList[itinList.length - 1].title || itinList[itinList.length - 1].name)) || 'Same as starting point';
                 return `
                   <div class="gyg-itin-endpoint">
                     <span class="gyg-itin-dot"></span>
@@ -604,13 +669,14 @@ function renderDrawerContent(scrim, p, closeDrawer) {
                   ${itinList.length ? `
                     <div class="gyg-timeline">
                       ${itinList.map((stop, idx) => {
-                        const title = stop.title || stop.name || `Stop ${idx + 1}`;
-                        const desc = stop.details || stop.subtitle || (stop.duration ? `Sightseeing, Walk, Visit, Guided tour (${stop.duration})` : 'Sightseeing, Walk, Visit, Guided tour');
+                        const title = stop.poi || stop.title || stop.name || `Stop ${idx + 1}`;
+                        const desc = stop.details || stop.subtitle || stop.description || (stop.duration ? `Activity (${stop.duration})` : 'Activity');
+                        const durBadge = stop.duration ? `<span class="badge" style="background:#FFF0ED; color:#FF5533; border:1px solid #FFD5CC; font-size:11px; padding:2px 7px; border-radius:12px; margin-left:8px; font-weight:600;">⏱️ ${esc(stop.duration)}</span>` : '';
                         return `
                           <div class="gyg-timeline-item">
                             <div class="gyg-timeline-num">${idx + 1}</div>
                             <div class="gyg-timeline-content">
-                              <div class="gyg-timeline-title">${esc(title)}</div>
+                              <div class="gyg-timeline-title">${esc(title)}${durBadge}</div>
                               <div class="gyg-timeline-desc">${esc(desc)}</div>
                             </div>
                           </div>

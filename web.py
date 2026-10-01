@@ -1728,12 +1728,53 @@ def _process_gyg_capture(con, c: GygCaptureIn):
         snap_data["full_description"] = f_desc
         snap_data["fullDescription"] = f_desc
 
+    fd = snap_data.get("food_and_drinks") or snap_data.get("foodAndDrinks")
+    if fd:
+        snap_data["food_and_drinks"] = fd
+        snap_data["foodAndDrinks"] = fd
+
+    loc_val = snap_data.get("starting_location") or snap_data.get("startingLocation") or snap_data.get("location")
+    if loc_val:
+        snap_data["starting_location"] = loc_val
+        snap_data["startingLocation"] = loc_val
+
+    p_hist = snap_data.get("portalHistory") or snap_data.get("history") or []
+    if p_hist:
+        snap_data["history"] = p_hist
+        snap_data["portalHistory"] = p_hist
+
+    itin_val = snap_data.get("itinerary") or []
+    stops_val = snap_data.get("stops") or []
+    if itin_val and not stops_val:
+        snap_data["stops"] = [{"name": s.get("title", ""), "duration": "", "subtitle": s.get("details", "")} for s in itin_val if isinstance(s, dict)]
+    elif stops_val and not itin_val:
+        snap_data["itinerary"] = [{"title": s.get("name", ""), "details": s.get("subtitle", "")} for s in stops_val if isinstance(s, dict)]
+
     if ref_code:
         snap_data["refCode"] = ref_code
         snap_data["reference_code"] = ref_code
         snap_data["product_reference_code"] = ref_code
 
     n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, snap_data)
+
+    # Always ensure the latest snapshot in database contains any enriched non-placeholder values
+    try:
+        cur_snap_row = con.execute("""SELECT id, normalized_json FROM snapshots
+                                      WHERE product_id=? ORDER BY id DESC LIMIT 1""", (pid,)).fetchone()
+        if cur_snap_row:
+            cur_id = cur_snap_row["id"] if isinstance(cur_snap_row, dict) or hasattr(cur_snap_row, "__getitem__") else cur_snap_row[0]
+            raw_snap = cur_snap_row["normalized_json"] if isinstance(cur_snap_row, dict) or hasattr(cur_snap_row, "__getitem__") else cur_snap_row[1]
+            try:
+                existing_snap = json.loads(raw_snap or "{}")
+            except Exception:
+                existing_snap = {}
+            for k, v in snap_data.items():
+                if v not in (None, "", "—", [], {}):
+                    existing_snap[k] = v
+            con.execute("UPDATE snapshots SET normalized_json=? WHERE id=?",
+                        (json.dumps(existing_snap, ensure_ascii=False), cur_id))
+    except Exception as e:
+        pass
 
     # Portal history records
     portal_hist = details.get("portalHistory") or details.get("history") or []
