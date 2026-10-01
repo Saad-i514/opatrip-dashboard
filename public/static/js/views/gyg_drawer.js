@@ -370,31 +370,6 @@ function renderDrawerContent(scrim, p, closeDrawer) {
         </div>
       ` : ''}
 
-      <!-- Photos Strip (Matching GetYourGuide Portal) -->
-      ${(p.photos && p.photos.length) ? `
-        <div class="gyg-photos-strip-wrap" style="margin: 0 28px 16px 28px;">
-          <div style="display:flex; gap:12px; height:180px; overflow-x:auto; border-radius:10px; position:relative;">
-            ${p.photos.slice(0, 4).map((img, idx) => `
-              <div style="flex:1; min-width:180px; height:100%; position:relative; overflow:hidden; border-radius:8px; background:#f1f5f9;">
-                <img src="${esc(img)}" alt="Tour Photo ${idx+1}" style="width:100%; height:100%; object-fit:cover;" />
-                ${idx === Math.min(p.photos.length, 4) - 1 ? `
-                  <div style="position:absolute; bottom:12px; right:12px; display:flex; gap:8px;">
-                    <button class="btn sm" id="gygEditPhotosBtn" style="background:rgba(0,0,0,0.75); color:#fff; border:none; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; cursor:pointer; backdrop-filter:blur(4px);">
-                      Edit
-                    </button>
-                    ${p.photos.length > 4 ? `
-                      <button class="btn sm" id="gygMorePhotosBtn" style="background:rgba(0,0,0,0.75); color:#fff; border:none; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; cursor:pointer; backdrop-filter:blur(4px); display:inline-flex; align-items:center; gap:4px;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                        +${p.photos.length - 4}
-                      </button>
-                    ` : ''}
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
 
       <!-- Main Content 2-Column Grid -->
       <div class="gyg-content-grid" style="margin-top: 10px;">

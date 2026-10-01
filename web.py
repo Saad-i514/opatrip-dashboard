@@ -1675,12 +1675,22 @@ def _process_gyg_capture(con, c: GygCaptureIn):
         except Exception:
             pass
 
-    # Save snapshot + diff
+    # Save snapshot + diff (strip picture URLs/blobs so no images are stored in database, keeping photo count for change tracing)
     sync_id = c.sync_id
     if not sync_id:
         sync_id = db.start_sync(con, account_pk, op_email, host="extension")
 
-    n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, details)
+    snap_data = dict(details)
+    raw_photos = snap_data.get("photos")
+    if isinstance(raw_photos, list):
+        snap_data["photos_count"] = len(raw_photos)
+        snap_data["photos"] = f"{len(raw_photos)} photos" if len(raw_photos) else "No photos"
+    elif isinstance(raw_photos, (int, str)):
+        snap_data["photos"] = str(raw_photos)
+    snap_data.pop("images", None)
+    snap_data.pop("gallery", None)
+
+    n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, snap_data)
 
     # Portal history records
     portal_hist = details.get("portalHistory") or details.get("history") or []
