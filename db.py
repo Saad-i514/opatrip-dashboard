@@ -553,6 +553,14 @@ def same_number(ov, nv):
     return math.isclose(ov, nv, rel_tol=1e-9, abs_tol=0.0)
 
 
+def _strip_html_and_ws(s):
+    if not isinstance(s, str):
+        return s
+    t = _re.sub(r'<[^>]+>', ' ', s)
+    t = _re.sub(r'&[a-zA-Z]+;', ' ', t)
+    return _re.sub(r'\s+', ' ', t).strip()
+
+
 def diff(old, new):
     """Field-level changes between two normalized snapshots."""
     a, b = flatten(old or {}), flatten(new or {})
@@ -561,11 +569,28 @@ def diff(old, new):
     for path in sorted(set(a) | set(b)):
         if is_volatile(path):
             continue
+        # Photo URLs must never produce diff churn
+        if path.startswith("photos") or "photos[" in path:
+            continue
+        # Rolling booking availability window is not a product edit
+        if "available_until" in path:
+            continue
+        # Internal booking engine mode
+        if "booking_engine" in path:
+            continue
+
         ov, nv = a.get(path, None), b.get(path, None)
+
         # If the baseline snapshot had no options captured yet, newly captured
         # options are initial detail hydration rather than an edit.
         if not old_has_options and path.startswith("options[") and ov is None:
             continue
+
+        # HTML tag formatting equivalence: <p>text</p> == text
+        if isinstance(ov, str) and isinstance(nv, str) and ("<" in ov or "<" in nv):
+            if _strip_html_and_ws(ov) == _strip_html_and_ws(nv):
+                continue
+
         # Option-level hydration and formatting guards
         if path.startswith("options["):
             # Empty / "NONE" / null equivalence
@@ -574,12 +599,18 @@ def diff(old, new):
             # Initial option detail hydration (e.g. old stub scraper had "" for duration/meeting_point/pickup/dropoff/languages)
             if (ov in ("", None)) and nv and any(path.endswith(f".{k}") for k in ("duration", "meeting_point", "pickup", "dropoff", "languages")):
                 continue
+            # Default option type
+            if path.endswith(".type") and (ov in ("", None, "Standard") and nv in ("Standard", "Private")):
+                continue
             # Status synonym equivalence
             if path.endswith(".status"):
                 ov_str = str(ov or "").strip().lower()
                 nv_str = str(nv or "").strip().lower()
                 if ov_str in ("bookable", "active", "live") and nv_str in ("bookable", "active", "live"):
                     continue
+                if ov_str in ("deactivated", "rejected") and nv_str in ("deactivated", "rejected"):
+                    continue
+
         # Stop-level formatting and subtitle churn guards
         if "stops[" in path:
             if path.endswith(".subtitle"):
@@ -592,12 +623,23 @@ def diff(old, new):
             if path.endswith(".duration"):
                 if (ov in ("", None)) and nv:
                     continue
+
+        # Food & drinks format expansion
+        if path == "food_and_drinks":
+            ov_s = str(ov or "").strip().lower()
+            nv_s = str(nv or "").strip().lower()
+            if "food tasting" in ov_s and "food tasting" in nv_s:
+                continue
+
         # General status synonym equivalence at root level
-        if path == "status":
+        if path in ("status", "category"):
             ov_str = str(ov or "").strip().lower()
             nv_str = str(nv or "").strip().lower()
             if ov_str in ("bookable", "active", "live") and nv_str in ("bookable", "active", "live"):
                 continue
+            if ov_str in ("deactivated", "rejected") and nv_str in ("deactivated", "rejected"):
+                continue
+
         if ov != nv and not same_number(ov, nv):
             changes.append((path, ov, nv))
     return changes
