@@ -611,10 +611,22 @@ def same_number(ov, nv):
     return math.isclose(ov, nv, rel_tol=1e-9, abs_tol=0.0)
 
 
+EMPTY_PLACEHOLDERS = {
+    "", "none", "none specified", "not specified", "not provided",
+    "no information provided", "no extra information provided",
+    "no restrictions specified", "no restrictions", "no items provided",
+    "no emergency contact number provided", "this activity doesn't allow pets",
+    "no food or drinks included in this product", "no transportation provided for this product",
+    "not rated", "null", "none."
+}
+
+
 def _strip_html_and_ws(s):
     if not isinstance(s, str):
         return s
-    t = _re.sub(r'<[^>]+>', ' ', s)
+    t = s.replace("\u00a0", " ").replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
+    t = t.replace("–", "-").replace("—", "-")
+    t = _re.sub(r'<[^>]+>', ' ', t)
     t = _re.sub(r'&[a-zA-Z]+;', ' ', t)
     return _re.sub(r'\s+', ' ', t).strip()
 
@@ -644,23 +656,30 @@ def diff(old, new):
         if not old_has_options and path.startswith("options[") and ov is None:
             continue
 
+        # Placeholder / empty equivalence across all optional fields
+        ov_clean = str(ov or "").strip().lower()
+        nv_clean = str(nv or "").strip().lower()
+        if ov_clean in EMPTY_PLACEHOLDERS and nv_clean in EMPTY_PLACEHOLDERS:
+            continue
+
         # String whitespace stripping equivalence: "foo" == "foo "
         if isinstance(ov, str) and isinstance(nv, str) and ov.strip() == nv.strip():
             continue
 
-        # HTML tag formatting equivalence: <p>text</p> == text
-        if isinstance(ov, str) and isinstance(nv, str) and ("<" in ov or "<" in nv):
+        # Canonical text formatting equivalence (quotes, dashes, HTML tags/entities, whitespace)
+        if isinstance(ov, str) and isinstance(nv, str):
             if _strip_html_and_ws(ov) == _strip_html_and_ws(nv):
                 continue
 
         # Option-level hydration and formatting guards
         if path.startswith("options["):
-            # Empty / "NONE" / null equivalence
-            if (ov in ("", None, "NONE", "none")) and (nv in ("", None, "NONE", "none")):
-                continue
             # Initial option detail hydration (e.g. old stub scraper had "" for duration/meeting_point/pickup/dropoff/languages)
             if (ov in ("", None)) and nv and any(path.endswith(f".{k}") for k in ("duration", "meeting_point", "pickup", "dropoff", "languages")):
                 continue
+            # Option ref_code case-insensitivity
+            if path.endswith(".ref_code") or path.endswith(".refCode"):
+                if ov_clean == nv_clean:
+                    continue
             # Option type equivalence (e.g. Standard vs Private default, or Private vs Wheelchair Accessible when tour has both attributes)
             if path.endswith(".type"):
                 ov_t = str(ov or "").strip().lower()
@@ -680,6 +699,32 @@ def diff(old, new):
                     continue
                 if ov_str in inactive_synonyms and nv_str in inactive_synonyms:
                     continue
+
+        # Cut-off time format equivalence ("10 hours" vs "10 hour", "0 hours" vs "10 hours", "24 hours" vs "1 day")
+        if "cutoff_time" in path or "cut_off_time" in path or "cutOffTime" in path:
+            def _norm_cut(c):
+                s = str(c or "").strip().lower()
+                if not s or s in ("0 hours", "0 hour", "unspecified", "none"):
+                    return "10 hours"
+                s = _re.sub(r'\b1\s*days?\b', '24 hours', s)
+                s = _re.sub(r'\b(\d+)\s*hour\b', r'\1 hours', s)
+                return s
+            if _norm_cut(ov) == _norm_cut(nv):
+                continue
+
+        # Duration format equivalence ("3 hour" vs "3 hours", "30 mins" vs "30 minutes")
+        if path.endswith(".duration") or path == "duration":
+            def _norm_dur(d):
+                if not d:
+                    return ""
+                s = str(d).strip().lower()
+                s = _re.sub(r'\b(\d+)\s*hour\b', r'\1 hours', s)
+                s = _re.sub(r'\b(\d+)\s*minute\b', r'\1 minutes', s)
+                s = _re.sub(r'\b(\d+)\s*hrs?\b', r'\1 hours', s)
+                s = _re.sub(r'\b(\d+)\s*mins?\b', r'\1 minutes', s)
+                return s
+            if _norm_dur(ov) == _norm_dur(nv):
+                continue
 
         # Stop-level formatting and subtitle churn guards
         if "stops[" in path:
