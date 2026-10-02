@@ -677,13 +677,13 @@ def overview(account: str | None = None):
 # needs the SQL; keeping them apart is how a filter ends up meaning something different
 # from the option that selects it.
 REVIEW_BANDS = {
-    "0":     ("No reviews yet",   "p.review_count = 0"),
-    "1":     ("Exactly 1 review", "p.review_count = 1"),
+    "0":     ("No reviews yet",   "(COALESCE(p.review_count, 0) = 0 AND p.review_rating IS NULL)"),
+    "1":     ("Exactly 1 review", "(p.review_count = 1 OR (COALESCE(p.review_count, 0) <= 1 AND p.review_rating IS NOT NULL))"),
     "2-5":   ("2 to 5 reviews",   "p.review_count BETWEEN 2 AND 5"),
     "6-20":  ("6 to 20 reviews",  "p.review_count BETWEEN 6 AND 20"),
     "21+":   ("21 or more",       "p.review_count >= 21"),
-    "any":   ("Has at least one", "p.review_count > 0"),
-    "none":  ("Not captured",     "p.review_count IS NULL"),
+    "any":   ("Has at least one", "(COALESCE(p.review_count, 0) > 0 OR p.review_rating IS NOT NULL)"),
+    "none":  ("Not captured",     "(p.review_count IS NULL AND p.review_rating IS NULL)"),
 }
 
 
