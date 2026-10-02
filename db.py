@@ -648,8 +648,19 @@ def diff(old, new):
         # Internal booking engine mode
         if "booking_engine" in path:
             continue
+        # Customer review counts and rating metrics are external feedback, not product edits
+        if path in ("rating", "review_count", "reviewCount", "review_rating", "reviewRating") or path.endswith(".rating") or path.endswith(".review_count"):
+            continue
 
         ov, nv = a.get(path, None), b.get(path, None)
+
+        # Generic tour guide descriptors ("Live tour guide" == "Tour guide" == "Live guide")
+        if path in ("guide_information", "guideInfo", "guide_info") or path.endswith(".guide_information"):
+            ov_g = str(ov or "").strip().lower()
+            nv_g = str(nv or "").strip().lower()
+            generic_guides = {"tour guide", "live tour guide", "live tour", "live_guide", "live guide", "guide", ""}
+            if ov_g in generic_guides and nv_g in generic_guides:
+                continue
 
         # If the baseline snapshot had no options captured yet, newly captured
         # options are initial detail hydration rather than an edit.
@@ -690,7 +701,7 @@ def diff(old, new):
             if path.endswith(".status"):
                 ov_str = str(ov or "").strip().lower().replace("_", " ")
                 nv_str = str(nv or "").strip().lower().replace("_", " ")
-                live_synonyms = {"bookable", "active", "live", "online", "published"}
+                live_synonyms = {"bookable", "active", "live", "online", "published", "no availability", "no active options"}
                 draft_synonyms = {"not submitted", "not yet submitted", "draft", "temp", "temporary", "new", "created"}
                 inactive_synonyms = {"deactivated", "rejected", "check", "in review", "under review", "needs action", "quality check failed", "quality_check_failed", "not bookable"}
                 if ov_str in live_synonyms and nv_str in live_synonyms:
@@ -750,7 +761,7 @@ def diff(old, new):
         if path in ("status", "category"):
             ov_str = str(ov or "").strip().lower().replace("_", " ")
             nv_str = str(nv or "").strip().lower().replace("_", " ")
-            live_synonyms = {"bookable", "active", "live", "online", "published"}
+            live_synonyms = {"bookable", "active", "live", "online", "published", "no availability", "no active options"}
             draft_synonyms = {"not submitted", "not yet submitted", "draft", "temp", "temporary", "new", "created"}
             inactive_synonyms = {"deactivated", "rejected", "check", "in review", "under review", "needs action", "quality check failed", "quality_check_failed", "not bookable"}
             if ov_str in live_synonyms and nv_str in live_synonyms:

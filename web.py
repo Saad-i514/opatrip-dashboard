@@ -1782,7 +1782,7 @@ def _clean_option_status(raw_s: str, prev_s: str = "") -> str:
 
     draft_syns = {"not submitted", "not yet submitted", "draft", "temp", "temporary", "new", "created"}
     inactive_syns = {"deactivated", "rejected", "check", "in review", "under review", "needs action", "quality check failed", "quality_check_failed", "not bookable"}
-    live_syns = {"bookable", "active", "live", "online", "published"}
+    live_syns = {"bookable", "active", "live", "online", "published", "no availability", "no active options"}
 
     if s_low in draft_syns:
         if p_low in draft_syns and prev_s:
@@ -1838,7 +1838,10 @@ def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict
     # Guide info
     guide_info = incoming.get("guide_information") or incoming.get("guideInfo") or incoming.get("guide_info")
     old_guide = res.get("guide_information") or res.get("guideInfo") or res.get("guide_info") or ""
-    if guide_info:
+    generic_guides = {"tour guide", "live tour guide", "live tour", "live_guide", "live guide", "guide", ""}
+    if str(guide_info or "").strip().lower() in generic_guides and str(old_guide or "").strip().lower() in generic_guides and old_guide:
+        guide_info = old_guide
+    elif guide_info:
         if old_guide and (guide_info in old_guide or old_guide in guide_info):
             guide_info = old_guide
     else:
