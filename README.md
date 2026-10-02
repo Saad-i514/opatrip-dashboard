@@ -106,6 +106,15 @@ shared by `/api/stats` and `/api/overview` so the two pages cannot disagree.
 The full data model, capture design and anti-block rules are documented in the desktop
 tool's README.
 
+### Product Display Sequence
+The Products view orders listings in a persistent 3-tier sequence:
+1. **Mapped products**: Listings matched between Viator and GetYourGuide (via `tour_id`, reference code, or catalog).
+2. **Viator unmapped products**: Viator listings awaiting a GetYourGuide reference code for cross-platform mapping.
+3. **Standalone GYG products**: GetYourGuide listings with no Viator counterpart.
+
+### Review Ratings & Reviews Filter
+Product rows display live star ratings (`★ 4.8`) alongside review counts. The reviews filter evaluates both review score and count across predefined bands (`0`, `1`, `2-5`, `6-20`, `21+`, `any`).
+
 ---
 
 ## Before this is shared beyond the team
