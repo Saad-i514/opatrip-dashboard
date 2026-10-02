@@ -644,6 +644,10 @@ def diff(old, new):
         if not old_has_options and path.startswith("options[") and ov is None:
             continue
 
+        # String whitespace stripping equivalence: "foo" == "foo "
+        if isinstance(ov, str) and isinstance(nv, str) and ov.strip() == nv.strip():
+            continue
+
         # HTML tag formatting equivalence: <p>text</p> == text
         if isinstance(ov, str) and isinstance(nv, str) and ("<" in ov or "<" in nv):
             if _strip_html_and_ws(ov) == _strip_html_and_ws(nv):
@@ -657,9 +661,12 @@ def diff(old, new):
             # Initial option detail hydration (e.g. old stub scraper had "" for duration/meeting_point/pickup/dropoff/languages)
             if (ov in ("", None)) and nv and any(path.endswith(f".{k}") for k in ("duration", "meeting_point", "pickup", "dropoff", "languages")):
                 continue
-            # Default option type
-            if path.endswith(".type") and (ov in ("", None, "Standard") and nv in ("Standard", "Private")):
-                continue
+            # Option type equivalence (e.g. Standard vs Private default, or Private vs Wheelchair Accessible when tour has both attributes)
+            if path.endswith(".type"):
+                ov_t = str(ov or "").strip().lower()
+                nv_t = str(nv or "").strip().lower()
+                if (ov_t in ("", "standard") and nv_t in ("standard", "private")) or (ov_t in ("private", "wheelchair accessible") and nv_t in ("private", "wheelchair accessible")):
+                    continue
             # Status synonym equivalence
             if path.endswith(".status"):
                 ov_str = str(ov or "").strip().lower().replace("_", " ")

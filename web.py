@@ -1919,7 +1919,7 @@ def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict
         for idx, opt in enumerate(options):
             if isinstance(opt, dict):
                 o_id = str(opt.get("option_id") or opt.get("optionId") or opt.get("id") or idx + 1)
-                o_ref = str(opt.get("ref_code") or opt.get("refCode") or opt.get("referenceCode") or opt.get("reference_code") or opt.get("supplierOptionCode") or ref_code or "default")
+                o_ref = str(opt.get("ref_code") or opt.get("refCode") or opt.get("referenceCode") or opt.get("reference_code") or opt.get("supplierOptionCode") or ref_code or "default").strip()
                 o_title = opt.get("title") or title or f"Option {idx + 1}"
                 prev_opt = {}
                 if isinstance(existing_opts, list):
@@ -1933,6 +1933,9 @@ def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict
                 o_status = _clean_option_status(opt.get("status") or status or "Bookable", prev_status)
                 o_cut = opt.get("cutoff_time") or opt.get("cutOffTime") or opt.get("cutoffTime") or opt.get("cut_off_time") or cut_off or "10 hours"
                 o_type = opt.get("type") or opt.get("option_type") or "Standard"
+                prev_type = prev_opt.get("type") if prev_opt else ""
+                if prev_type and prev_type in ("Wheelchair Accessible", "Private") and o_type in ("Wheelchair Accessible", "Private"):
+                    o_type = prev_type
                 o_be = opt.get("booking_engine") or opt.get("bookingEngine") or opt.get("booking_engine_mode") or booking_engine or "Automatically accept new bookings"
                 o_conn = opt.get("connectivity") or opt.get("connectivitySettings") or opt.get("connectivity_settings") or connectivity or "Direct (API / Extranet)"
                 o_avail = opt.get("available_until") or opt.get("availableUntil") or opt.get("validUntil") or opt.get("valid_until") or available_until or ""
