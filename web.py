@@ -1773,6 +1773,35 @@ class GygSyncFinishIn(BaseModel):
 
 
 
+def _clean_option_status(raw_s: str, prev_s: str = "") -> str:
+    if not raw_s:
+        return prev_s or "Bookable"
+    s_clean = str(raw_s).strip()
+    s_low = s_clean.lower().replace("_", " ")
+    p_low = str(prev_s or "").strip().lower().replace("_", " ")
+
+    draft_syns = {"not submitted", "not yet submitted", "draft", "temp", "temporary", "new", "created"}
+    inactive_syns = {"deactivated", "rejected", "check", "in review", "under review", "needs action", "quality check failed", "quality_check_failed", "not bookable"}
+    live_syns = {"bookable", "active", "live", "online", "published"}
+
+    if s_low in draft_syns:
+        if p_low in draft_syns and prev_s:
+            return prev_s
+        return "Not Submitted"
+
+    if s_low in inactive_syns:
+        if p_low in inactive_syns and prev_s:
+            return prev_s
+        return "Deactivated" if "deact" in s_low else "In review"
+
+    if s_low in live_syns:
+        if p_low in live_syns and prev_s:
+            return prev_s
+        return "Bookable"
+
+    return s_clean
+
+
 def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict:
     if not existing:
         existing = {}
@@ -1885,13 +1914,23 @@ def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict
 
     # Options normalization: ensure each option contains all aliases
     norm_opts = []
+    existing_opts = res.get("options") or []
     if options and isinstance(options, list):
         for idx, opt in enumerate(options):
             if isinstance(opt, dict):
                 o_id = str(opt.get("option_id") or opt.get("optionId") or opt.get("id") or idx + 1)
                 o_ref = str(opt.get("ref_code") or opt.get("refCode") or opt.get("referenceCode") or opt.get("reference_code") or opt.get("supplierOptionCode") or ref_code or "default")
                 o_title = opt.get("title") or title or f"Option {idx + 1}"
-                o_status = opt.get("status") or status or "Bookable"
+                prev_opt = {}
+                if isinstance(existing_opts, list):
+                    for eo in existing_opts:
+                        if isinstance(eo, dict) and str(eo.get("id") or eo.get("option_id") or eo.get("optionId")) == o_id:
+                            prev_opt = eo
+                            break
+                    if not prev_opt and idx < len(existing_opts) and isinstance(existing_opts[idx], dict):
+                        prev_opt = existing_opts[idx]
+                prev_status = prev_opt.get("status") if prev_opt else ""
+                o_status = _clean_option_status(opt.get("status") or status or "Bookable", prev_status)
                 o_cut = opt.get("cutoff_time") or opt.get("cutOffTime") or opt.get("cutoffTime") or opt.get("cut_off_time") or cut_off or "10 hours"
                 o_type = opt.get("type") or opt.get("option_type") or "Standard"
                 o_be = opt.get("booking_engine") or opt.get("bookingEngine") or opt.get("booking_engine_mode") or booking_engine or "Automatically accept new bookings"

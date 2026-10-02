@@ -662,11 +662,16 @@ def diff(old, new):
                 continue
             # Status synonym equivalence
             if path.endswith(".status"):
-                ov_str = str(ov or "").strip().lower()
-                nv_str = str(nv or "").strip().lower()
-                if ov_str in ("bookable", "active", "live") and nv_str in ("bookable", "active", "live"):
+                ov_str = str(ov or "").strip().lower().replace("_", " ")
+                nv_str = str(nv or "").strip().lower().replace("_", " ")
+                live_synonyms = {"bookable", "active", "live", "online", "published"}
+                draft_synonyms = {"not submitted", "not yet submitted", "draft", "temp", "temporary", "new", "created"}
+                inactive_synonyms = {"deactivated", "rejected", "check", "in review", "under review", "needs action", "quality check failed", "quality_check_failed", "not bookable"}
+                if ov_str in live_synonyms and nv_str in live_synonyms:
                     continue
-                if ov_str in ("deactivated", "rejected") and nv_str in ("deactivated", "rejected"):
+                if ov_str in draft_synonyms and nv_str in draft_synonyms:
+                    continue
+                if ov_str in inactive_synonyms and nv_str in inactive_synonyms:
                     continue
 
         # Stop-level formatting and subtitle churn guards
@@ -691,11 +696,16 @@ def diff(old, new):
 
         # General status synonym equivalence at root level
         if path in ("status", "category"):
-            ov_str = str(ov or "").strip().lower()
-            nv_str = str(nv or "").strip().lower()
-            if ov_str in ("bookable", "active", "live") and nv_str in ("bookable", "active", "live"):
+            ov_str = str(ov or "").strip().lower().replace("_", " ")
+            nv_str = str(nv or "").strip().lower().replace("_", " ")
+            live_synonyms = {"bookable", "active", "live", "online", "published"}
+            draft_synonyms = {"not submitted", "not yet submitted", "draft", "temp", "temporary", "new", "created"}
+            inactive_synonyms = {"deactivated", "rejected", "check", "in review", "under review", "needs action", "quality check failed", "quality_check_failed", "not bookable"}
+            if ov_str in live_synonyms and nv_str in live_synonyms:
                 continue
-            if ov_str in ("deactivated", "rejected") and nv_str in ("deactivated", "rejected"):
+            if ov_str in draft_synonyms and nv_str in draft_synonyms:
+                continue
+            if ov_str in inactive_synonyms and nv_str in inactive_synonyms:
                 continue
 
         if ov != nv and not same_number(ov, nv):
