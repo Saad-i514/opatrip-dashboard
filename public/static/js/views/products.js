@@ -400,6 +400,39 @@ export async function viewProducts(){
                              viewProducts(); }),
     cachedApi('/api/filters'+fparams),   // months come from the data, so no empty option exists
   ]);
+
+  // Ensure persistent 3-tier sequence:
+  // 1: Mapped products
+  // 2: Viator products that still need GYG code for mapping
+  // 3: GetYourGuide products which have no match until now
+  if (d && Array.isArray(d.products)) {
+    d.products.sort((a, b) => {
+      const getTier = (p) => {
+        if (p.tier != null) return p.tier;
+        const isGyg = (
+          p.platform_id === 2 ||
+          p.platform_code === 'getyourguide' ||
+          (p.account_name && String(p.account_name).toLowerCase().includes('gyg')) ||
+          (p.viator_account_id && String(p.viator_account_id).toLowerCase().includes('gyg')) ||
+          (/^\d{6,8}$/.test(String(p.product_code || '')))
+        ) && (p.platform_id !== 1 && p.platform_code !== 'viator');
+        const listings = p.tour_listings || [];
+        const gygSib = listings.find(l => l.platform === 'getyourguide' && l.code !== p.product_code);
+        const viatorSib = listings.find(l => l.platform === 'viator' || !l.platform);
+        if (!isGyg) {
+          const hasRef = Boolean(p.gyg_reference || p.gyg_tour_id || gygSib);
+          return hasRef ? 1 : 2;
+        } else {
+          return viatorSib ? 1 : 3;
+        }
+      };
+      const tA = getTier(a);
+      const tB = getTier(b);
+      if (tA !== tB) return tA - tB;
+      return String(a.product_code || '').localeCompare(String(b.product_code || ''), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }
+
   v.dataset.painted='1';
   v.innerHTML='';
 

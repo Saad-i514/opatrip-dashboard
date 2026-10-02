@@ -996,20 +996,44 @@ def products(account: str | None = None, q: str | None = None,
             # went the same way when the "+N" marker was removed.
             r["tour_listings"] = sorted(by_tour.get(r.get("tour_id")) or [],
                                         key=lambda x: x["platform"])
-            # Fallback or enrich gyg_reference from gyg_catalog.json or existing tour listings
-            gyg_info = get_gyg_for_viator(r.get("product_code"))
-            gyg_listing = next((l for l in r["tour_listings"] if l.get("platform") == "getyourguide"), None)
-            if not r.get("gyg_reference"):
-                if gyg_info and (gyg_info.get("reference_code") or gyg_info.get("tour_id")):
-                    r["gyg_reference"] = gyg_info.get("reference_code") or gyg_info.get("tour_id")
-                elif gyg_listing and gyg_listing.get("code"):
-                    r["gyg_reference"] = gyg_listing.get("code")
-            if gyg_info and not r.get("gyg_tour_id"):
-                r["gyg_tour_id"] = gyg_info.get("tour_id")
-            elif gyg_listing and not r.get("gyg_tour_id"):
-                r["gyg_tour_id"] = gyg_listing.get("code")
+            p_code = r.get("product_code") or ""
+            is_gyg = (r.get("platform_code") == "getyourguide" or r.get("platform_id") == 2)
+            gyg_sibling = next((l for l in r["tour_listings"] if l.get("platform") == "getyourguide" and l.get("code") != p_code), None)
+            viator_sibling = next((l for l in r["tour_listings"] if l.get("platform") == "viator" or l.get("platform") is None), None)
+
+            if not is_gyg:
+                # Fallback or enrich gyg_reference from gyg_catalog.json or existing tour listings
+                gyg_info = get_gyg_for_viator(p_code)
+                ref = (r.get("gyg_reference") or "").strip()
+                if ref == p_code:
+                    ref = ""
+                    r["gyg_reference"] = None
+                if not ref:
+                    if gyg_info and (gyg_info.get("reference_code") or gyg_info.get("tour_id")):
+                        r["gyg_reference"] = gyg_info.get("reference_code") or gyg_info.get("tour_id")
+                    elif gyg_sibling and gyg_sibling.get("code"):
+                        r["gyg_reference"] = gyg_sibling.get("code")
+                if gyg_info and not r.get("gyg_tour_id"):
+                    r["gyg_tour_id"] = gyg_info.get("tour_id")
+                elif gyg_sibling and not r.get("gyg_tour_id"):
+                    r["gyg_tour_id"] = gyg_sibling.get("code")
+
+                # Tier 1: Mapped products; Tier 2: Viator products needing GYG code
+                has_gyg_link = bool(r.get("gyg_reference") or r.get("gyg_tour_id") or gyg_sibling)
+                r["tier"] = 1 if has_gyg_link else 2
+            else:
+                # Tier 1: GYG product matched with Viator; Tier 3: Standalone GYG product with no match
+                has_viator_link = bool(viator_sibling)
+                r["tier"] = 1 if has_viator_link else 3
+
         # manual overrides win for display, and carry who made them
         db.apply_edits(con, rows)
+
+        # Sort products by requested sequence:
+        # Tier 1: Mapped products
+        # Tier 2: Viator products that still need GYG code for mapping
+        # Tier 3: GYG products which have no match until now
+        rows.sort(key=lambda x: (x.get("tier", 2), (x.get("product_code") or "").lower()))
     return {"products": rows}
 
 
