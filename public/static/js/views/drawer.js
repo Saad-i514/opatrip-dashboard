@@ -124,22 +124,25 @@ export async function openDrawer(pid){
   }
 
   /* headline facts */
-  if (cur && cur.product){
-    const pp = cur.product, it = pp.itinerary||{};
+  if (cur){
+    const isViator = Boolean(cur.product);
+    const pp = cur.product || cur, it = pp.itinerary||{};
     const rr = cur.review_rating||{};
-    const durVal = pp.duration || totalDuration(it) || '—';
-    const commVal = (()=>{ const c = commissionOf(pp);
+    const durVal = pp.duration || (cur.options && cur.options[0]?.duration) || totalDuration(it) || '—';
+    const commVal = (()=>{ const c = isViator ? commissionOf(pp) : null;
         return c!=null ? c+'%' : '—'; })();
     const rawQual = (pp.quality||{}).level || p.quality_level || cur.quality_level || '';
     const qualVal = qualLabel(rawQual);
-    const revCnt = (rr.totalReviewCount!=null ? rr.totalReviewCount : p.review_count) || 0;
-    const revScore = rr.rating || p.review_rating;
+    const revCnt = (rr.totalReviewCount!=null ? rr.totalReviewCount : (p.review_count || cur.review_count || cur.reviewCount)) || 0;
+    const currentRating = p.review_rating || cur.rating || rr.rating;
+    const revScore = currentRating ? (String(currentRating).includes('/') ? currentRating : `★ ${Number(currentRating).toFixed(1)}`) : 'Not rated';
+    const revSubtitle = currentRating ? `rated ${revScore}` : (revCnt ? `${revCnt} reviews` : 'Not rated');
 
     const tiles = el('div','tiles');
-    [['Commission', commVal, (pp.pricing||{}).productProgramMargin && (pp.pricing||{}).productProgramMargin.isOptedIn ? 'incl. boost' : 'click to edit', 'product.pricing.productProgramMargin.baseMargin', 'Commission'],
-     ['Duration', durVal, 'click to edit', 'product.itinerary.durationInMinutes', 'Duration'],
-     ['Quality', qualVal, 'click to edit', 'product.quality.level', 'Quality Level'],
-     ['Reviews', revCnt, revCnt ? `rated ${revScore}` : 'click to edit', 'review_rating.rating', 'Reviews'],
+    [['Commission', commVal, (pp.pricing||{}).productProgramMargin && (pp.pricing||{}).productProgramMargin.isOptedIn ? 'incl. boost' : (isViator ? 'click to edit' : 'platform standard'), isViator ? 'product.pricing.productProgramMargin.baseMargin' : '', 'Commission'],
+     ['Duration', durVal, isViator ? 'click to edit' : 'catalog option', isViator ? 'product.itinerary.durationInMinutes' : '', 'Duration'],
+     ['Quality', qualVal, isViator ? 'click to edit' : '', isViator ? 'product.quality.level' : '', 'Quality Level'],
+     ['Reviews', revCnt || (currentRating ? 'Rated' : 0), revSubtitle, '', 'Reviews'],
      ['Currency', pp.currency||'—', 'click to edit', 'product.currency', 'Currency'],
      ['Changes', d.changes.length, 'since first capture', '', '']]
      .forEach(([l,n,s,path,lbl])=>{

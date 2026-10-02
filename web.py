@@ -2085,13 +2085,31 @@ def _process_gyg_capture(con, c: GygCaptureIn):
     tour_id = db.match_or_upsert_tour(con, title, ref_code or tour_code)
     canon = db.canonical_status(con, plat_id, raw_status)
 
+    # Extract review ratings & counts from incoming details
+    raw_rating = str(details.get("rating") or "").strip()
+    m_rate = _re.search(r"\b([1-5](?:\.[0-9]+)?)\b", raw_rating) if raw_rating and "not rated" not in raw_rating.lower() else None
+    rev_rating = float(m_rate.group(1)) if m_rate else None
+
+    rev_cnt = details.get("reviewCount") if details.get("reviewCount") is not None else details.get("review_count")
+    try:
+        rev_cnt = int(rev_cnt) if rev_cnt is not None else 0
+    except Exception:
+        rev_cnt = 0
+
     pid = db.upsert_product(
         con, account_pk, tour_code,
         title=title, status=raw_status,
         location=location,
         is_draft_stub=1 if canon == "DRAFT" else 0,
-        platform_id=plat_id, tour_id=tour_id, status_canonical=canon
+        platform_id=plat_id, tour_id=tour_id, status_canonical=canon,
+        review_count=rev_cnt, review_rating=rev_rating
     )
+
+    if rev_rating is not None or (rev_cnt and rev_cnt > 0):
+        try:
+            con.execute("UPDATE products SET review_count=?, review_rating=? WHERE id=?", (rev_cnt, rev_rating, pid))
+        except Exception:
+            pass
 
     if ref_code:
         try:

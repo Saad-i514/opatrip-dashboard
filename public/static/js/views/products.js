@@ -576,9 +576,11 @@ export async function viewProducts(){
     // client wants to read, and Reviews and Changes are counts either way.
     const fact = (k, v) => `<div class="pfact"><span class="pf-k">${esc(k)}</span>
       <span class="pf-v">${v || '0'}</span></div>`;
-    const rr = p.review_count ? `${p.review_count}${p.review_rating
-          ? ` <span class="hint">★ ${Number(p.review_rating).toFixed(1)}</span>` : ''}`
-      : '0';
+    const hasRating = p.review_rating != null && !isNaN(Number(p.review_rating)) && Number(p.review_rating) > 0;
+    const hasCount = p.review_count != null && Number(p.review_count) > 0;
+    const starSpan = hasRating ? `<span class="hint" style="color:#d97706;font-weight:600">★ ${Number(p.review_rating).toFixed(1)}</span>` : '';
+    const rr = (hasCount && hasRating) ? `${p.review_count} ${starSpan}`
+      : (hasCount ? `${p.review_count}` : (hasRating ? starSpan : '<span class="hint">Not rated</span>'));
 
     row.innerHTML = `
       <div class="pmain">
