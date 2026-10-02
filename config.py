@@ -85,7 +85,7 @@ VOLATILE_PREFIXES = (
     "viator_matched_", "viator_account_id",
     "importantInfo", "viator_mapping", "linkUrl", "rowPosition",
     "lastSeenAt", "firstSeenAt", "lastCapturedAt", "savedAt", "hasDetails",
-    "action", "rejectionReason", "itinerary",
+    "action", "rejectionReason", "itinerary", "photos",
 )
 VOLATILE_TOKENS = (
     "sessionId", "lookbackId", "traceId", "requestTimestampUTC", "altSessId",
