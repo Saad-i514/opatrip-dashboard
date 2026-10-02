@@ -713,6 +713,10 @@ def diff(old, new):
                     continue
                 if ov_str in inactive_synonyms and nv_str in inactive_synonyms:
                     continue
+                # If the product itself is not live (Rejected, Deactivated, Draft, In review), option status shifts are not product edits
+                parent_st = str((old or {}).get("status") or (old or {}).get("category") or (new or {}).get("status") or (new or {}).get("category") or "").strip().lower()
+                if any(syn in parent_st for syn in ("reject", "deact", "draft", "review", "check")):
+                    continue
 
         # Cut-off time format equivalence ("10 hours" vs "10 hour", "0 hours" vs "10 hours", "24 hours" vs "1 day")
         if "cutoff_time" in path or "cut_off_time" in path or "cutOffTime" in path:

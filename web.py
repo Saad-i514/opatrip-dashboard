@@ -1773,7 +1773,7 @@ class GygSyncFinishIn(BaseModel):
 
 
 
-def _clean_option_status(raw_s: str, prev_s: str = "") -> str:
+def _clean_option_status(raw_s: str, prev_s: str = "", parent_status: str = "") -> str:
     if not raw_s:
         return prev_s or "Bookable"
     s_clean = str(raw_s).strip()
@@ -1783,6 +1783,11 @@ def _clean_option_status(raw_s: str, prev_s: str = "") -> str:
     draft_syns = {"not submitted", "not yet submitted", "draft", "temp", "temporary", "new", "created"}
     inactive_syns = {"deactivated", "rejected", "check", "in review", "under review", "needs action", "quality check failed", "quality_check_failed", "not bookable"}
     live_syns = {"bookable", "active", "live", "online", "published", "no availability", "no active options"}
+
+    # If the product itself is in an inactive/rejected/draft state, preserve the previous option status
+    parent_low = str(parent_status or "").strip().lower()
+    if any(syn in parent_low for syn in ("reject", "deact", "draft", "review", "check")) and prev_s:
+        return prev_s
 
     if s_low in draft_syns:
         if p_low in draft_syns and prev_s:
@@ -1933,7 +1938,7 @@ def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict
                     if not prev_opt and idx < len(existing_opts) and isinstance(existing_opts[idx], dict):
                         prev_opt = existing_opts[idx]
                 prev_status = prev_opt.get("status") if prev_opt else ""
-                o_status = _clean_option_status(opt.get("status") or status or "Bookable", prev_status)
+                o_status = _clean_option_status(opt.get("status") or status or "Bookable", prev_status, status)
                 o_cut = opt.get("cutoff_time") or opt.get("cutOffTime") or opt.get("cutoffTime") or opt.get("cut_off_time") or cut_off or "10 hours"
                 o_type = opt.get("type") or opt.get("option_type") or "Standard"
                 prev_type = prev_opt.get("type") if prev_opt else ""
