@@ -322,39 +322,91 @@ def upsert_tour(con, title, created_by=None):
     return r["id"] if r else None
 
 
+GENERIC_REFS = {
+    "walking tour", "walking", "family walking tour", "magic christmas tour",
+    "romantic tour", "standard", "default", "groups", "group", "private tour",
+    "day tour", "highlights", "city tour", "sightseeing"
+}
+
+_STOP_WORDS_COMPAT = {
+    "private", "walking", "walk", "tour", "tours", "guided", "the", "a", "an", "and", "or",
+    "in", "of", "with", "for", "to", "at", "by", "from", "day", "half", "full", "hours",
+    "hour", "highlights", "best", "historic", "historical", "cultural", "city", "experience",
+    "discovery", "discover", "old", "town", "trip", "gems", "landmarks", "unique", "romantic",
+    "stories", "magic", "family", "friendly", "scenic", "essential", "journey",
+    "explore", "exploring", "adventure", "around", "center", "centre",
+    "christmas", "xmas", "holiday", "festive", "halloween"
+}
+
+
+def are_titles_compatible(title_a, title_b):
+    """Returns False if two tour/product titles clearly describe different destinations or concepts."""
+    if not title_a or not title_b:
+        return True
+    words_a = _re.findall(r'[a-z0-9]+', str(title_a).lower())
+    words_b = _re.findall(r'[a-z0-9]+', str(title_b).lower())
+    toks_a = {w for w in words_a if w not in _STOP_WORDS_COMPAT and len(w) > 2}
+    toks_b = {w for w in words_b if w not in _STOP_WORDS_COMPAT and len(w) > 2}
+    if not toks_a or not toks_b:
+        return True
+    overlap = toks_a & toks_b
+    if not overlap:
+        return False
+    union = toks_a | toks_b
+    # If they only share 1 token (such as just city name 'barcelona') but have distinct themes (pilates vs gothic)
+    if len(overlap) == 1 and len(union) >= 4:
+        return False
+    return (len(overlap) / len(union)) >= 0.30
+
+
 def match_or_upsert_tour(con, title, ref_code=None):
     """Matches an existing tour across platforms by reference code, normalised title, or exact title."""
     if ref_code:
         clean_ref = str(ref_code).strip()
-        # 1. Direct match on product_code
-        pr = con.execute("SELECT tour_id FROM products WHERE product_code=? AND tour_id IS NOT NULL", (clean_ref,)).fetchone()
-        if pr:
-            tid = pr[0] if isinstance(pr, (list, tuple)) else pr["tour_id"]
-            if tid:
-                return tid
-        # 2. Match on user-saved gyg_reference on product
-        try:
-            pr2 = con.execute("SELECT tour_id FROM products WHERE gyg_reference=? AND tour_id IS NOT NULL", (clean_ref,)).fetchone()
-            if pr2:
-                tid = pr2[0] if isinstance(pr2, (list, tuple)) else pr2["tour_id"]
-                if tid:
+        if clean_ref.lower() not in GENERIC_REFS:
+            # 1. Direct match on product_code
+            pr = con.execute("""
+                SELECT p.tour_id, t.title as tour_title 
+                FROM products p 
+                JOIN tours t ON t.id = p.tour_id 
+                WHERE p.product_code=? AND p.tour_id IS NOT NULL
+            """, (clean_ref,)).fetchone()
+            if pr:
+                tid = pr[0] if isinstance(pr, (list, tuple)) else pr["tour_id"]
+                ttitle = pr[1] if isinstance(pr, (list, tuple)) else pr["tour_title"]
+                if tid and are_titles_compatible(title, ttitle):
                     return tid
-        except Exception:
-            pass
-        # 3. Match from gyg_mappings table
-        try:
-            gm = con.execute("""
-                SELECT p.tour_id 
-                FROM gyg_mappings m 
-                JOIN products p ON p.product_code = m.viator_product_code 
-                WHERE (m.gyg_ref = ? OR m.gyg_tour_id = ?) AND p.tour_id IS NOT NULL
-            """, (clean_ref, clean_ref)).fetchone()
-            if gm:
-                tid = gm[0] if isinstance(gm, (list, tuple)) else gm["tour_id"]
-                if tid:
-                    return tid
-        except Exception:
-            pass
+            # 2. Match on user-saved gyg_reference on product
+            try:
+                pr2 = con.execute("""
+                    SELECT p.tour_id, t.title as tour_title 
+                    FROM products p 
+                    JOIN tours t ON t.id = p.tour_id 
+                    WHERE p.gyg_reference=? AND p.tour_id IS NOT NULL
+                """, (clean_ref,)).fetchone()
+                if pr2:
+                    tid = pr2[0] if isinstance(pr2, (list, tuple)) else pr2["tour_id"]
+                    ttitle = pr2[1] if isinstance(pr2, (list, tuple)) else pr2["tour_title"]
+                    if tid and are_titles_compatible(title, ttitle):
+                        return tid
+            except Exception:
+                pass
+            # 3. Match from gyg_mappings table
+            try:
+                gm = con.execute("""
+                    SELECT p.tour_id, t.title as tour_title
+                    FROM gyg_mappings m 
+                    JOIN products p ON p.product_code = m.viator_product_code 
+                    JOIN tours t ON t.id = p.tour_id
+                    WHERE (m.gyg_ref = ? OR m.gyg_tour_id = ?) AND p.tour_id IS NOT NULL
+                """, (clean_ref, clean_ref)).fetchone()
+                if gm:
+                    tid = gm[0] if isinstance(gm, (list, tuple)) else gm["tour_id"]
+                    ttitle = gm[1] if isinstance(gm, (list, tuple)) else gm["tour_title"]
+                    if tid and are_titles_compatible(title, ttitle):
+                        return tid
+            except Exception:
+                pass
     k = tour_key(title)
     if not k:
         return None
@@ -377,15 +429,21 @@ def match_or_upsert_tour(con, title, ref_code=None):
         stripped_title = _re.sub(r"^[^:]+:\s*", "", title)
         k_stripped = tour_key(stripped_title)
         if k_stripped:
-            r4 = con.execute("SELECT id FROM tours WHERE tour_key=?", (k_stripped,)).fetchone()
+            r4 = con.execute("SELECT id, title FROM tours WHERE tour_key=?", (k_stripped,)).fetchone()
             if r4:
-                return r4[0] if isinstance(r4, (list, tuple)) else r4["id"]
+                tid = r4[0] if isinstance(r4, (list, tuple)) else r4["id"]
+                ttitle = r4[1] if isinstance(r4, (list, tuple)) else r4["title"]
+                if are_titles_compatible(title, ttitle):
+                    return tid
         # Also try without "private" or "group" qualifier
         k_clean = tour_key(_re.sub(r"\b(private|group)\s+", "", stripped_title, flags=_re.IGNORECASE))
         if k_clean and k_clean != k_stripped:
-            r5 = con.execute("SELECT id FROM tours WHERE tour_key=?", (k_clean,)).fetchone()
+            r5 = con.execute("SELECT id, title FROM tours WHERE tour_key=?", (k_clean,)).fetchone()
             if r5:
-                return r5[0] if isinstance(r5, (list, tuple)) else r5["id"]
+                tid = r5[0] if isinstance(r5, (list, tuple)) else r5["id"]
+                ttitle = r5[1] if isinstance(r5, (list, tuple)) else r5["title"]
+                if are_titles_compatible(title, ttitle):
+                    return tid
     return upsert_tour(con, title)
 
 
