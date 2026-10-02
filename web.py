@@ -1810,7 +1810,7 @@ def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict
 
     # 1. Clean volatile or internal fields from base
     for k in list(res.keys()):
-        if any(k.startswith(p) for p in ("matched_viator", "change_history_", "mapping_", "unmatched_diagnosis", "viator_matched_", "viator_account_id")) or k in ("isHydrated", "savedAt", "type", "lastCapturedAt", "firstSeenAt", "rejectionReason", "hasDetails", "syncId", "sync_id", "last_captured_timestamp"):
+        if any(k.startswith(p) for p in ("matched_viator", "change_history_", "mapping_", "unmatched_diagnosis", "viator_matched_", "viator_account_id")) or k in ("isHydrated", "savedAt", "type", "lastCapturedAt", "firstSeenAt", "rejectionReason", "hasDetails", "syncId", "sync_id", "last_captured_timestamp", "portal_history", "portalHistory", "history"):
             res.pop(k, None)
 
     # 2. Extract values from incoming with fallbacks
@@ -2047,8 +2047,6 @@ def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict
         clean_res["options"] = norm_opts
     elif options:
         clean_res["options"] = options
-    if portal_history:
-        clean_res["portal_history"] = portal_history
     if stops:
         clean_res["stops"] = stops
     if photos:
@@ -2130,26 +2128,6 @@ def _process_gyg_capture(con, c: GygCaptureIn):
     snap_data = normalize_gyg_snapshot(details, clean_prev)
 
     n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, snap_data)
-
-    # Portal history records
-    portal_hist = details.get("portalHistory") or details.get("history") or []
-    if isinstance(portal_hist, list) and len(portal_hist):
-        for h in portal_hist:
-            try:
-                h_date = h.get("date") or db.now()
-                h_sec = h.get("section") or "Portal History"
-                h_after = str(h.get("after") or "")
-                h_before = str(h.get("before") or "")
-                h_field = h.get("field") or "General"
-                field_path = f"gyg_history.{h_sec} › {h_field}" if h_sec != h_field else f"gyg_history.{h_sec}"
-                exists = con.execute("""SELECT id FROM changes WHERE product_id=? AND field_path=? AND new_value=?""",
-                                     (pid, field_path, h_after)).fetchone()
-                if not exists and (h_before or h_after):
-                    con.execute("""INSERT INTO changes (product_id, sync_id, field_path, old_value, new_value, detected_at, account_id, operator_email, source)
-                                   VALUES (?,?,?,?,?,?,?,?,?)""",
-                                (pid, sync_id, field_path, h_before, h_after, h_date, account_pk, op_email, "gyg_portal"))
-            except Exception:
-                pass
 
     db.bump_sync(con, sync_id, seen=1, changed=n)
     db.mark_done(con, sync_id, tour_code)

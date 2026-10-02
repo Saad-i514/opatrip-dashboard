@@ -651,6 +651,9 @@ def diff(old, new):
         # Customer review counts and rating metrics are external feedback, not product edits
         if path in ("rating", "review_count", "reviewCount", "review_rating", "reviewRating") or path.endswith(".rating") or path.endswith(".review_count"):
             continue
+        # GYG internal portal history is a historical revision log, not a product edit
+        if "portal_history" in path or "gyg_history" in path or "portalHistory" in path:
+            continue
 
         ov, nv = a.get(path, None), b.get(path, None)
 
@@ -1067,8 +1070,23 @@ def active_sync_elsewhere(con, account_id, host):
 
 
 def finish_sync(con, sync_id, status, message=None):
-    con.execute("""UPDATE syncs SET finished_at=?, status=?, message=? WHERE id=?""",
-                (now(), status, message, sync_id))
+    # Reconcile products_seen with unique completed products in sync_progress
+    actual_seen = con.execute("SELECT COUNT(DISTINCT product_code) FROM sync_progress WHERE sync_id=?", (sync_id,)).fetchone()
+    seen_cnt = actual_seen[0] if actual_seen and actual_seen[0] is not None else None
+    actual_changes = con.execute("SELECT COUNT(*) FROM changes WHERE sync_id=?", (sync_id,)).fetchone()
+    changes_cnt = actual_changes[0] if actual_changes and actual_changes[0] is not None else 0
+
+    # If message says "Batch of 0..." or is empty, correct it to the actual count of products seen
+    if message and ("Batch of 0" in message or message == "No products to save.") and seen_cnt and seen_cnt > 0:
+        message = f"Batch of {seen_cnt} products captured from extension"
+    elif not message and seen_cnt is not None and seen_cnt > 0:
+        message = f"Batch of {seen_cnt} products captured from extension"
+
+    con.execute("""UPDATE syncs SET finished_at=?, status=?, message=?,
+                   products_seen=COALESCE(?, products_seen),
+                   changes_found=?
+                   WHERE id=?""",
+                (now(), status, message, seen_cnt if seen_cnt and seen_cnt > 0 else None, changes_cnt, sync_id))
 
 
 def bump_sync(con, sync_id, seen=0, changed=0):
