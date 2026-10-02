@@ -566,6 +566,38 @@ def diff(old, new):
         # options are initial detail hydration rather than an edit.
         if not old_has_options and path.startswith("options[") and ov is None:
             continue
+        # Option-level hydration and formatting guards
+        if path.startswith("options["):
+            # Empty / "NONE" / null equivalence
+            if (ov in ("", None, "NONE", "none")) and (nv in ("", None, "NONE", "none")):
+                continue
+            # Initial option detail hydration (e.g. old stub scraper had "" for duration/meeting_point/pickup/dropoff/languages)
+            if (ov in ("", None)) and nv and any(path.endswith(f".{k}") for k in ("duration", "meeting_point", "pickup", "dropoff", "languages")):
+                continue
+            # Status synonym equivalence
+            if path.endswith(".status"):
+                ov_str = str(ov or "").strip().lower()
+                nv_str = str(nv or "").strip().lower()
+                if ov_str in ("bookable", "active", "live") and nv_str in ("bookable", "active", "live"):
+                    continue
+        # Stop-level formatting and subtitle churn guards
+        if "stops[" in path:
+            if path.endswith(".subtitle"):
+                ov_s = str(ov or "").strip().lower()
+                nv_s = str(nv or "").strip().lower()
+                if ov_s == nv_s:
+                    continue
+                if (("activity" in ov_s and "sightseeing" in nv_s) or ("sightseeing" in ov_s and "activity" in nv_s)):
+                    continue
+            if path.endswith(".duration"):
+                if (ov in ("", None)) and nv:
+                    continue
+        # General status synonym equivalence at root level
+        if path == "status":
+            ov_str = str(ov or "").strip().lower()
+            nv_str = str(nv or "").strip().lower()
+            if ov_str in ("bookable", "active", "live") and nv_str in ("bookable", "active", "live"):
+                continue
         if ov != nv and not same_number(ov, nv):
             changes.append((path, ov, nv))
     return changes
