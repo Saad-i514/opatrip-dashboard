@@ -2087,7 +2087,7 @@ def _process_gyg_capture(con, c: GygCaptureIn):
 
     # Extract review ratings & counts from incoming details
     raw_rating = str(details.get("rating") or "").strip()
-    m_rate = _re.search(r"\b([1-5](?:\.[0-9]+)?)\b", raw_rating) if raw_rating and "not rated" not in raw_rating.lower() else None
+    m_rate = re.search(r"\b([1-5](?:\.[0-9]+)?)\b", raw_rating) if raw_rating and "not rated" not in raw_rating.lower() else None
     rev_rating = float(m_rate.group(1)) if m_rate else None
 
     rev_cnt = details.get("reviewCount") if details.get("reviewCount") is not None else details.get("review_count")
