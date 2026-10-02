@@ -1651,16 +1651,27 @@ def gyg_edit_product(tour_id: str, data: GygEditIn):
 
 
 class GygCaptureIn(BaseModel):
+    tour_id: str | int | None = None
+    data: dict | None = None
+    operator_email: str | None = None
     sync_id: int | None = None
     account_pk: int | None = None
-    tour_id: str | int | None = None
-    data: dict
-    operator_email: str | None = None
 
 
 class GygBatchCaptureIn(BaseModel):
     items: list[GygCaptureIn]
     operator_email: str | None = None
+    sync_id: int | None = None
+
+
+class GygSyncStartIn(BaseModel):
+    operator_email: str | None = None
+
+
+class GygSyncFinishIn(BaseModel):
+    sync_id: int
+    status: str = "done"
+    message: str | None = None
 
 
 def _process_gyg_capture(con, c: GygCaptureIn):
@@ -1703,9 +1714,11 @@ def _process_gyg_capture(con, c: GygCaptureIn):
             pass
 
     # Save snapshot + diff (strip picture URLs/blobs so no images are stored in database, keeping photo count for change tracing)
+    created_single_sync = False
     sync_id = c.sync_id
     if not sync_id:
         sync_id = db.start_sync(con, account_pk, op_email, host="extension")
+        created_single_sync = True
 
     snap_data = dict(details)
     raw_photos = snap_data.get("photos")
@@ -1749,6 +1762,26 @@ def _process_gyg_capture(con, c: GygCaptureIn):
         snap_data["stops"] = [{"name": s.get("title", ""), "duration": "", "subtitle": s.get("details", "")} for s in itin_val if isinstance(s, dict)]
     elif stops_val and not itin_val:
         snap_data["itinerary"] = [{"title": s.get("name", ""), "details": s.get("subtitle", "")} for s in stops_val if isinstance(s, dict)]
+
+    be = snap_data.get("bookingEngine") or snap_data.get("booking_engine_mode")
+    if be:
+        snap_data["bookingEngine"] = be
+        snap_data["booking_engine_mode"] = be
+
+    au = snap_data.get("availableUntil") or snap_data.get("available_until")
+    if au:
+        snap_data["availableUntil"] = au
+        snap_data["available_until"] = au
+
+    cs = snap_data.get("connectivitySettings") or snap_data.get("connectivity_settings")
+    if cs:
+        snap_data["connectivitySettings"] = cs
+        snap_data["connectivity_settings"] = cs
+
+    cp = snap_data.get("cancellationPolicy") or snap_data.get("cancellation_policy")
+    if cp:
+        snap_data["cancellationPolicy"] = cp
+        snap_data["cancellation_policy"] = cp
 
     if ref_code:
         snap_data["refCode"] = ref_code
@@ -1798,16 +1831,36 @@ def _process_gyg_capture(con, c: GygCaptureIn):
 
     db.bump_sync(con, sync_id, seen=1, changed=n)
     db.mark_done(con, sync_id, tour_code)
+    if created_single_sync:
+        db.finish_sync(con, sync_id, "done", f"Single product {tour_code} captured from extension")
     try:
         con.execute("UPDATE accounts SET last_sync_at=? WHERE id=?", (db.now(), account_pk))
     except Exception:
         pass
-    return {"ok": True, "product_id": pid, "tour_id": tour_id, "changes": n}
+    return {"ok": True, "product_id": pid, "tour_id": tour_id, "changes": n, "sync_id": sync_id}
 
 
 @app.get("/api/ext/status")
 def ext_status():
     return {"ok": True, "service": "Opatrip Trace Backend", "timestamp": db.now()}
+
+
+@app.post("/api/ext/gyg/sync/start")
+def gyg_sync_start(s: GygSyncStartIn):
+    op_email = s.operator_email or "operator@opatrip.com"
+    with db.session() as con:
+        plat_id = db.platform_id(con, "getyourguide") or 2
+        acc = con.execute("SELECT id FROM accounts WHERE viator_account_id LIKE 'gyg_%'").fetchone()
+        account_pk = acc["id"] if isinstance(acc, dict) or hasattr(acc, "__getitem__") else (acc[0] if acc else 1)
+        sync_id = db.start_sync(con, account_pk, op_email, host="extension")
+    return {"ok": True, "sync_id": sync_id}
+
+
+@app.post("/api/ext/gyg/sync/finish")
+def gyg_sync_finish(f: GygSyncFinishIn):
+    with db.session() as con:
+        db.finish_sync(con, f.sync_id, f.status, f.message)
+    return {"ok": True}
 
 
 @app.post("/api/ext/gyg/product/capture")
@@ -1821,15 +1874,38 @@ def gyg_product_capture(c: GygCaptureIn):
 def gyg_products_batch(b: GygBatchCaptureIn):
     results = []
     with db.session() as con:
+        op_email = b.operator_email or "operator@opatrip.com"
+        acc = con.execute("SELECT id FROM accounts WHERE viator_account_id LIKE 'gyg_%'").fetchone()
+        account_pk = acc["id"] if isinstance(acc, dict) or hasattr(acc, "__getitem__") else (acc[0] if acc else 1)
+
+        batch_sync_id = b.sync_id
+        created_batch_sync = False
+        if not batch_sync_id:
+            batch_sync_id = db.start_sync(con, account_pk, op_email, host="extension")
+            created_batch_sync = True
+
+        total_changed = 0
         for item in b.items:
+            item.sync_id = batch_sync_id
             if not item.operator_email and b.operator_email:
                 item.operator_email = b.operator_email
             try:
                 r = _process_gyg_capture(con, item)
                 results.append(r)
+                total_changed += r.get("changes", 0)
             except Exception as e:
                 results.append({"ok": False, "error": str(e), "tour_id": item.tour_id})
-    return {"ok": True, "processed": len(b.items), "success_count": sum(1 for r in results if r.get("ok"))}
+
+        if created_batch_sync:
+            db.finish_sync(con, batch_sync_id, "done", f"Synced batch of {len(b.items)} products from extension")
+
+    return {
+        "ok": True,
+        "processed": len(b.items),
+        "success_count": sum(1 for r in results if r.get("ok")),
+        "sync_id": batch_sync_id,
+        "total_changes": total_changed
+    }
 
 
 @app.get("/api/editable")
