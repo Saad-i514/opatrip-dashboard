@@ -883,8 +883,22 @@ def products(account: str | None = None, q: str | None = None,
                 if allowed else " AND 1=0")
         args += allowed
     if q:
-        sql += " AND (p.title LIKE ? OR p.product_code LIKE ?)"
-        args += [f"%{q}%", f"%{q}%"]
+        q_clean = q.strip()
+        q_like = f"%{q_clean}%"
+        sql += """ AND (
+            LOWER(p.title) LIKE LOWER(?)
+            OR LOWER(p.product_code) LIKE LOWER(?)
+            OR LOWER(COALESCE(p.gyg_reference, '')) LIKE LOWER(?)
+            OR EXISTS (
+                SELECT 1 FROM products sib
+                WHERE sib.tour_id = p.tour_id AND sib.tour_id IS NOT NULL AND (
+                    LOWER(sib.title) LIKE LOWER(?)
+                    OR LOWER(sib.product_code) LIKE LOWER(?)
+                    OR LOWER(COALESCE(sib.gyg_reference, '')) LIKE LOWER(?)
+                )
+            )
+        )"""
+        args += [q_like, q_like, q_like, q_like, q_like, q_like]
     if status:
         sql += " AND p.status=?"
         args.append(status)
@@ -903,7 +917,7 @@ def products(account: str | None = None, q: str | None = None,
     if platform:
         sql += " AND pl.code=?"
         args.append(platform)
-    else:
+    elif not q:
         # Show all Viator products, plus standalone products from other platforms (e.g. GYG) that are not yet mapped to any Viator tour
         sql += """ AND (
             pl.code='viator'
