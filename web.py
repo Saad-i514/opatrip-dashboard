@@ -903,11 +903,24 @@ def products(account: str | None = None, q: str | None = None,
         sql += " AND p.status=?"
         args.append(status)
     if country:
-        sql += " AND a.country=?"
-        args.append(country)
+        sql += """ AND (
+            a.country = ? 
+            OR EXISTS (
+                SELECT 1 FROM products sib 
+                JOIN accounts va ON va.id = sib.account_id 
+                WHERE sib.tour_id = p.tour_id AND sib.tour_id IS NOT NULL AND va.country = ?
+            )
+        )"""
+        args += [country, country]
     if city:
-        sql += " AND p.location=?"
-        args.append(city)
+        sql += """ AND (
+            p.location = ? 
+            OR EXISTS (
+                SELECT 1 FROM products sib 
+                WHERE sib.tour_id = p.tour_id AND sib.tour_id IS NOT NULL AND sib.location = ?
+            )
+        )"""
+        args += [city, city]
     # lifecycle is the CANONICAL status (LIVE/DRAFT/...) — the same word the dashboard
     # cards and the donut use. `status` above is the platform's own raw word, kept so an
     # existing link with ?status=ACTIVE still works.

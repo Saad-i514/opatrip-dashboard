@@ -42,6 +42,22 @@ STATUS_MAP = {
         "REJECTED": "REJECTED",
         "INACTIVE": "REMOVED",
     },
+    "getyourguide": {
+        "BOOKABLE": "LIVE",
+        "ONLINE": "LIVE",
+        "ACTIVE": "LIVE",
+        "REJECTED": "REJECTED",
+        "NOT SUBMITTED": "DRAFT",
+        "NOT YET SUBMITTED": "DRAFT",
+        "DRAFT": "DRAFT",
+        "IN REVIEW": "PENDING",
+        "NEEDS ACTION": "PENDING",
+        "DEACTIVATED": "REMOVED",
+        "NOT BOOKABLE": "REMOVED",
+        "NO AVAILABILITY": "REMOVED",
+        "NO ACTIVE OPTIONS": "REMOVED",
+        "EXPIRING SOON": "REMOVED",
+    },
 }
 
 TASK_TYPES = [
