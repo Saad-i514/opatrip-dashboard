@@ -1353,7 +1353,7 @@ def gyg_product_detail(code: str):
             except Exception:
                 pass
 
-        # Harmonize descriptions and reference codes across camelCase & snake_case
+        # Harmonize descriptions, scalars, options, photos, ratings and reference codes across camelCase & snake_case
         s_desc = cur_snap.get("short_description") or cur_snap.get("shortDescription")
         if s_desc:
             cur_snap["short_description"] = s_desc
@@ -1369,6 +1369,90 @@ def gyg_product_detail(code: str):
             cur_snap["food_and_drinks"] = fd
             cur_snap["foodAndDrinks"] = fd
 
+        guide = cur_snap.get("guide_information") or cur_snap.get("guideInfo") or cur_snap.get("guide_info")
+        if guide:
+            cur_snap["guide_information"] = guide
+            cur_snap["guideInfo"] = guide
+            cur_snap["guide_info"] = guide
+
+        loc = cur_snap.get("starting_location") or cur_snap.get("startingLocation") or prow.get("location")
+        if loc:
+            cur_snap["starting_location"] = loc
+            cur_snap["startingLocation"] = loc
+            cur_snap["location"] = loc
+
+        cut = cur_snap.get("cut_off_time") or cur_snap.get("cutOffTime") or cur_snap.get("cutoff_time")
+        if cut:
+            cur_snap["cut_off_time"] = cut
+            cur_snap["cutOffTime"] = cut
+            cur_snap["cutoff_time"] = cut
+
+        be = cur_snap.get("booking_engine_mode") or cur_snap.get("bookingEngine") or cur_snap.get("booking_engine")
+        if be:
+            cur_snap["booking_engine_mode"] = be
+            cur_snap["bookingEngine"] = be
+            cur_snap["booking_engine"] = be
+
+        conn = cur_snap.get("connectivity_settings") or cur_snap.get("connectivitySettings") or cur_snap.get("connectivity")
+        if conn:
+            cur_snap["connectivity_settings"] = conn
+            cur_snap["connectivitySettings"] = conn
+            cur_snap["connectivity"] = conn
+
+        ref_pol = cur_snap.get("refund_policy") or cur_snap.get("refundPolicy")
+        if ref_pol:
+            cur_snap["refund_policy"] = ref_pol
+            cur_snap["refundPolicy"] = ref_pol
+
+        avail = cur_snap.get("available_until") or cur_snap.get("availableUntil")
+        if avail:
+            cur_snap["available_until"] = avail
+            cur_snap["availableUntil"] = avail
+
+        rating = cur_snap.get("rating")
+        if rating:
+            cur_snap["rating"] = rating
+
+        rev_count = cur_snap.get("reviewCount") if cur_snap.get("reviewCount") is not None else cur_snap.get("review_count")
+        if rev_count is not None:
+            cur_snap["reviewCount"] = rev_count
+            cur_snap["review_count"] = rev_count
+
+        trans = cur_snap.get("transportation")
+        if trans:
+            cur_snap["transportation"] = trans
+
+        # Important Information
+        cur_snap["emergency_contact"] = cur_snap.get("emergency_contact") or cur_snap.get("emergencyContact") or "No emergency contact number provided"
+        cur_snap["emergencyContact"] = cur_snap["emergency_contact"]
+        cur_snap["pet_policy"] = cur_snap.get("pet_policy") or cur_snap.get("petPolicy") or "This activity doesn't allow pets"
+        cur_snap["petPolicy"] = cur_snap["pet_policy"]
+        cur_snap["mandatory_items"] = cur_snap.get("mandatory_items") or cur_snap.get("mandatoryItems") or "No items provided"
+        cur_snap["mandatoryItems"] = cur_snap["mandatory_items"]
+        cur_snap["whats_not_allowed"] = cur_snap.get("whats_not_allowed") or cur_snap.get("not_allowed") or cur_snap.get("notAllowed") or "No restrictions specified"
+        cur_snap["not_allowed"] = cur_snap["whats_not_allowed"]
+        cur_snap["notAllowed"] = cur_snap["whats_not_allowed"]
+        cur_snap["not_suitable_for"] = cur_snap.get("not_suitable_for") or cur_snap.get("notSuitableFor") or "No restrictions specified"
+        cur_snap["notSuitableFor"] = cur_snap["not_suitable_for"]
+        cur_snap["know_before_you_go"] = cur_snap.get("know_before_you_go") or cur_snap.get("knowBeforeYouGo") or "No extra information provided"
+        cur_snap["knowBeforeYouGo"] = cur_snap["know_before_you_go"]
+        cur_snap["ticket_instructions"] = cur_snap.get("ticket_instructions") or cur_snap.get("ticket_info") or cur_snap.get("ticketVoucherInfo") or "No information provided"
+        cur_snap["ticket_info"] = cur_snap["ticket_instructions"]
+        cur_snap["ticketVoucherInfo"] = cur_snap["ticket_instructions"]
+
+        # Photos
+        photos = cur_snap.get("photos")
+        p_count = cur_snap.get("photos_count") or cur_snap.get("photoCount") or (len(photos) if isinstance(photos, list) else 0)
+        cur_snap["photoCount"] = p_count
+        cur_snap["photos_count"] = p_count
+        if photos:
+            cur_snap["photos"] = photos
+
+        cur_snap["tour_id"] = cur_snap.get("tour_id") or cur_snap.get("tourId") or prow.get("tour_id") or prow.get("product_code")
+        cur_snap["tourId"] = cur_snap["tour_id"]
+        cur_snap["stops"] = cur_snap.get("stops") or cur_snap.get("itinerary") or []
+        cur_snap["itinerary"] = cur_snap["stops"]
+
         ref = prow.get("gyg_reference") or cur_snap.get("reference_code") or cur_snap.get("product_reference_code") or cur_snap.get("refCode")
         if ref:
             cur_snap["reference_code"] = ref
@@ -1379,7 +1463,7 @@ def gyg_product_detail(code: str):
             prow["refCode"] = ref
             prow["gyg_reference"] = ref
 
-    return {"product": prow, "details": cur_snap, "changes": changes, "snapshots": snaps}
+    return {"ok": True, "product": prow, "details": cur_snap, "changes": changes, "snapshots": snaps}
 
 
 _GYG_CATALOG_CACHE = None
@@ -1674,6 +1758,246 @@ class GygSyncFinishIn(BaseModel):
     message: str | None = None
 
 
+
+def normalize_gyg_snapshot(incoming: dict, existing: dict | None = None) -> dict:
+    if not existing:
+        existing = {}
+
+    res = dict(existing)
+
+    # 1. Clean volatile or internal fields from base
+    for k in list(res.keys()):
+        if any(k.startswith(p) for p in ("matched_viator", "change_history_", "mapping_", "unmatched_diagnosis", "viator_matched_", "viator_account_id")) or k in ("isHydrated", "savedAt", "type", "lastCapturedAt", "firstSeenAt", "rejectionReason", "hasDetails", "syncId", "sync_id", "last_captured_timestamp"):
+            res.pop(k, None)
+
+    # 2. Extract values from incoming with fallbacks
+    tour_id = incoming.get("tour_id") or incoming.get("tourId") or res.get("tour_id") or ""
+    ref_code = incoming.get("product_reference_code") or incoming.get("reference_code") or incoming.get("refCode") or incoming.get("referenceCode") or res.get("product_reference_code") or ""
+    title = incoming.get("title") or res.get("title") or ""
+    status = incoming.get("status") or incoming.get("category") or res.get("status") or "Bookable"
+    category = incoming.get("category") or incoming.get("status") or res.get("category") or "Bookable"
+    location = incoming.get("starting_location") or incoming.get("startingLocation") or incoming.get("location") or res.get("starting_location") or ""
+
+    # Descriptions
+    short_desc = incoming.get("short_description") or incoming.get("shortDescription") or res.get("short_description") or ""
+    full_desc = incoming.get("full_description") or incoming.get("fullDescription") or res.get("full_description") or ""
+
+    # Scalars
+    cut_off = incoming.get("cut_off_time") or incoming.get("cutOffTime") or incoming.get("cutoff_time") or res.get("cut_off_time") or ""
+    booking_engine = incoming.get("booking_engine_mode") or incoming.get("bookingEngine") or incoming.get("booking_engine") or res.get("booking_engine_mode") or ""
+    connectivity = incoming.get("connectivity_settings") or incoming.get("connectivitySettings") or incoming.get("connectivity") or res.get("connectivity_settings") or ""
+    available_until = incoming.get("available_until") or incoming.get("availableUntil") or incoming.get("valid_until") or res.get("available_until") or ""
+    refund_policy = incoming.get("refund_policy") or incoming.get("refundPolicy") or res.get("refund_policy") or ""
+    transportation = incoming.get("transportation") or res.get("transportation") or ""
+    food_drinks = incoming.get("food_and_drinks") or incoming.get("foodAndDrinks") or res.get("food_and_drinks") or ""
+    preview_url = incoming.get("preview_url") or incoming.get("previewUrl") or res.get("preview_url") or ""
+
+    # Guide info
+    guide_info = incoming.get("guide_information") or incoming.get("guideInfo") or incoming.get("guide_info")
+    old_guide = res.get("guide_information") or res.get("guideInfo") or res.get("guide_info") or ""
+    if guide_info:
+        if old_guide and (guide_info in old_guide or old_guide in guide_info):
+            guide_info = old_guide
+    else:
+        guide_info = old_guide
+
+    # Important Info / Requirements
+    imp = incoming.get("importantInfo") if isinstance(incoming.get("importantInfo"), dict) else {}
+
+    def resolve_field(incoming_flat_keys, incoming_imp_key, existing_keys, default_values):
+        for k in incoming_flat_keys:
+            if incoming.get(k):
+                val = str(incoming.get(k)).strip()
+                if val:
+                    return val
+        if incoming_imp_key and imp.get(incoming_imp_key):
+            val = str(imp.get(incoming_imp_key)).strip()
+            if val:
+                return val
+        for k in existing_keys:
+            if res.get(k):
+                return str(res.get(k)).strip()
+        return default_values[0] if default_values else ""
+
+    def harmonize_empty(new_val, old_val, empty_equivalents):
+        n_str = (new_val or "").strip()
+        o_str = (old_val or "").strip()
+        if n_str.lower() in [e.lower() for e in empty_equivalents] and o_str.lower() in [e.lower() for e in empty_equivalents]:
+            return old_val
+        return new_val
+
+    empty_std = ["", "none", "none specified", "no information provided", "not specified"]
+    empty_extra = ["", "none", "none specified", "no extra information provided", "no information provided"]
+    empty_items = ["", "none", "none specified", "no items provided", "not specified"]
+    empty_restr = ["", "none", "none specified", "no restrictions specified", "no restrictions"]
+    empty_contact = ["", "none", "none specified", "not provided", "no emergency contact number provided"]
+
+    emerg = resolve_field(["emergency_contact", "emergencyContact"], "emergencyContact", ["emergency_contact"], ["No emergency contact number provided"])
+    emerg = harmonize_empty(emerg, res.get("emergency_contact"), empty_contact)
+
+    pet = resolve_field(["pet_policy", "petPolicy"], "petPolicy", ["pet_policy"], ["This activity doesn't allow pets"])
+
+    know = resolve_field(["know_before_you_go", "knowBeforeYouGo"], "knowBeforeYouGo", ["know_before_you_go"], ["None specified"])
+    know = harmonize_empty(know, res.get("know_before_you_go"), empty_extra)
+
+    mand = resolve_field(["mandatory_items", "mandatoryItems"], "mandatoryItems", ["mandatory_items"], ["None specified"])
+    mand = harmonize_empty(mand, res.get("mandatory_items"), empty_items)
+
+    not_all = resolve_field(["whats_not_allowed", "not_allowed", "notAllowed"], "notAllowed", ["whats_not_allowed", "not_allowed"], ["No restrictions specified"])
+    not_all = harmonize_empty(not_all, res.get("whats_not_allowed"), empty_restr)
+
+    not_suit = resolve_field(["not_suitable_for", "notSuitableFor"], "notSuitableFor", ["not_suitable_for"], ["No restrictions specified"])
+    not_suit = harmonize_empty(not_suit, res.get("not_suitable_for"), empty_restr)
+
+    ticket_inst = resolve_field(["ticket_instructions", "ticket_info", "ticketVoucherInfo"], "ticketVoucherInfo", ["ticket_instructions", "ticket_info"], ["None specified"])
+    ticket_inst = harmonize_empty(ticket_inst, res.get("ticket_instructions"), empty_std)
+
+    # Lists
+    highlights = incoming.get("highlights") or res.get("highlights") or []
+    inclusions = incoming.get("inclusions") or res.get("inclusions") or []
+    exclusions = incoming.get("exclusions") or res.get("exclusions") or []
+    keywords = incoming.get("keywords") or res.get("keywords") or []
+    options = incoming.get("options") or res.get("options") or []
+    portal_history = incoming.get("portalHistory") or incoming.get("history") or res.get("portalHistory") or res.get("history") or []
+
+    # Ratings & Review stats
+    rating = incoming.get("rating") or res.get("rating") or "Not rated"
+    review_count = incoming.get("reviewCount") if incoming.get("reviewCount") is not None else (
+        incoming.get("review_count") if incoming.get("review_count") is not None else (
+            res.get("reviewCount") if res.get("reviewCount") is not None else (res.get("review_count") or 0)
+        )
+    )
+    rejection_reason = incoming.get("rejectionReason") or incoming.get("rejection_reason") or res.get("rejectionReason") or res.get("rejection_reason") or ""
+
+    # Options normalization: ensure each option contains all aliases
+    norm_opts = []
+    if options and isinstance(options, list):
+        for idx, opt in enumerate(options):
+            if isinstance(opt, dict):
+                o_id = str(opt.get("option_id") or opt.get("optionId") or opt.get("id") or idx + 1)
+                o_ref = str(opt.get("ref_code") or opt.get("refCode") or opt.get("referenceCode") or opt.get("reference_code") or opt.get("supplierOptionCode") or ref_code or "default")
+                o_title = opt.get("title") or title or f"Option {idx + 1}"
+                o_status = opt.get("status") or status or "Bookable"
+                o_cut = opt.get("cutoff_time") or opt.get("cutOffTime") or opt.get("cutoffTime") or opt.get("cut_off_time") or cut_off or "10 hours"
+                o_type = opt.get("type") or opt.get("option_type") or "Standard"
+                o_be = opt.get("booking_engine") or opt.get("bookingEngine") or opt.get("booking_engine_mode") or booking_engine or "Automatically accept new bookings"
+                o_conn = opt.get("connectivity") or opt.get("connectivitySettings") or opt.get("connectivity_settings") or connectivity or "Direct (API / Extranet)"
+                o_avail = opt.get("available_until") or opt.get("availableUntil") or opt.get("validUntil") or opt.get("valid_until") or available_until or ""
+                o_dur = opt.get("duration") or ""
+                o_mp = opt.get("meetingPoint") or opt.get("meeting_point") or ""
+                o_pu = opt.get("pickUp") or opt.get("pickup") or ""
+                o_do = opt.get("dropOff") or opt.get("dropoff") or ""
+                o_lang = opt.get("languages") or ""
+                norm_opts.append({
+                    "id": o_id,
+                    "ref_code": o_ref,
+                    "title": o_title,
+                    "status": o_status,
+                    "cutoff_time": o_cut,
+                    "type": o_type,
+                    "booking_engine": o_be,
+                    "connectivity": o_conn,
+                    "available_until": o_avail,
+                    "duration": o_dur,
+                    "meeting_point": o_mp,
+                    "pickup": o_pu,
+                    "dropoff": o_do,
+                    "languages": o_lang
+                })
+            else:
+                norm_opts.append(opt)
+
+    # Itinerary / Stops handling
+    raw_itin = incoming.get("itinerary")
+    if not raw_itin:
+        raw_itin = [s for s in incoming.get("stops", []) if s.get("name") or s.get("poi") or s.get("title")]
+    if not raw_itin:
+        raw_itin = res.get("stops") or res.get("itinerary") or []
+
+    stops = res.get("stops") or []
+    if raw_itin and isinstance(raw_itin, list):
+        formatted_stops = []
+        for idx, s in enumerate(raw_itin):
+            if isinstance(s, dict):
+                poi_name = (s.get("name") or s.get("poi") or s.get("title") or f"Stop {idx + 1}").strip()
+                dur = (s.get("duration") or "").strip()
+                det = (s.get("subtitle") or s.get("details") or s.get("description") or "").strip()
+                formatted_stops.append({
+                    "name": poi_name,
+                    "duration": dur,
+                    "subtitle": det or (f"Activity ({dur})" if dur else "Activity")
+                })
+        if stops and len(stops) == len(formatted_stops):
+            matched = True
+            for old_st, new_st in zip(stops, formatted_stops):
+                if isinstance(old_st, dict) and isinstance(new_st, dict):
+                    old_name = old_st.get("name", "").strip()
+                    new_name = new_st.get("name", "").strip()
+                    if not old_name and new_name:
+                        matched = False
+                        break
+                    if old_name and not new_name:
+                        continue
+                    old_clean = old_name.rstrip(")").strip().lower()
+                    new_clean = new_name.rstrip(")").strip().lower()
+                    if old_clean and new_clean and old_clean != new_clean and old_clean not in new_clean and new_clean not in old_clean:
+                        matched = False
+                        break
+            if matched:
+                formatted_stops = stops
+        stops = formatted_stops
+
+    photos = incoming.get("photos") or res.get("photos") or []
+    if isinstance(photos, str):
+        photos = []
+
+    # Write clean canonical snapshot
+    clean_res = {
+        "tour_id": str(tour_id),
+        "product_reference_code": str(ref_code),
+        "title": title,
+        "status": status,
+        "category": category,
+        "starting_location": location,
+        "short_description": short_desc,
+        "full_description": full_desc,
+        "cut_off_time": cut_off,
+        "guide_information": guide_info,
+        "booking_engine_mode": booking_engine,
+        "connectivity_settings": connectivity,
+        "refund_policy": refund_policy,
+        "available_until": available_until,
+        "transportation": transportation,
+        "food_and_drinks": food_drinks,
+        "preview_url": preview_url,
+        "rating": rating,
+        "review_count": review_count,
+        "emergency_contact": emerg,
+        "pet_policy": pet,
+        "know_before_you_go": know,
+        "mandatory_items": mand,
+        "whats_not_allowed": not_all,
+        "not_suitable_for": not_suit,
+        "ticket_instructions": ticket_inst,
+        "highlights": list(highlights),
+        "inclusions": list(inclusions),
+        "exclusions": list(exclusions),
+        "keywords": list(keywords)
+    }
+    if norm_opts:
+        clean_res["options"] = norm_opts
+    elif options:
+        clean_res["options"] = options
+    if portal_history:
+        clean_res["portal_history"] = portal_history
+    if stops:
+        clean_res["stops"] = stops
+    if photos:
+        clean_res["photos"] = photos
+
+    return clean_res
+
+
 def _process_gyg_capture(con, c: GygCaptureIn):
     details = c.data or {}
     tour_code = str(c.tour_id or details.get("tourId") or details.get("product_code") or "").strip()
@@ -1720,77 +2044,9 @@ def _process_gyg_capture(con, c: GygCaptureIn):
         sync_id = db.start_sync(con, account_pk, op_email, host="extension")
         created_single_sync = True
 
-    snap_data = dict(details)
-    raw_photos = snap_data.get("photos")
-    if isinstance(raw_photos, list):
-        snap_data["photos_count"] = len(raw_photos)
-        snap_data["photos"] = f"{len(raw_photos)} photos" if len(raw_photos) else "No photos"
-    elif isinstance(raw_photos, (int, str)):
-        snap_data["photos"] = str(raw_photos)
-    snap_data.pop("images", None)
-    snap_data.pop("gallery", None)
-
-    # Harmonize descriptions & reference codes across both camelCase and snake_case
-    s_desc = snap_data.get("short_description") or snap_data.get("shortDescription")
-    if s_desc:
-        snap_data["short_description"] = s_desc
-        snap_data["shortDescription"] = s_desc
-
-    f_desc = snap_data.get("full_description") or snap_data.get("fullDescription") or snap_data.get("description")
-    if f_desc:
-        snap_data["full_description"] = f_desc
-        snap_data["fullDescription"] = f_desc
-
-    fd = snap_data.get("food_and_drinks") or snap_data.get("foodAndDrinks")
-    if fd:
-        snap_data["food_and_drinks"] = fd
-        snap_data["foodAndDrinks"] = fd
-
-    loc_val = snap_data.get("starting_location") or snap_data.get("startingLocation") or snap_data.get("location")
-    if loc_val:
-        snap_data["starting_location"] = loc_val
-        snap_data["startingLocation"] = loc_val
-
-    p_hist = snap_data.get("portalHistory") or snap_data.get("history") or []
-    if p_hist:
-        snap_data["history"] = p_hist
-        snap_data["portalHistory"] = p_hist
-
-    itin_val = snap_data.get("itinerary") or []
-    stops_val = snap_data.get("stops") or []
-    if itin_val and not stops_val:
-        snap_data["stops"] = [{"name": s.get("title", ""), "duration": "", "subtitle": s.get("details", "")} for s in itin_val if isinstance(s, dict)]
-    elif stops_val and not itin_val:
-        snap_data["itinerary"] = [{"title": s.get("name", ""), "details": s.get("subtitle", "")} for s in stops_val if isinstance(s, dict)]
-
-    be = snap_data.get("bookingEngine") or snap_data.get("booking_engine_mode")
-    if be:
-        snap_data["bookingEngine"] = be
-        snap_data["booking_engine_mode"] = be
-
-    au = snap_data.get("availableUntil") or snap_data.get("available_until")
-    if au:
-        snap_data["availableUntil"] = au
-        snap_data["available_until"] = au
-
-    cs = snap_data.get("connectivitySettings") or snap_data.get("connectivity_settings")
-    if cs:
-        snap_data["connectivitySettings"] = cs
-        snap_data["connectivity_settings"] = cs
-
-    cp = snap_data.get("cancellationPolicy") or snap_data.get("cancellation_policy")
-    if cp:
-        snap_data["cancellationPolicy"] = cp
-        snap_data["cancellation_policy"] = cp
-
-    if ref_code:
-        snap_data["refCode"] = ref_code
-        snap_data["reference_code"] = ref_code
-        snap_data["product_reference_code"] = ref_code
-
-    n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, snap_data)
-
-    # Always ensure the latest snapshot in database contains any enriched non-placeholder values
+    # Retrieve existing baseline snapshot first to intelligently harmonize fields and prevent false diffs
+    existing_snap = {}
+    cur_id = None
     try:
         cur_snap_row = con.execute("""SELECT id, normalized_json FROM snapshots
                                       WHERE product_id=? ORDER BY id DESC LIMIT 1""", (pid,)).fetchone()
@@ -1801,13 +2057,20 @@ def _process_gyg_capture(con, c: GygCaptureIn):
                 existing_snap = json.loads(raw_snap or "{}")
             except Exception:
                 existing_snap = {}
-            for k, v in snap_data.items():
-                if v not in (None, "", "—", [], {}):
-                    existing_snap[k] = v
-            con.execute("UPDATE snapshots SET normalized_json=? WHERE id=?",
-                        (json.dumps(existing_snap, ensure_ascii=False), cur_id))
-    except Exception as e:
+    except Exception:
         pass
+
+    clean_prev = normalize_gyg_snapshot(existing_snap, {})
+    if cur_id and clean_prev != existing_snap:
+        try:
+            con.execute("UPDATE snapshots SET normalized_json=? WHERE id=?",
+                        (json.dumps(clean_prev, ensure_ascii=False), cur_id))
+        except Exception:
+            pass
+
+    snap_data = normalize_gyg_snapshot(details, clean_prev)
+
+    n = db.save_snapshot(con, pid, sync_id, account_pk, op_email, snap_data)
 
     # Portal history records
     portal_hist = details.get("portalHistory") or details.get("history") or []

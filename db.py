@@ -557,10 +557,15 @@ def diff(old, new):
     """Field-level changes between two normalized snapshots."""
     a, b = flatten(old or {}), flatten(new or {})
     changes = []
+    old_has_options = bool(old and old.get("options"))
     for path in sorted(set(a) | set(b)):
         if is_volatile(path):
             continue
         ov, nv = a.get(path, None), b.get(path, None)
+        # If the baseline snapshot had no options captured yet, newly captured
+        # options are initial detail hydration rather than an edit.
+        if not old_has_options and path.startswith("options[") and ov is None:
+            continue
         if ov != nv and not same_number(ov, nv):
             changes.append((path, ov, nv))
     return changes
@@ -755,6 +760,26 @@ def save_snapshot(con, product_id, sync_id, account_id, operator_email,
         _log_lifecycle_event(con, product_id, sync_id, account_id, operator_email, t,
                              "_event.draft_completed")
         return 1
+
+    # ---- 1c. GYG stub hydration: the previous snapshot was an unhydrated stub
+    # without options, stops, and descriptions. Capturing full details for the first time
+    # is a baseline hydration, not a batch of fake edits.
+    is_gyg_prev_stub = (
+        ("tour_id" in prev or "product_reference_code" in prev or "tourId" in prev)
+        and not prev.get("options")
+        and not prev.get("short_description")
+        and not prev.get("stops")
+    )
+    is_gyg_now_hydrated = (
+        ("tour_id" in normalized or "product_reference_code" in normalized or "tourId" in normalized)
+        and bool(normalized.get("options") or normalized.get("short_description") or normalized.get("stops"))
+    )
+    if is_gyg_prev_stub and is_gyg_now_hydrated:
+        con.execute("""INSERT INTO snapshots (product_id, sync_id, captured_at,
+                                              normalized_json, raw_network_json)
+                       VALUES (?,?,?,?,?)""",
+                    (product_id, sync_id, t, payload, raw_json))
+        return 0
 
     rows = diff(prev, normalized)
 

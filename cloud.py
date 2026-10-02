@@ -10,6 +10,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 ENV_PATH = ROOT / ".env"
+if not ENV_PATH.is_file() and (ROOT.parent / "audit" / ".env").is_file():
+    ENV_PATH = ROOT.parent / "audit" / ".env"
+elif not ENV_PATH.is_file() and (ROOT.parent / ".env").is_file():
+    ENV_PATH = ROOT.parent / ".env"
 
 
 def load_env(path=ENV_PATH):

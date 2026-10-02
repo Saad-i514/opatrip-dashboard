@@ -21,6 +21,10 @@ export function normalizeGygProductData(p) {
   p.product_reference_code = ref;
   p.refCode = ref;
 
+  // Status & Category
+  p.status = p.status || p.category || 'Bookable';
+  p.category = p.category || p.status || 'Bookable';
+
   // Short description
   const sDesc = p.short_description || p.shortDescription || '';
   p.short_description = sDesc;
@@ -40,7 +44,7 @@ export function normalizeGygProductData(p) {
   }
 
   // Food & Drinks
-  const food = p.food_and_drinks || p.foodAndDrinks || '';
+  const food = p.food_and_drinks || p.foodAndDrinks || 'No food or drinks included in this product';
   p.food_and_drinks = food;
   p.foodAndDrinks = food;
 
@@ -50,20 +54,92 @@ export function normalizeGygProductData(p) {
   p.startingLocation = loc;
 
   // Guide info
-  const guide = p.guide_info || p.guideInfo || '';
+  const guide = p.guide_information || p.guide_info || p.guideInfo || 'Tour guide';
+  p.guide_information = guide;
   p.guide_info = guide;
   p.guideInfo = guide;
+
+  // Transportation
+  const trans = p.transportation || 'No transportation provided for this product';
+  p.transportation = trans;
+
+  // Rating & Review stats
+  const rating = p.rating || 'Not rated';
+  const revCount = p.reviewCount !== undefined ? p.reviewCount : (p.review_count !== undefined ? p.review_count : 0);
+  p.rating = rating;
+  p.reviewCount = revCount;
+  p.review_count = revCount;
+
+  // Rejection Reason
+  const rej = p.rejection_reason || p.rejectionReason || '';
+  p.rejection_reason = rej;
+  p.rejectionReason = rej;
+
+  // Cut-off time, Booking Engine, Connectivity, Availability, Refund Policy
+  p.cut_off_time = p.cut_off_time || p.cutoff_time || p.cutOffTime || (p.options && p.options[0]?.cut_off_time) || (p.options && p.options[0]?.cutOffTime) || '10 hours';
+  p.cutoff_time = p.cut_off_time;
+  p.cutOffTime = p.cut_off_time;
+
+  p.booking_engine_mode = p.booking_engine_mode || p.booking_engine || p.bookingEngine || (p.options && p.options[0]?.booking_engine) || (p.options && p.options[0]?.bookingEngine) || 'Automatically accept new bookings';
+  p.booking_engine = p.booking_engine_mode;
+  p.bookingEngine = p.booking_engine_mode;
+
+  p.connectivity_settings = p.connectivity_settings || p.connectivity || p.connectivitySettings || (p.options && p.options[0]?.connectivity) || (p.options && p.options[0]?.connectivitySettings) || 'Direct (API / Extranet)';
+  p.connectivity = p.connectivity_settings;
+  p.connectivitySettings = p.connectivity_settings;
+
+  p.available_until = p.available_until || p.availableUntil || (p.options && p.options[0]?.available_until) || (p.options && p.options[0]?.availableUntil) || '';
+  p.availableUntil = p.available_until;
+
+  p.refund_policy = p.refund_policy || p.refundPolicy || 'Standard (24-hour) refund policy: Cancel up to 24 hours in advance for a full refund';
+  p.refundPolicy = p.refund_policy;
+
+  // Photos
+  let photos = p.photos;
+  let photoCount = 0;
+  if (Array.isArray(photos)) {
+    photoCount = photos.length;
+  } else if (typeof photos === 'string' && photos) {
+    const m = photos.match(/^(\d+)\s+photos?$/i);
+    if (m) {
+      photoCount = parseInt(m[1], 10);
+    } else if (photos.startsWith('http')) {
+      photos = [photos];
+      photoCount = 1;
+    }
+  }
+  if (!photoCount) {
+    photoCount = p.photos_count || p.photoCount || 0;
+  }
+  p.photoCount = photoCount;
+  p.photos_count = photoCount;
+  p.photos = Array.isArray(photos) ? photos : (photoCount ? `${photoCount} photos` : 'No photos');
 
   // Important Information
   const imp = (p.importantInfo && typeof p.importantInfo === 'object') ? p.importantInfo :
               (p.important_information && typeof p.important_information === 'object') ? p.important_information : {};
-  p.not_suitable_for = p.not_suitable_for || p.notSuitableFor || imp.notSuitableFor || imp.not_suitable_for || '';
-  p.not_allowed = p.not_allowed || p.notAllowed || p.whats_not_allowed || imp.notAllowed || imp.not_allowed || '';
-  p.pet_policy = p.pet_policy || p.petPolicy || imp.petPolicy || imp.pet_policy || '';
-  p.mandatory_items = p.mandatory_items || p.mandatoryItems || imp.mandatoryItems || imp.mandatory_items || '';
-  p.know_before_you_go = p.know_before_you_go || p.knowBeforeYouGo || imp.knowBeforeYouGo || imp.know_before_you_go || '';
-  p.emergency_contact = p.emergency_contact || p.emergencyContact || imp.emergencyContact || imp.emergency_contact || '';
-  p.ticket_info = p.ticket_info || p.ticket_instructions || p.ticketVoucherInfo || imp.ticketVoucherInfo || imp.ticket_voucher_info || '';
+  p.not_suitable_for = p.not_suitable_for || p.notSuitableFor || imp.notSuitableFor || imp.not_suitable_for || 'No restrictions specified';
+  p.notSuitableFor = p.not_suitable_for;
+
+  p.not_allowed = p.not_allowed || p.notAllowed || p.whats_not_allowed || imp.notAllowed || imp.not_allowed || 'No restrictions specified';
+  p.notAllowed = p.not_allowed;
+  p.whats_not_allowed = p.not_allowed;
+
+  p.pet_policy = p.pet_policy || p.petPolicy || imp.petPolicy || imp.pet_policy || "This activity doesn't allow pets";
+  p.petPolicy = p.pet_policy;
+
+  p.mandatory_items = p.mandatory_items || p.mandatoryItems || imp.mandatoryItems || imp.mandatory_items || 'No items provided';
+  p.mandatoryItems = p.mandatory_items;
+
+  p.know_before_you_go = p.know_before_you_go || p.knowBeforeYouGo || imp.knowBeforeYouGo || imp.know_before_you_go || 'No extra information provided';
+  p.knowBeforeYouGo = p.know_before_you_go;
+
+  p.emergency_contact = p.emergency_contact || p.emergencyContact || imp.emergencyContact || imp.emergency_contact || 'No emergency contact number provided';
+  p.emergencyContact = p.emergency_contact;
+
+  p.ticket_info = p.ticket_info || p.ticket_instructions || p.ticketVoucherInfo || imp.ticketVoucherInfo || imp.ticket_voucher_info || 'No information provided';
+  p.ticket_instructions = p.ticket_info;
+  p.ticketVoucherInfo = p.ticket_info;
 
   // Inclusions & Exclusions
   if (!Array.isArray(p.inclusions)) p.inclusions = p.inclusions ? [String(p.inclusions)] : [];
@@ -71,6 +147,56 @@ export function normalizeGygProductData(p) {
 
   // Keywords
   if (!p.keywords && Array.isArray(p.keyword_list)) p.keywords = p.keyword_list;
+  if (!Array.isArray(p.keywords)) p.keywords = p.keywords ? [String(p.keywords)] : [];
+
+  // Options normalization
+  if (Array.isArray(p.options) && p.options.length) {
+    p.options = p.options.map((opt, idx) => {
+      if (typeof opt !== 'object' || !opt) return opt;
+      const id = String(opt.id || opt.optionId || opt.option_id || idx + 1);
+      const optRef = opt.ref_code || opt.refCode || opt.supplierOptionCode || p.reference_code || 'default';
+      const optTitle = opt.title || opt.sourceText?.title || p.title || `Option ${idx + 1}`;
+      const optStatus = opt.status || p.status || 'Bookable';
+      const cutoff = opt.cutoff_time || opt.cutOffTime || opt.cut_off_time || p.cut_off_time || '10 hours';
+      const optType = opt.type || opt.option_type || 'Standard';
+      const optBe = opt.booking_engine || opt.bookingEngine || opt.booking_engine_mode || p.booking_engine_mode || 'Automatically accept new bookings';
+      const optConn = opt.connectivity || opt.connectivitySettings || opt.connectivity_settings || p.connectivity_settings || 'Direct (API / Extranet)';
+      const avail = opt.available_until || opt.availableUntil || p.available_until || '';
+      const dur = opt.duration || '';
+      const mp = opt.meetingPoint || opt.meeting_point || '';
+      const pu = opt.pickUp || opt.pickup || '';
+      const doff = opt.dropOff || opt.dropoff || '';
+      const langs = opt.languages || '';
+      return {
+        ...opt,
+        id,
+        option_id: id,
+        optionId: id,
+        title: optTitle,
+        ref_code: optRef,
+        refCode: optRef,
+        status: optStatus,
+        cutoff_time: cutoff,
+        cutOffTime: cutoff,
+        cut_off_time: cutoff,
+        type: optType,
+        booking_engine: optBe,
+        bookingEngine: optBe,
+        booking_engine_mode: optBe,
+        connectivity: optConn,
+        connectivity_settings: optConn,
+        connectivitySettings: optConn,
+        available_until: avail,
+        availableUntil: avail,
+        duration: dur,
+        meetingPoint: mp,
+        meeting_point: mp,
+        pickUp: pu,
+        dropOff: doff,
+        languages: langs
+      };
+    });
+  }
 
   // Itinerary & Stops
   let itinList = p.itinerary || p.stops || [];
@@ -102,7 +228,8 @@ export function normalizeGygProductData(p) {
         title: poi || `Stop ${idx + 1}`,
         name: poi || `Stop ${idx + 1}`,
         duration: dur,
-        details: details || 'Activity'
+        details: details || 'Activity',
+        subtitle: details || 'Activity'
       };
     });
   } else if (Array.isArray(itinList)) {
@@ -113,7 +240,8 @@ export function normalizeGygProductData(p) {
           title: stop,
           name: stop,
           duration: '',
-          details: 'Activity'
+          details: 'Activity',
+          subtitle: 'Activity'
         };
       }
       const poiName = stop.poi || stop.title || stop.name || (stop.location && (stop.location.name || stop.location)) || `Stop ${idx + 1}`;
@@ -125,7 +253,8 @@ export function normalizeGygProductData(p) {
         title: poiName,
         name: poiName,
         duration: dur,
-        details: det
+        details: det,
+        subtitle: det
       };
     });
   }
@@ -768,6 +897,34 @@ function renderDrawerContent(scrim, p, closeDrawer) {
               <a href="https://supplier.getyourguide.com/faq" target="_blank" rel="noopener noreferrer" style="color:#2563EB; text-decoration:none; margin-left:4px; font-weight:500;">Read the FAQ to learn more about refund policies.</a>
             </div>
           </div>
+
+          <!-- Photos Card -->
+          <div class="gyg-card">
+            <div class="gyg-card-header">
+              <h2 class="gyg-card-title">Photos (${p.photoCount || (Array.isArray(p.photos) ? p.photos.length : 0)})</h2>
+              <button class="gyg-card-edit-btn" id="gygEditPhotosBtn">
+                Edit
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+              </button>
+            </div>
+            ${Array.isArray(p.photos) && p.photos.length ? `
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(88px, 1fr)); gap:8px;">
+                ${p.photos.slice(0, 6).map((img, idx) => `
+                  <a href="${esc(img)}" target="_blank" style="display:block; border-radius:6px; overflow:hidden; border:1px solid #E5E7EB; background:#f8fafc; height:70px;">
+                    <img src="${esc(img)}" alt="Photo ${idx + 1}" style="width:100%; height:100%; object-fit:cover;" />
+                  </a>
+                `).join('')}
+              </div>
+              ${p.photos.length > 6 ? `
+                <button class="gyg-btn-see-more" id="gygMorePhotosBtn" style="margin-top:8px;">
+                  See all ${p.photos.length} photos
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+              ` : ''}
+            ` : `
+              <div class="gyg-pill-box">${esc(typeof p.photos === 'string' && p.photos ? p.photos : 'No photos uploaded')}</div>
+            `}
+          </div>
         </div>
       </div>
 
@@ -804,11 +961,11 @@ function renderDrawerContent(scrim, p, closeDrawer) {
             <div class="gyg-options-grid">
               <div>
                 <div class="gyg-opt-label">Reference code</div>
-                <div class="gyg-opt-val mono">${esc(opt.ref_code || 'default')}</div>
+                <div class="gyg-opt-val mono">${esc(opt.ref_code || opt.refCode || opt.supplierOptionCode || p.reference_code || 'default')}</div>
               </div>
               <div>
                 <div class="gyg-opt-label">Option ID</div>
-                <div class="gyg-opt-val mono">${esc(opt.id || opt.option_id || '—')}</div>
+                <div class="gyg-opt-val mono">${esc(opt.id || opt.option_id || opt.optionId || '—')}</div>
               </div>
               <div>
                 <div class="gyg-opt-label">Status</div>
@@ -821,23 +978,23 @@ function renderDrawerContent(scrim, p, closeDrawer) {
               </div>
               <div>
                 <div class="gyg-opt-label">Booking Engine</div>
-                <div class="gyg-opt-val">${esc(opt.booking_engine || p.booking_engine || p.booking_engine_mode || 'Automatically accept new bookings')}</div>
+                <div class="gyg-opt-val">${esc(opt.booking_engine || opt.bookingEngine || opt.booking_engine_mode || p.booking_engine_mode || 'Automatically accept new bookings')}</div>
               </div>
               <div>
                 <div class="gyg-opt-label">Cut-off time</div>
-                <div class="gyg-opt-val">${esc(opt.cutoff_time || p.cutoff_time || p.cut_off_time || '10 hours')}</div>
+                <div class="gyg-opt-val">${esc(opt.cutoff_time || opt.cutOffTime || opt.cut_off_time || p.cut_off_time || '10 hours')}</div>
               </div>
               <div>
                 <div class="gyg-opt-label">Type</div>
-                <div class="gyg-opt-val">${esc(opt.type || opt.option_type || p.option_type || 'Standard')}</div>
+                <div class="gyg-opt-val">${esc(opt.type || opt.option_type || 'Standard')}</div>
               </div>
               <div>
                 <div class="gyg-opt-label">Connectivity Settings</div>
-                <div class="gyg-opt-val">${esc(opt.connectivity || p.connectivity || p.connectivity_settings || 'Not connected.')}</div>
+                <div class="gyg-opt-val">${esc(opt.connectivity || opt.connectivitySettings || opt.connectivity_settings || p.connectivity_settings || 'Direct (API / Extranet)')}</div>
               </div>
               <div>
                 <div class="gyg-opt-label">Available until</div>
-                <div class="gyg-opt-val">${esc(opt.available_until || p.available_until || 'Tuesday, January 25th, 2028')}</div>
+                <div class="gyg-opt-val">${esc(opt.available_until || opt.availableUntil || p.available_until || 'Tuesday, January 25th, 2028')}</div>
               </div>
               ${(opt.meetingPoint || opt.meeting_point) ? `
                 <div>

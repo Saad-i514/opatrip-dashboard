@@ -81,10 +81,18 @@ VOLATILE_PREFIXES = (
     "_capture",
     "trackingData", "request.", "meta.", "config.", "prompts",
     "accelerate",
+    "matched_viator", "change_history_", "mapping_", "unmatched_diagnosis",
+    "viator_matched_", "viator_account_id",
+    "importantInfo", "viator_mapping", "linkUrl", "rowPosition",
+    "lastSeenAt", "firstSeenAt", "lastCapturedAt", "savedAt", "hasDetails",
+    "action", "rejectionReason", "itinerary",
 )
 VOLATILE_TOKENS = (
     "sessionId", "lookbackId", "traceId", "requestTimestampUTC", "altSessId",
-    "lastUpdatedAt", "statusStartDate",
+    "lastUpdatedAt", "statusStartDate", "isHydrated", "savedAt",
+    "lastSeenAt", "firstSeenAt", "lastCapturedAt", "hasDetails",
+    "rowPosition", "linkUrl", "action", "rejectionReason", "rejection_reason",
+    "itinerary", "photoCount", "photos_count", "change_history_summary", "matched_viator",
 
     # --- values that describe WHEN WE LOOKED, not the product -------------------
     # Each was checked against the real data before being added here; the row counts
